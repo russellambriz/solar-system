@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-09: Milky Way update
+
+### Added
+- **Milky Way sky band**: a glowing band across the background sky, generated in code (shader). It's oriented realistically: the galactic plane is tilted ~60° to the ecliptic, and the galactic center is toward Sagittarius (ecliptic longitude ~266.8°). It has a brighter core and bulge, a dark "Great Rift" dust lane, soft mottling, and 9,000 extra faint stars concentrated along the band (4,000 on touch devices). It's drawn as a large inside-out sphere that follows the camera, so it stays at "infinity".
+- **Milky Way toggle**: checkbox in Controls to show or hide the sky band.
+- **Galaxy view**: a zoomed-out view of the whole Milky Way, built from particles: a barred spiral with 4 arms (2 major, 2 minor), a central bulge and bar, yellowish core to bluish arms, pink star-forming regions, dark dust lanes, a disk glow and an Orion Spur.
+  - A pulsing **"You are here: Sun"** marker sits in the Orion Spur ~26,000 light-years from the center, plus a "Galactic center · Sgr A*" label.
+  - Tap or click the galaxy (or the marker) for an info panel: diameter ~100,000 ly, ~100–400 billion stars, the Sun's distance from the center, its ~230-million-year orbit, and a fun fact.
+  - Ways in: the **🌌 Galaxy view** button, the `G` key, or zooming / pinching far out past Neptune. Ways back: the **☀ Solar System** button, `Esc`, ⟲ Overview, tapping a planet in the list, or zooming / pinching all the way in.
+  - Smooth transition: the camera flies out, fades to black, swaps scenes and flies in.
+  - The galaxy is a separate scene with its own units (1 unit = 100 ly) and its own camera near/far range, so there are no floating-point or depth precision problems.
+  - An on-screen note explains that the scale is wildly compressed.
+- New module `galaxy.js`, which holds the sky band and galaxy generation.
+
+### Changed
+- Zooming out is now capped at 900 units in the Solar System view; reaching the cap opens the galaxy view.
+- Touch devices draw fewer galaxy particles (26,000 instead of 65,000 stars, 3,500 instead of 9,000 dust particles).
+- The info panel's row titles now change with what's selected (planet or galaxy).
+- On touch devices, the hint text in Controls hides while an info panel is open, so the two panels don't overlap.
+
 ## 2026-10-09
 
 ### Added: initial build

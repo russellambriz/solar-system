@@ -56,15 +56,21 @@
         <button id="pause-btn" title="Space">⏸ Pause</button>
         <button id="overview-btn" title="Esc">⟲ Overview</button>
       </div>
+      <div class="row buttons">
+        <button id="galaxy-btn" title="G">🌌 Galaxy view</button>
+      </div>
       <label class="row toggle"><input type="checkbox" id="toggle-orbits" checked /> Orbit lines</label>
       <label class="row toggle"><input type="checkbox" id="toggle-labels" checked /> Labels</label>
+      <label class="row toggle"><input type="checkbox" id="toggle-milkyway" checked /> Milky Way (sky band)</label>
       <div class="help help-desktop">
         <b>Drag</b> rotate · <b>Scroll</b> zoom · <b>Right-drag</b> pan<br />
-        <b>Click</b> a planet to follow it · <b>Esc</b> overview · <b>Space</b> pause
+        <b>Click</b> a planet to follow it · <b>Esc</b> overview · <b>Space</b> pause<br />
+        <b>Zoom far out</b> or <b>G</b> for the galaxy view
       </div>
       <div class="help help-touch">
         <b>1 finger</b> rotate · <b>Pinch</b> zoom · <b>2 fingers</b> pan<br />
-        <b>Tap</b> a planet, label or name to follow it · <b>⟲ Overview</b> to return
+        <b>Tap</b> a planet, label or name to follow it · <b>⟲ Overview</b> to return<br />
+        <b>Pinch far out</b> or tap <b>🌌 Galaxy view</b> to see the Milky Way
       </div>
     </div>
   </div>
@@ -75,10 +81,10 @@
     <h2 id="info-name">Planet</h2>
     <div id="info-type" class="subtitle"></div>
     <table>
-      <tr><th>Diameter</th><td id="info-diameter"></td></tr>
+      <tr><th id="info-diameter-label">Diameter</th><td id="info-diameter"></td></tr>
       <tr><th id="info-distance-label">Distance from Sun</th><td id="info-distance"></td></tr>
-      <tr><th>Orbital period</th><td id="info-period"></td></tr>
-      <tr><th>Day length</th><td id="info-day"></td></tr>
+      <tr><th id="info-period-label">Orbital period</th><td id="info-period"></td></tr>
+      <tr><th id="info-day-label">Day length</th><td id="info-day"></td></tr>
     </table>
     <p id="info-fact"></p>
   </div>
@@ -89,6 +95,16 @@
     Orbital periods are correctly proportional; self-rotation is slowed 50× for visibility. Orbits are drawn as circles in one plane;
     planet positions are approximate mean longitudes for the shown date.
   </div>
+
+  <!-- Galaxy view: scale note -->
+  <div id="galaxy-note">
+    <b>Galaxy view: scale is wildly compressed.</b> 1 grid unit ≈ 100 light-years. At this scale the whole Solar System
+    (out to Neptune, ~0.0005 light-years across) would be far smaller than a single pixel, so the Sun marker is hugely exaggerated.
+    Particles stand in for billions of stars; the galaxy's rotation is sped up by trillions of times. Zoom in, press Esc or tap ☀ Solar System to go back.
+  </div>
+
+  <!-- Black fade used during the solar ⇄ galaxy transition -->
+  <div id="fade"></div>
 
   <script type="module" src="./main.js"></script>
 </body>

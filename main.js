@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { createSkyBand, createGalaxy, GALAXY_INFO } from './galaxy.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -71,7 +72,8 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 2;
-controls.maxDistance = 1200;
+const SOLAR_MAX_DIST = 900;          // zooming out to this distance switches to the galaxy view
+controls.maxDistance = SOLAR_MAX_DIST;
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.12));
 const sunLight = new THREE.PointLight(0xfff2dd, 3.2, 0, 0); // decay 0: no falloff, so outer planets stay visible
@@ -274,7 +276,7 @@ const orbitLines = [];
 
 function addLabel(parent, text, yOffset, small = false) {
   const el = document.createElement('div');
-  el.className = 'label' + (small ? ' small' : '');
+  el.className = 'label solar-label' + (small ? ' small' : '');
   el.textContent = text;
   const obj = new CSS2DObject(el);
   obj.position.set(0, yOffset, 0);
@@ -385,6 +387,17 @@ for (const p of PLANETS) {
     size: 7, vertexColors: true, map: new THREE.CanvasTexture(dot), transparent: true, depthWrite: false, sizeAttenuation: true })));
 }
 
+// Milky Way sky band (galactic plane tilted ~60° to the ecliptic, center toward Sagittarius)
+const skyBand = createSkyBand({ isTouch: IS_TOUCH, renderer });
+scene.add(skyBand.group);
+
+// Galaxy view lives in its own scene with its own units (1 unit = 100 ly) → no float/depth precision issues
+const galaxy = createGalaxy({ isTouch: IS_TOUCH });
+const GALAXY_POS = new THREE.Vector3(0, 620, 720);
+const GALAXY_MIN_DIST = 90, GALAXY_MAX_DIST = 3000;
+let activeScene = scene;
+let mode = 'solar';                  // 'solar' | 'galaxy' | 'transit'
+
 // ---------------------------------------------------------------------------
 // UI
 // ---------------------------------------------------------------------------
@@ -414,10 +427,13 @@ speedSlider.addEventListener('input', () => { paused = false; updateSpeed(); });
 pauseBtn.addEventListener('click', togglePause);
 $('toggle-orbits').addEventListener('change', (e) => orbitLines.forEach((l) => (l.visible = e.target.checked)));
 $('toggle-labels').addEventListener('change', (e) => (labelRenderer.domElement.style.display = e.target.checked ? '' : 'none'));
-$('overview-btn').addEventListener('click', () => goOverview());
-$('close-info').addEventListener('click', () => goOverview());
+$('toggle-milkyway').addEventListener('change', (e) => (skyBand.group.visible = e.target.checked));
+$('overview-btn').addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy() : goOverview()));
+$('galaxy-btn').addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy() : enterGalaxy()));
+$('close-info').addEventListener('click', () => (mode === 'galaxy' ? hideInfo() : goOverview()));
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') goOverview();
+  if (e.key === 'Escape') { if (mode === 'galaxy') exitGalaxy(); else if (mode === 'solar') goOverview(); }
+  if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey) { if (mode === 'galaxy') exitGalaxy(); else enterGalaxy(); }
   if (e.code === 'Space' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') { e.preventDefault(); togglePause(); }
 });
 updateSpeed();
@@ -428,7 +444,7 @@ for (const b of bodies) {
   const btn = document.createElement('button');
   btn.innerHTML = `<span class="dot" style="background:${b.info.color}"></span>${b.name}`;
   if (b.isMoon) btn.style.paddingLeft = '22px';
-  btn.addEventListener('click', () => focusOn(b));
+  btn.addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy(() => focusOn(b)) : mode === 'solar' && focusOn(b)));
   b.button = btn;
   list.appendChild(btn);
   b.labelEl.addEventListener('click', (e) => {
@@ -450,8 +466,30 @@ function fmtDay(rotDays) {
   const d = Math.abs(rotDays), retro = rotDays < 0 ? ' (retrograde)' : '';
   return (d < 2 ? `${(d * 24).toFixed(1)} hours` : `${d.toFixed(1)} Earth days`) + retro;
 }
+function setRowLabels(a, b, c, d) {
+  $('info-diameter-label').textContent = a; $('info-distance-label').textContent = b;
+  $('info-period-label').textContent = c; $('info-day-label').textContent = d;
+}
+function openInfoPanel() {
+  $('info-panel').classList.remove('hidden');
+  $('info-panel').scrollTop = 0;
+  document.body.classList.add('info-open');
+}
+function hideInfo() {
+  $('info-panel').classList.add('hidden');
+  document.body.classList.remove('info-open');
+}
+function showGalaxyInfo() {
+  const g = GALAXY_INFO;
+  $('info-name').textContent = g.name; $('info-name').style.color = g.color; $('info-type').textContent = g.type;
+  setRowLabels(...g.rows.map((r) => r[0]));
+  ['info-diameter', 'info-distance', 'info-period', 'info-day'].forEach((id, k) => ($(id).textContent = g.rows[k][1]));
+  $('info-fact').textContent = '💡 ' + g.fact;
+  openInfoPanel();
+}
 function showInfo(b) {
   const i = b.info;
+  setRowLabels('Diameter', 'Distance from Sun', 'Orbital period', 'Day length');
   $('info-name').textContent = i.name;
   $('info-name').style.color = i.color;
   $('info-type').textContent = i.type;
@@ -473,9 +511,7 @@ function showInfo(b) {
     $('info-day').textContent = fmtDay(i.rotation);
   }
   $('info-fact').textContent = '💡 ' + i.fact;
-  $('info-panel').classList.remove('hidden');
-  $('info-panel').scrollTop = 0;
-  document.body.classList.add('info-open');
+  openInfoPanel();
 }
 
 // ---------------------------------------------------------------------------
@@ -512,6 +548,19 @@ function pick(clientX, clientY, slopPx) {
   return best;
 }
 
+// Galaxy view picking: did the tap land on the galactic disk (ray ∩ galactic plane within the radius)?
+const galaxyPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+function pickGalaxy(clientX, clientY) {
+  const r = renderer.domElement.getBoundingClientRect();
+  pointer.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.ray.intersectPlane(galaxyPlane, _proj);
+  return !!hit && hit.length() < galaxy.R * 1.1;
+}
+for (const lab of galaxy.labelEls) {
+  lab.addEventListener('click', (e) => { e.stopPropagation(); if (mode === 'galaxy') showGalaxyInfo(); });
+}
+
 // Tap-vs-drag detection with pointer events (works for mouse, touch and pen).
 const activePointers = new Set();
 let tap = null; // { id, x, y, t }
@@ -525,7 +574,8 @@ el.addEventListener('pointerdown', (e) => {
 el.addEventListener('pointermove', (e) => {
   if (tap && e.pointerId === tap.id && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > TAP_SLOP()) tap = null;
   if (e.pointerType === 'mouse' && !e.buttons) {
-    hovered = pick(e.clientX, e.clientY, 8);
+    if (mode === 'galaxy') { hovered = null; el.style.cursor = pickGalaxy(e.clientX, e.clientY) ? 'pointer' : 'grab'; return; }
+    hovered = mode === 'solar' ? pick(e.clientX, e.clientY, 8) : null;
     el.style.cursor = hovered ? 'pointer' : 'grab';
   }
 });
@@ -534,7 +584,8 @@ const endPointer = (e) => {
   if (e.type !== 'pointerup' || !tap || e.pointerId !== tap.id) { if (e.type !== 'pointerup') tap = null; return; }
   const ok = performance.now() - tap.t < 600 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) <= TAP_SLOP();
   tap = null;
-  if (!ok) return;
+  if (!ok || mode === 'transit') return;
+  if (mode === 'galaxy') { if (pickGalaxy(e.clientX, e.clientY)) showGalaxyInfo(); return; }
   const b = pick(e.clientX, e.clientY, e.pointerType === 'mouse' ? 10 : 28);
   if (b) focusOn(b);
 };
@@ -564,7 +615,7 @@ for (const btn of document.querySelectorAll('.collapse-btn')) {
 // ---------------------------------------------------------------------------
 const labelOrder = [...bodies].sort((a, b) => b.radius - a.radius);
 function declutterLabels() {
-  if (labelRenderer.domElement.style.display === 'none') return;
+  if (labelRenderer.domElement.style.display === 'none' || activeScene !== scene) return;
   const w = window.innerWidth, h = window.innerHeight;
   const ordered = labelOrder.slice().sort((a, b) => prio(b) - prio(a));
   const placed = [];
@@ -616,21 +667,96 @@ function goOverview() {
   transition = { fromCam: camera.position.clone(), fromTarget: controls.target.clone(), t: 0, overview: true };
   controls.minDistance = 2;
   bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); });
-  $('info-panel').classList.add('hidden');
-  document.body.classList.remove('info-open');
+  hideInfo();
+}
+
+// ---------------------------------------------------------------------------
+// Solar System ⇄ Galaxy transitions
+// Fly out → fade to black → swap scene + camera range → fade in → fly to the destination.
+// ---------------------------------------------------------------------------
+const fadeEl = $('fade');
+function flyTo(goalCam, goalTarget, duration, onDone) {
+  transition = { fly: true, fromCam: camera.position.clone(), fromTarget: controls.target.clone(), t: 0,
+    goalCam: goalCam.clone(), goalTarget: goalTarget.clone(), duration, onDone };
+}
+function setCameraRange(near, far) { camera.near = near; camera.far = far; camera.updateProjectionMatrix(); }
+function beginTransit() {
+  mode = 'transit';
+  controls.enabled = false;
+  controls.minDistance = 0; controls.maxDistance = Infinity;
+  hovered = null;
+  hideInfo();
+}
+function updateGalaxyButton() {
+  const g = activeScene === galaxy.scene;
+  $('galaxy-btn').textContent = g ? '☀ Solar System' : '🌌 Galaxy view';
+  document.body.classList.toggle('galaxy-mode', g);
+}
+
+function enterGalaxy() {
+  if (mode !== 'solar') return;
+  focused = null;
+  bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); });
+  beginTransit();
+  const dir = tmp.subVectors(camera.position, controls.target).normalize();
+  if (dir.lengthSq() < 0.5) dir.set(0, 0.5, 0.86);
+  setTimeout(() => fadeEl.classList.add('on'), 550);
+  flyTo(controls.target.clone().addScaledVector(dir, 2200), new THREE.Vector3(), 1.0, () => {
+    // swap to the galaxy scene: start close to the Sun marker, then pull back to the full galaxy
+    activeScene = galaxy.scene;
+    setCameraRange(1, 20000);
+    updateGalaxyButton();
+    const sun = galaxy.sunWorldPos();
+    controls.target.copy(sun);
+    camera.position.copy(sun).add(new THREE.Vector3(0, 18, 30));
+    fadeEl.classList.remove('on');
+    flyTo(GALAXY_POS, new THREE.Vector3(), 2.4, () => {
+      mode = 'galaxy';
+      controls.minDistance = GALAXY_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST;
+      controls.enabled = true;
+    });
+  });
+}
+
+function exitGalaxy(after) {
+  if (mode !== 'galaxy') return;
+  beginTransit();
+  const sun = galaxy.sunWorldPos();
+  const dir = tmp.subVectors(camera.position, sun).normalize();
+  setTimeout(() => fadeEl.classList.add('on'), 1100);
+  flyTo(sun.clone().addScaledVector(dir, 25), sun, 1.6, () => {
+    activeScene = scene;
+    setCameraRange(0.05, 6000);
+    updateGalaxyButton();
+    controls.target.set(0, 0, 0);
+    camera.position.copy(OVERVIEW_POS).normalize().multiplyScalar(2200);
+    fadeEl.classList.remove('on');
+    flyTo(OVERVIEW_POS, new THREE.Vector3(), 1.9, () => {
+      mode = 'solar';
+      controls.minDistance = 2; controls.maxDistance = SOLAR_MAX_DIST;
+      controls.enabled = true;
+      if (after) after();
+    });
+  });
 }
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 function updateCamera(dt) {
   if (transition) {
-    transition.t = Math.min(1, transition.t + dt / 1.6);
+    transition.t = Math.min(1, transition.t + dt / (transition.duration || 1.6));
     const e = ease(transition.t);
     let goalTarget, goalCam;
-    if (transition.overview) { goalTarget = new THREE.Vector3(); goalCam = OVERVIEW_POS; }
+    if (transition.fly) { goalTarget = transition.goalTarget; goalCam = transition.goalCam; }
+    else if (transition.overview) { goalTarget = new THREE.Vector3(); goalCam = OVERVIEW_POS; }
     else { goalTarget = bodyWorldPos(focused, new THREE.Vector3()); goalCam = goalTarget.clone().add(transition.offset); }
     controls.target.lerpVectors(transition.fromTarget, goalTarget, e);
     camera.position.lerpVectors(transition.fromCam, goalCam, e);
-    if (transition.t >= 1) { transition = null; if (focused) bodyWorldPos(focused, lastFocusPos); }
+    if (transition.t >= 1) {
+      const done = transition.onDone;
+      transition = null;
+      if (focused) bodyWorldPos(focused, lastFocusPos);
+      if (done) done();
+    }
   } else if (focused) {
     // follow: shift camera and target by the body's motion; user can still orbit/zoom around it
     const p = bodyWorldPos(focused, tmp);
@@ -674,10 +800,17 @@ function animate() {
   scene.updateMatrixWorld();
   updateCamera(dt);
   controls.update();
+  // zoom-based switching between views
+  if (!transition) {
+    if (mode === 'solar' && controls.getDistance() >= SOLAR_MAX_DIST * 0.99) enterGalaxy();
+    else if (mode === 'galaxy' && controls.getDistance() <= GALAXY_MIN_DIST * 1.02) exitGalaxy();
+  }
+  if (activeScene === scene) skyBand.update(camera);
+  else galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0);
   dateEl.textContent = 'Date: ' + new Date(simTime).toISOString().slice(0, 10) + (paused || daysPerSecond === 0 ? '  ⏸' : '');
-  renderer.render(scene, camera);
+  renderer.render(activeScene, camera);
   declutterLabels();
-  labelRenderer.render(scene, camera);
+  labelRenderer.render(activeScene, camera);
 }
 
 function onResize() {
@@ -685,15 +818,18 @@ function onResize() {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   labelRenderer.setSize(window.innerWidth, window.innerHeight);
+  // galaxy point sprites: pixels per world unit at distance 1
+  galaxy.setScale(window.innerHeight * renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)));
 }
 window.addEventListener('resize', onResize);
 window.addEventListener('orientationchange', () => setTimeout(onResize, 250)); // iOS reports new size a bit late
 
 updateBodies();
+onResize();
 animate();
 const loading = $('loading');
 loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { THREE, scene, camera, controls, bodies, focusOn, goOverview };
+window.solar = { THREE, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
