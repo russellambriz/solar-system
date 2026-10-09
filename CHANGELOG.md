@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-09: Moon visibility update
+
+### Changed
+- **The Moon is now clearly visible orbiting Earth.** Its orbit radius went from 2.6× to 3.4× Earth's radius (~3.2 units), and it's drawn at half Earth's size. Both are exaggerated on purpose; the real Moon is 0.27× Earth's diameter and ~30 Earth-diameters away, which at this compressed scale would put it inside Earth. The scaling note now says so.
+- The Moon has a slightly brighter orbit ring around Earth. It follows Earth and is toggled with "Orbit lines".
+- **Focusing Earth** now pulls the camera back far enough to show the whole Moon orbit. Earth's and the Moon's labels are always shown together when either one is focused. In the far overview the Moon label can still hide behind Earth's, and it comes back as you zoom in.
+- The Moon has a faint glow so its night side isn't pitch black. It still always shows the same face to Earth, and it laps Earth in ~2.7 s at the default 10 days/s.
+- **Easier tapping of fast-moving bodies:** picking also checks where each body was over the last ~400 ms. So tapping the Moon (or anything moving quickly on screen) where you just saw it still selects it, on iPad and desktop.
+
 ## 2026-10-09: Milky Way update
 
 ### Added

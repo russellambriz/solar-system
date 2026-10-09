@@ -6,7 +6,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 
 ## Features
 - The Sun (glowing, and it's the light source) plus all 8 planets in the right order, with correctly proportional orbital periods
-- Real axial tilts and day lengths (spin is slowed 50× so you can see it), Saturn's and Uranus's rings, and Earth's Moon and clouds
+- Real axial tilts and day lengths (spin is slowed 50× so you can see it), Saturn's and Uranus's rings, Earth's clouds, and the Moon clearly orbiting Earth with its own orbit ring
 - Click or tap any planet to fly to it and follow it, with an info panel: diameter, distance from the Sun (AU), orbital period, day length and a fun fact
 - Time speed slider (paused up to about 2.7 years per second), checkboxes for orbit lines and labels, and collapsible panels
 - **Milky Way**: a glowing galactic band across the sky, tilted realistically to the planets' orbital plane (toggle it in Controls)

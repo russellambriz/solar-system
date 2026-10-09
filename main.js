@@ -343,18 +343,20 @@ for (const p of PLANETS) {
     tiltGroup.add(clouds);
     body.clouds = clouds;
 
-    // Moon
-    const moonDist = radius * 2.6;
+    // Moon — size and distance exaggerated so it's clearly visible: real Moon is 0.27× Earth's diameter and
+    // ~30 Earth diameters away (which at our compressed scale would sit inside Earth's sphere).
+    const moonDist = radius * 3.4;   // ≈ 3.2 units: clearly separated from Earth, still inside the Venus–Mars gap
+    body.moonDist = moonDist;
     const moonPivot = new THREE.Group();
     moonPivot.rotation.z = THREE.MathUtils.degToRad(5.1); // orbit inclination
     group.add(moonPivot);
-    const moonR = scaleRadius(MOON_INFO.diameter) * 0.8;
+    const moonR = radius * 0.5;      // shown at ~half Earth's size (real: 0.27×) so it reads at overview zoom
     const moonGroup = new THREE.Group();
     moonPivot.add(moonGroup);
     const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(moonR, 32, 24),
-      new THREE.MeshStandardMaterial({ map: TEXTURES.Moon(), roughness: 1 }));
+      new THREE.MeshStandardMaterial({ map: TEXTURES.Moon(), roughness: 1, emissive: 0x1a1a1f })); // faint emissive: night side not pitch black
     moonGroup.add(moonMesh);
-    moonPivot.add(orbitLine(moonDist, 0x9aa6c8, 0.22));
+    moonPivot.add(orbitLine(moonDist, 0xb8c4e6, 0.4));  // faint ring around Earth; follows Earth; toggled with "Orbit lines"
     const moonBody = { name: 'Moon', info: MOON_INFO, group: moonGroup, mesh: moonMesh, radius: moonR, moonDist, isMoon: true };
     moonBody.labelEl = addLabel(moonGroup, 'Moon', moonR + 0.5, true);
     addPickSphere(moonGroup, moonR * 0.8, moonBody);
@@ -519,7 +521,7 @@ function showInfo(b) {
 // ---------------------------------------------------------------------------
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
-const _proj = new THREE.Vector3();
+const _proj = new THREE.Vector3(), _hist = new THREE.Vector3();
 let hovered = null;
 
 // Picking: every body gets a score = (screen distance from tap to its center) / (its on-screen radius + finger slop).
@@ -534,13 +536,18 @@ function pick(clientX, clientY, slopPx) {
   let best = null, bestScore = Infinity;
   const fovScale = r.height / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
   for (const b of bodies) {
-    b.group.getWorldPosition(_proj);
-    const dist = _proj.distanceTo(camera.position);
-    _proj.project(camera);
-    if (_proj.z > 1) continue; // behind camera
-    const sx = (_proj.x + 1) / 2 * r.width + r.left, sy = (1 - _proj.y) / 2 * r.height + r.top;
-    const screenR = (b.radius / dist) * fovScale;
-    const centerDist = Math.hypot(sx - clientX, sy - clientY);
+    // Test the body's current position AND where it was over the last ~400 ms: fast movers (the Moon laps Earth
+    // every ~2.7 s at default speed) have moved on by the time a finger lands, so tapping where you saw it still works.
+    let centerDist = Infinity, screenR = 0;
+    for (const wp of [b.group.getWorldPosition(_hist), ...(b.hist || []).map((h) => h.p)]) {
+      const dist = wp.distanceTo(camera.position);
+      _proj.copy(wp).project(camera);
+      if (_proj.z > 1) continue; // behind camera
+      const sx = (_proj.x + 1) / 2 * r.width + r.left, sy = (1 - _proj.y) / 2 * r.height + r.top;
+      const d = Math.hypot(sx - clientX, sy - clientY);
+      if (d < centerDist) { centerDist = d; screenR = (b.radius / dist) * fovScale; }
+    }
+    if (centerDist === Infinity) continue;
     if (centerDist > screenR + slopPx && b !== rayBody) continue;
     const score = centerDist / (screenR + slopPx) * (b === rayBody ? 0.8 : 1);
     if (score < bestScore) { bestScore = score; best = b; }
@@ -627,12 +634,18 @@ function declutterLabels() {
     const lw = (lab._w ||= lab.offsetWidth || lab.textContent.length * 7 + 18), lh = (lab._h ||= lab.offsetHeight || 20);
     const rect = [cx - lw / 2 - 2, cy - lh / 2 - 2, cx + lw / 2 + 2, cy + lh / 2 + 2];
     const hit = placed.some((p) => rect[0] < p[2] && rect[2] > p[0] && rect[1] < p[3] && rect[3] > p[1]);
-    const forced = b === focused || b === hovered;
+    // keep Earth+Moon labels together when either is focused
+    const forced = b === focused || b === hovered || (focused && ((focused.name === 'Earth' && b.isMoon) || (focused.isMoon && b.name === 'Earth')));
     lab.classList.toggle('overlap', hit && !forced);
     if (!hit || forced) placed.push(rect);
   }
 }
-function prio(b) { return b === focused ? 1e6 : b === hovered ? 1e5 : b.name === 'Sun' ? 1e4 : b.radius; }
+function prio(b) {
+  if (b === focused) return 1e6;
+  if (b === hovered) return 1e5;
+  if (focused && ((focused.name === 'Earth' && b.isMoon) || (focused.isMoon && b.name === 'Earth'))) return 5e4;
+  return b.name === 'Sun' ? 1e4 : b.radius;
+}
 
 // ---------------------------------------------------------------------------
 // Camera focus / follow with smooth transitions
@@ -646,7 +659,8 @@ const UP = new THREE.Vector3(0, 1, 0);
 function bodyWorldPos(b, out) { return b.group.getWorldPosition(out); }
 function focusOffset(b, out) {
   const p = bodyWorldPos(b, tmp2);
-  const dist = b.name === 'Sun' ? 32 : b.radius * 6 + 2.5;
+  // Earth: back off far enough that the whole Moon orbit is in frame
+  const dist = b.name === 'Sun' ? 32 : b.name === 'Earth' ? b.moonDist * 3.4 : b.radius * 6 + 2.5;
   if (p.lengthSq() < 1e-6) out.set(0, 0.45, 1);
   else {
     // start from the outward direction, swing ~110° around toward the Sun so we see the lit (day) side
@@ -792,12 +806,25 @@ function updateBodies() {
   }
 }
 
+// short position history per body (used by picking so fast-moving targets are easy to tap)
+function recordHistory() {
+  const now = performance.now();
+  for (const b of bodies) {
+    const h = (b.hist ||= []);
+    const last = h[h.length - 1];
+    if (last && now - last.t < 30) continue;          // sample ~every 30 ms
+    h.push({ t: now, p: b.group.getWorldPosition(new THREE.Vector3()) });
+    while (h.length && now - h[0].t > 400) h.shift();
+  }
+}
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.1);
   if (!paused) simTime += daysPerSecond * dt * DAY_MS;
   updateBodies();
   scene.updateMatrixWorld();
+  recordHistory();
   updateCamera(dt);
   controls.update();
   // zoom-based switching between views
