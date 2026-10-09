@@ -152,6 +152,8 @@ body.galaxy-mode .solar-label, body:not(.galaxy-mode) .galaxy-label-wrap { displ
 body.lg-view #galaxy-note .note-mw, body:not(.lg-view) #galaxy-note .note-lg { display: none; }
 .galaxy-label.off { display: none; }
 .galaxy-label.m31-label { color: #ffe2b0; border-color: rgba(255, 210, 150, 0.6); background: rgba(40, 26, 10, 0.6); pointer-events: auto; cursor: pointer; }
+.galaxy-label.deep-label { color: #ffc6dc; border-color: rgba(255, 150, 190, 0.45); }
+body.lg-view .galaxy-label.deep-label { display: none; }
 .galaxy-label.mw-far { color: #cdd6ff; border-color: rgba(185, 198, 255, 0.6); }
 .galaxy-label.dist-label { color: #aebfff; background: rgba(0, 0, 20, 0.55); transform: none; pointer-events: none !important; }
 body.touch .galaxy-label.dist-label::before { display: none; }

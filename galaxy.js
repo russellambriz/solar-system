@@ -2,6 +2,7 @@
 // Everything is generated in code — no image files.
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { addDeepSpace } from './deepspace.js';
 
 // ---------------------------------------------------------------------------
 // Galactic coordinate frame expressed in our scene's ecliptic frame.
@@ -478,10 +479,13 @@ export function createGalaxy({ isTouch = false } = {}) {
   distLabel.obj.position.copy(SUN_POS).lerp(M31_POS, 0.5);
   scene.add(distLabel.obj);
 
+  // Nebulae, dust clouds, young-star knots, halo globulars and named objects (Orion, Eagle, Carina, Pleiades, ω Cen, M13…)
+  const deep = addDeepSpace({ group, SUN_POS, R }, { isTouch, labels: true });
+
   const tmp = new THREE.Vector3();
   let t = 0;
   return {
-    scene, group, R, SUN_POS, marker, M31_POS, M31_R, m31Dir, m31Minor, m31Normal, andromeda,
+    scene, group, R, SUN_POS, marker, M31_POS, M31_R, m31Dir, m31Minor, m31Normal, andromeda, deep,
     labelEls: [sunLabel.el, centerLabel.el, mwLabel.el],
     m31LabelEls: [m31Label.el, m32Label.el, m110Label.el],
     m31Counts: { stars: NA, dust: NAD },
@@ -497,6 +501,8 @@ export function createGalaxy({ isTouch = false } = {}) {
       const dMW = camera.position.length(), dM31 = camera.position.distanceTo(M31_POS);
       const far = dMW > 4500;
       sunLabel.el.classList.toggle('off', far);
+      deep.update(camera);                                // deep-space labels appear only when the camera is near
+      if (far) for (const o of deep.objects) o.labelEl?.classList.add('off'); // keep the Local Group view uncluttered
       centerLabel.el.classList.toggle('off', far);
       mwLabel.el.classList.toggle('off', !far);
       m32Label.el.classList.toggle('off', dM31 > 6000);

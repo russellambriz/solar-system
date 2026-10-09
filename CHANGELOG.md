@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-09: Nebulae & star clusters in the galaxy view
+
+### Added
+- **Deep-space layer** (new module `deepspace.js`, wired into `galaxy.js`): glowing pink emission nebulae and dark dust clouds along the spiral arms, bright blue young-star knots, and ~150 halo globular clusters around the Milky Way.
+- **Real named objects** at their true positions relative to the Sun (sizes exaggerated so they're visible): Orion Nebula, Pleiades, Eagle, Lagoon, Carina and Crab nebulae, and the globular clusters Omega Centauri, 47 Tucanae, M13, M4, M22, M15 and M3.
+- Labels for these objects fade in only when you zoom near them, and are hidden in the Local Group / Andromeda view.
+- The galaxy scale note mentions that nebulae and clusters are drawn larger than life.
+
+### Performance
+- 4 extra draw calls (instanced billboards + points). iPad uses about a third of the sprites and points and smaller textures.
+
 ## 2026-10-09: Solar flares & close-up Sun
 
 ### Added
