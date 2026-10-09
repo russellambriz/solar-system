@@ -5,6 +5,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { createSkyBand, createGalaxy, GALAXY_INFO, ANDROMEDA_INFO } from './galaxy.js';
 import { createGalileanMesh, createPotatoMesh } from './moons.js';
 import { createSunFX } from './sun.js';
+import { createEarth } from './earth/index.js';
 import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitPoints, createAsteroidBelt, createKuiperBelt,
   surfaceTexture } from './smallbodies.js';
 
@@ -393,10 +394,10 @@ for (const p of PLANETS) {
   bodies.push(body);
 
   if (p.name === 'Earth') {
-    const clouds = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.02, 64, 48),
-      new THREE.MeshStandardMaterial({ map: cloudTexture(), transparent: true, depthWrite: false, roughness: 1 }));
-    tiltGroup.add(clouds);
-    body.clouds = clouds;
+    // real-texture Earth (day/night, ocean glint, clouds + shadows, atmosphere): see earth/index.js
+    const earth = createEarth({ radius, sunLight, isMobile: IS_TOUCH, renderer, mesh });
+    tiltGroup.add(earth.group);
+    body.clouds = earth.clouds; body.earth = earth;   // clouds still spun in updateBodies(); earth.uEarthTint for the Moon
 
     // Moon — size and distance exaggerated so it's clearly visible: real Moon is 0.27× Earth's diameter and
     // ~30 Earth diameters away (which at our compressed scale would sit inside Earth's sphere).
