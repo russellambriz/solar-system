@@ -59,13 +59,16 @@
       <div class="row buttons">
         <button id="galaxy-btn" title="G">🌌 Galaxy view</button>
       </div>
+      <div class="row buttons">
+        <button id="andromeda-btn" title="A">🔭 Andromeda</button>
+      </div>
       <label class="row toggle"><input type="checkbox" id="toggle-orbits" checked /> Orbit lines</label>
       <label class="row toggle"><input type="checkbox" id="toggle-labels" checked /> Labels</label>
       <label class="row toggle"><input type="checkbox" id="toggle-milkyway" checked /> Milky Way (sky band)</label>
       <div class="help help-desktop">
         <b>Drag</b> rotate · <b>Scroll</b> zoom · <b>Right-drag</b> pan<br />
         <b>Click</b> a planet to follow it · <b>Esc</b> overview · <b>Space</b> pause<br />
-        <b>Zoom far out</b> or <b>G</b> for the galaxy view
+        <b>Zoom far out</b> or <b>G</b> for the galaxy view · <b>A</b> Andromeda
       </div>
       <div class="help help-touch">
         <b>1 finger</b> rotate · <b>Pinch</b> zoom · <b>2 fingers</b> pan<br />
@@ -98,9 +101,13 @@
 
   <!-- Galaxy view: scale note -->
   <div id="galaxy-note">
-    <b>Galaxy view: scale is wildly compressed.</b> 1 grid unit ≈ 100 light-years. At this scale the whole Solar System
+    <span class="note-lg"><b>Local Group: true scale.</b> Andromeda is shown at its real distance, ~2.5 million light-years away (about 25 Milky Way
+    diameters), and both galaxies are drawn to scale. Andromeda is ~220,000 ly across, about twice the Milky Way. The dwarf companions M32 and M110
+    are shown in approximate positions. Tap 🌌 Back to Milky Way or press Esc to return.</span>
+    <span class="note-mw"><b>Galaxy view: scale is wildly compressed.</b> 1 grid unit ≈ 100 light-years. At this scale the whole Solar System
     (out to Neptune, ~0.0005 light-years across) would be far smaller than a single pixel, so the Sun marker is hugely exaggerated.
     Particles stand in for billions of stars; the galaxy's rotation is sped up by trillions of times. Zoom in, press Esc or tap ☀ Solar System to go back.
+    Zoom far out (or tap 🔭 Andromeda) to see our neighbor galaxy.</span>
   </div>
 
   <!-- Black fade used during the solar ⇄ galaxy transition -->

@@ -11,6 +11,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 - Time speed slider (paused up to about 2.7 years per second), checkboxes for orbit lines and labels, and collapsible panels
 - **Milky Way**: a glowing galactic band across the sky, tilted realistically to the planets' orbital plane (toggle it in Controls)
 - **Galaxy view**: zoom far out (or press 🌌 Galaxy view) to see the whole Milky Way as a 4-armed barred spiral, with a pulsing "You are here: Sun" marker 26,000 light-years from the center
+- **Andromeda & the Local Group**: zoom even farther out (or press 🔭 Andromeda / `A`) to see the Andromeda Galaxy (M31) with its companions M32 and M110, shown at its true distance of ~2.5 million light-years
 - Distances and sizes are scaled so everything is visible (in the galaxy view, *wildly* so); see the note in the bottom-left corner of the page
 
 ## Controls
@@ -25,6 +26,8 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 | Galaxy view | `G`, 🌌 Galaxy view, or zoom far out | 🌌 Galaxy view, or pinch far out |
 | Back from galaxy | `Esc`, ☀ Solar System, or zoom all the way in | ☀ Solar System, or pinch all the way in |
 | Galaxy info | Click the galaxy or "You are here" | Tap the galaxy or "You are here" |
+| Andromeda | `A`, 🔭 Andromeda, zoom far out from the galaxy, or click it | 🔭 Andromeda, pinch far out, or tap it |
+| Back from Andromeda | `Esc` or 🌌 Back to Milky Way | 🌌 Back to Milky Way |
 | Milky Way sky band on/off | Controls checkbox | Controls checkbox |
 
 ## Run locally
@@ -41,7 +44,7 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 ## Files
 - `index.html`: page layout, plus an import map that loads `three` and its addons from the CDN
 - `main.js`: scene, procedural textures, picking, camera focus/follow, view switching and UI code (commented)
-- `galaxy.js`: Milky Way sky band shader and the particle-based galaxy scene
+- `galaxy.js`: Milky Way sky band shader, the particle-based Milky Way, and Andromeda (M31) with M32/M110
 - `moons.js`: GPU-baked surfaces of the Galilean moons and the potato-shaped Phobos and Deimos
 - `style.css`: dark space-themed UI that adapts to touch screens
 - `.nojekyll`: tells GitHub Pages to serve the files as they are

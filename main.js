@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { createSkyBand, createGalaxy, GALAXY_INFO } from './galaxy.js';
+import { createSkyBand, createGalaxy, GALAXY_INFO, ANDROMEDA_INFO } from './galaxy.js';
 import { createGalileanMesh, createPotatoMesh } from './moons.js';
 
 // ---------------------------------------------------------------------------
@@ -464,7 +464,11 @@ scene.add(skyBand.group);
 // Galaxy view lives in its own scene with its own units (1 unit = 100 ly) → no float/depth precision issues
 const galaxy = createGalaxy({ isTouch: IS_TOUCH });
 const GALAXY_POS = new THREE.Vector3(0, 620, 720);
-const GALAXY_MIN_DIST = 90, GALAXY_MAX_DIST = 3000;
+const GALAXY_MIN_DIST = 90, GALAXY_MAX_DIST = 60000;   // zooming far out reveals the Local Group (Andromeda at its true distance)
+const GALAXY_FAR = 200000;                              // galaxy-scene camera far plane (units of 100 ly)
+const M31_MIN_DIST = 160;
+let galaxyFocus = 'mw';              // what the galaxy-view camera orbits: 'mw' (Milky Way) | 'm31' (Andromeda)
+const LG_MID = galaxy.SUN_POS.clone().lerp(galaxy.M31_POS, 0.5);
 let activeScene = scene;
 let mode = 'solar';                  // 'solar' | 'galaxy' | 'transit'
 
@@ -500,9 +504,14 @@ $('toggle-labels').addEventListener('change', (e) => (labelRenderer.domElement.s
 $('toggle-milkyway').addEventListener('change', (e) => (skyBand.group.visible = e.target.checked));
 $('overview-btn').addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy() : goOverview()));
 $('galaxy-btn').addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy() : enterGalaxy()));
+$('andromeda-btn').addEventListener('click', () => {
+  if (mode === 'solar') enterGalaxy(() => flyToAndromeda());
+  else if (mode === 'galaxy') (galaxyFocus === 'm31' ? flyToMilkyWay() : flyToAndromeda());
+});
 $('close-info').addEventListener('click', () => (mode === 'galaxy' ? hideInfo() : goOverview()));
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { if (mode === 'galaxy') exitGalaxy(); else if (mode === 'solar') goOverview(); }
+  if (e.key === 'Escape') { if (mode === 'galaxy') (galaxyFocus === 'm31' ? flyToMilkyWay() : exitGalaxy()); else if (mode === 'solar') goOverview(); }
+  if ((e.key === 'a' || e.key === 'A') && !e.metaKey && !e.ctrlKey) $('andromeda-btn').click();
   if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey) { if (mode === 'galaxy') exitGalaxy(); else enterGalaxy(); }
   if (e.code === 'Space' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') { e.preventDefault(); togglePause(); }
 });
@@ -551,6 +560,14 @@ function hideInfo() {
 }
 function showGalaxyInfo() {
   const g = GALAXY_INFO;
+  $('info-name').textContent = g.name; $('info-name').style.color = g.color; $('info-type').textContent = g.type;
+  setRowLabels(...g.rows.map((r) => r[0]));
+  ['info-diameter', 'info-distance', 'info-period', 'info-day'].forEach((id, k) => ($(id).textContent = g.rows[k][1]));
+  $('info-fact').textContent = '💡 ' + g.fact;
+  openInfoPanel();
+}
+function showAndromedaInfo() {
+  const g = ANDROMEDA_INFO;
   $('info-name').textContent = g.name; $('info-name').style.color = g.color; $('info-type').textContent = g.type;
   setRowLabels(...g.rows.map((r) => r[0]));
   ['info-diameter', 'info-distance', 'info-period', 'info-day'].forEach((id, k) => ($(id).textContent = g.rows[k][1]));
@@ -636,6 +653,20 @@ function pickGalaxy(clientX, clientY) {
 for (const lab of galaxy.labelEls) {
   lab.addEventListener('click', (e) => { e.stopPropagation(); if (mode === 'galaxy') showGalaxyInfo(); });
 }
+// Andromeda picking: within its projected disk (or a finger-sized zone when it's just a far-away smudge)
+function pickAndromeda(clientX, clientY, slopPx) {
+  const r = renderer.domElement.getBoundingClientRect();
+  _proj.copy(galaxy.M31_POS).project(camera);
+  if (_proj.z > 1) return false;
+  const sx = (_proj.x + 1) / 2 * r.width + r.left, sy = (1 - _proj.y) / 2 * r.height + r.top;
+  const fovScale = r.height / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  const rpx = galaxy.M31_R * 0.6 / camera.position.distanceTo(galaxy.M31_POS) * fovScale;
+  return Math.hypot(sx - clientX, sy - clientY) < rpx + slopPx;
+}
+function onAndromedaTap() { if (galaxyFocus === 'm31') showAndromedaInfo(); else flyToAndromeda(); }
+for (const lab of galaxy.m31LabelEls) {
+  lab.addEventListener('click', (e) => { e.stopPropagation(); if (mode === 'galaxy') onAndromedaTap(); });
+}
 
 // Tap-vs-drag detection with pointer events (works for mouse, touch and pen).
 const activePointers = new Set();
@@ -650,7 +681,7 @@ el.addEventListener('pointerdown', (e) => {
 el.addEventListener('pointermove', (e) => {
   if (tap && e.pointerId === tap.id && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > TAP_SLOP()) tap = null;
   if (e.pointerType === 'mouse' && !e.buttons) {
-    if (mode === 'galaxy') { hovered = null; el.style.cursor = pickGalaxy(e.clientX, e.clientY) ? 'pointer' : 'grab'; return; }
+    if (mode === 'galaxy') { hovered = null; el.style.cursor = pickAndromeda(e.clientX, e.clientY, 8) || pickGalaxy(e.clientX, e.clientY) ? 'pointer' : 'grab'; return; }
     hovered = mode === 'solar' ? pick(e.clientX, e.clientY, 8) : null;
     el.style.cursor = hovered ? 'pointer' : 'grab';
   }
@@ -661,7 +692,11 @@ const endPointer = (e) => {
   const ok = performance.now() - tap.t < 600 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) <= TAP_SLOP();
   tap = null;
   if (!ok || mode === 'transit') return;
-  if (mode === 'galaxy') { if (pickGalaxy(e.clientX, e.clientY)) showGalaxyInfo(); return; }
+  if (mode === 'galaxy') {
+    if (pickAndromeda(e.clientX, e.clientY, e.pointerType === 'mouse' ? 10 : 28)) onAndromedaTap();
+    else if (pickGalaxy(e.clientX, e.clientY)) showGalaxyInfo();
+    return;
+  }
   const b = pick(e.clientX, e.clientY, e.pointerType === 'mouse' ? 10 : 28);
   if (b) focusOn(b);
 };
@@ -779,11 +814,13 @@ function beginTransit() {
 function updateGalaxyButton() {
   const g = activeScene === galaxy.scene;
   $('galaxy-btn').textContent = g ? '☀ Solar System' : '🌌 Galaxy view';
+  $('andromeda-btn').textContent = g && galaxyFocus === 'm31' ? '🌌 Back to Milky Way' : '🔭 Andromeda';
   document.body.classList.toggle('galaxy-mode', g);
 }
 
-function enterGalaxy() {
+function enterGalaxy(after) {
   if (mode !== 'solar') return;
+  galaxyFocus = 'mw';
   focused = null;
   bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); });
   beginTransit();
@@ -793,7 +830,7 @@ function enterGalaxy() {
   flyTo(controls.target.clone().addScaledVector(dir, 2200), new THREE.Vector3(), 1.0, () => {
     // swap to the galaxy scene: start close to the Sun marker, then pull back to the full galaxy
     activeScene = galaxy.scene;
-    setCameraRange(1, 20000);
+    setCameraRange(1, GALAXY_FAR);
     updateGalaxyButton();
     const sun = galaxy.sunWorldPos();
     controls.target.copy(sun);
@@ -803,12 +840,86 @@ function enterGalaxy() {
       mode = 'galaxy';
       controls.minDistance = GALAXY_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST;
       controls.enabled = true;
+      if (after) after();
     });
   });
 }
 
+// Milky Way ⇄ Andromeda: pull back to a Local Group view that shows both galaxies (so you feel the 2.5-million-ly gap),
+// then glide in to the destination.
+function lgView() {
+  const axis = tmp2.subVectors(galaxy.M31_POS, galaxy.SUN_POS).normalize().clone();
+  if (camera.aspect < 1) {
+    // narrow/portrait screens: stand behind the Milky Way and look toward Andromeda —
+    // our galaxy fills the foreground, Andromeda is a small oval far away in the middle of the screen
+    const back = axis.clone().negate();
+    const up = new THREE.Vector3(0, 1, 0).addScaledVector(axis, -axis.y).normalize();
+    back.applyAxisAngle(new THREE.Vector3().crossVectors(up, back).normalize(), -14 * Math.PI / 180);
+    return { cam: back.multiplyScalar(2600), target: galaxy.M31_POS.clone() };
+  }
+  // wide screens: look roughly along Andromeda's disk axis (so it shows as a recognizable spiral, not a sliver),
+  // kept perpendicular-ish to the MW–M31 line and framed to fit both galaxies
+  const side = galaxy.m31Normal.clone().addScaledVector(axis, -galaxy.m31Normal.dot(axis));
+  if (side.y < 0) side.negate();
+  side.normalize().addScaledVector(axis, -0.2).normalize();
+  // keep both galaxies in the middle ~40% of the screen width (clear of the side panels)
+  const fit = 12500 / 0.42 / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / camera.aspect;
+  return { cam: LG_MID.clone().addScaledVector(side, fit), target: LG_MID.clone() };
+}
+const lgPair = () => { const v = lgView(); return [v.cam, v.target]; };
+function galaxyFly(midCam, midTarget, endCam, endTarget, onDone) {
+  beginTransit();
+  glideBase = null;
+  flyTo(midCam, midTarget, 2.6, () => flyTo(endCam, endTarget, 2.6, () => {
+    mode = 'galaxy';
+    controls.enabled = true;
+    if (onDone) onDone();
+  }));
+}
+function flyToAndromeda() {
+  if (mode !== 'galaxy' || galaxyFocus === 'm31') return;
+  // final view: from our side of Andromeda (as we see it from the Milky Way: tilted 77°), slightly above and to one side
+  const toUs = galaxy.m31Dir.clone().negate();
+  const sideways = new THREE.Vector3(0, 1, 0).cross(toUs).normalize();
+  // view close to our own line of sight, so it looks like the famous photos (a long tilted oval), nudged a little for depth
+  const endDir = toUs.clone().addScaledVector(sideways, 0.18).addScaledVector(galaxy.m31Minor, 0.12).normalize();
+  const endDist = galaxy.M31_R * 1.12 / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / Math.min(1, camera.aspect);
+  galaxyFly(...lgPair(), galaxy.M31_POS.clone().addScaledVector(endDir, endDist), galaxy.M31_POS, () => {
+    galaxyFocus = 'm31';
+    controls.minDistance = M31_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST;
+    updateGalaxyButton();
+    showAndromedaInfo();
+  });
+}
+function flyToMilkyWay() {
+  if (mode !== 'galaxy' || galaxyFocus === 'mw') return;
+  galaxyFly(...lgPair(), GALAXY_POS, new THREE.Vector3(), () => {
+    galaxyFocus = 'mw';
+    controls.minDistance = GALAXY_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST;
+    updateGalaxyButton();
+  });
+}
+// While zoomed far out, slide the orbit target from the focused galaxy toward the Local Group midpoint,
+// so zooming out reveals both galaxies (and zooming back in returns to the focused one).
+const _glide = new THREE.Vector3();
+let glideBase = null, glideEnabled = true;                 // orbit target when the glide started (keeps any panning the user did)
+function glideGalaxyTarget() {
+  const d = camera.position.distanceTo(controls.target);
+  if (d < 2500) { glideBase = null; return; }
+  if (!glideBase) glideBase = controls.target.clone();
+  const t = THREE.MathUtils.smoothstep(d, 2500, 26000);
+  _glide.copy(glideBase).lerp(LG_MID, t).sub(controls.target);
+  if (_glide.lengthSq() > 1e-6) { camera.position.add(_glide); controls.target.add(_glide); }
+}
+
 function exitGalaxy(after) {
   if (mode !== 'galaxy') return;
+  if (galaxyFocus === 'm31') { // come home first, then drop into the Solar System
+    galaxyFly(...lgPair(), GALAXY_POS, new THREE.Vector3(), () => {
+      galaxyFocus = 'mw'; updateGalaxyButton(); exitGalaxy(after);
+    });
+    return;
+  }
   beginTransit();
   const sun = galaxy.sunWorldPos();
   const dir = tmp.subVectors(camera.position, sun).normalize();
@@ -905,8 +1016,10 @@ function animate() {
   // zoom-based switching between views
   if (!transition) {
     if (mode === 'solar' && controls.getDistance() >= SOLAR_MAX_DIST * 0.99) enterGalaxy();
-    else if (mode === 'galaxy' && controls.getDistance() <= GALAXY_MIN_DIST * 1.02) exitGalaxy();
+    else if (mode === 'galaxy' && galaxyFocus === 'mw' && controls.getDistance() <= GALAXY_MIN_DIST * 1.02) exitGalaxy();
   }
+  if (mode === 'galaxy' && !transition && glideEnabled) glideGalaxyTarget();
+  if (activeScene === galaxy.scene) document.body.classList.toggle('lg-view', galaxyFocus === 'm31' || camera.position.length() > 4500);
   if (activeScene === scene) skyBand.update(camera);
   else galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0);
   dateEl.textContent = 'Date: ' + new Date(simTime).toISOString().slice(0, 10) + (paused || daysPerSecond === 0 ? '  ⏸' : '');
@@ -934,4 +1047,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
+window.solar = { setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };

@@ -149,6 +149,13 @@ body.galaxy-mode .solar-label, body:not(.galaxy-mode) .galaxy-label-wrap { displ
   background: rgba(0, 0, 0, 0.45); padding: 7px 10px; border-radius: 8px; border-left: 3px solid #b9c6ff;
 }
 #galaxy-note b { color: #cdd6ff; }
+body.lg-view #galaxy-note .note-mw, body:not(.lg-view) #galaxy-note .note-lg { display: none; }
+.galaxy-label.off { display: none; }
+.galaxy-label.m31-label { color: #ffe2b0; border-color: rgba(255, 210, 150, 0.6); background: rgba(40, 26, 10, 0.6); pointer-events: auto; cursor: pointer; }
+.galaxy-label.mw-far { color: #cdd6ff; border-color: rgba(185, 198, 255, 0.6); }
+.galaxy-label.dist-label { color: #aebfff; background: rgba(0, 0, 20, 0.55); transform: none; pointer-events: none !important; }
+body.touch .galaxy-label.dist-label::before { display: none; }
+#andromeda-btn { background: rgba(200, 140, 70, 0.2); border-color: rgba(255, 200, 140, 0.35); }
 body.galaxy-mode #galaxy-note { display: block; }
 body.galaxy-mode #scale-note { display: none; }
 body.galaxy-mode #body-list button { opacity: 0.75; }

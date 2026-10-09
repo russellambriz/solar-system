@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-09: Andromeda Galaxy & Local Group
+
+### Added
+- **Andromeda Galaxy (M31)** in the galaxy view, built from particles: 140,000 stars and 14,000 dust particles on desktop, 50,000 and 5,000 on touch devices.
+  - About 220,000 light-years across, roughly twice the Milky Way.
+  - A big, bright yellowish bulge, two tightly wound spiral arms and its famous slightly off-center "10 kpc" star-forming ring with pink HII regions.
+  - Dark dust lanes along the arms and ring, bluish outer arms and a faint outer disk.
+  - Tilted 77° from face-on as seen from the Milky Way, so it looks like the classic long oval from photos.
+- **Companions M32 and M110**, small elliptical galaxies in roughly their photo positions.
+- **True-scale distance.** Andromeda sits ~2.5 million light-years away (≈ 25 Milky Way diameters) in its real direction on the sky (galactic longitude 121°, latitude −22°). Both galaxies are drawn to scale, so from home it's just a small smudge.
+- **Local Group view.** Zoom (or pinch) far out from the galaxy view and the camera eases back to show both galaxies. It adds labels and a dashed "≈ 2.5 million light-years" line.
+- **🔭 Andromeda button** (or the `A` key), also available from the Solar System view. The camera pulls back to the Local Group, then glides in to Andromeda and opens its info panel. The info covers distance, diameter, ~1 trillion stars, approaching at ~110 km/s, merging in ~4–5 billion years ("Milkomeda") and fun facts.
+- Tap Andromeda (even as a far-away smudge) to fly there.
+- **Ways back:** 🌌 Back to Milky Way, `Esc`, or ☀ Solar System (which goes home via the Milky Way). Zooming all the way into Andromeda never drops you into the Solar System.
+- An on-screen Local Group scale note.
+- On narrow (portrait) screens, the Local Group view looks from behind the Milky Way toward Andromeda, so both stay clear of the side panels.
+
+### Changed
+- The galaxy-view camera far plane went from 20,000 to 200,000 units, and max zoom-out from 3,000 to 60,000 units.
+- Galaxy particles smaller than a pixel now fade by their true area, and galaxy glows strengthen with distance. So far-away galaxies render as smooth, faint smudges instead of noisy sparkles.
+- Background stars now follow the camera, so they stay "at infinity" at any zoom.
+
 ## 2026-10-09: Mars & Jupiter moons
 
 ### Added

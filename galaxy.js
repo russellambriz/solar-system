@@ -152,22 +152,39 @@ export const GALAXY_INFO = {
         'At the center sits Sagittarius A*, a black hole about 4 million times the mass of the Sun.',
 };
 
+export const ANDROMEDA_INFO = {
+  name: 'Andromeda Galaxy (M31)', type: 'Spiral galaxy (type SA(s)b) · our nearest big neighbor', color: '#ffd9a0',
+  rows: [
+    ['Distance', '~2.5 million light-years (≈ 25 Milky Way diameters)'],
+    ['Diameter', '~220,000 light-years (about twice the Milky Way)'],
+    ['Stars', '~1 trillion'],
+    ['Heading our way', 'Approaching at ~110 km/s; it will merge with the Milky Way in ~4–5 billion years'],
+  ],
+  fact: 'The light you see from Andromeda left it about 2.5 million years ago, when the first humans were appearing in Africa. ' +
+        'It is the most distant thing you can see with your bare eyes. It looks like a faint smudge, but it spans about 6 full Moons across the sky. ' +
+        'When it collides with the Milky Way, stars are so far apart that almost none will actually hit each other. The two will blend into one giant elliptical galaxy, nicknamed "Milkomeda".',
+};
+
 const particleVert = /* glsl */`
   attribute float size; attribute vec3 aColor;
   uniform float uScale, uBright;
-  varying vec3 vColor;
+  varying vec3 vColor; varying float vFade;
   void main() {
     vColor = aColor * uBright;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = clamp(size * uScale / -mv.z, 1.0, 64.0);
+    float ps = size * uScale / -mv.z;
+    // a particle smaller than a pixel is drawn as 1 px but dimmed by its true area, so far-away
+    // galaxies fade into a smooth, correctly faint smudge instead of a noisy sparkle
+    vFade = clamp(ps * ps, 0.0, 1.0);
+    gl_PointSize = clamp(ps, 1.0, 64.0);
     gl_Position = projectionMatrix * mv;
   }`;
 const starFrag = /* glsl */`
-  varying vec3 vColor;
-  void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.8); gl_FragColor = vec4(vColor * a, 1.0); }`;
+  varying vec3 vColor; varying float vFade;
+  void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = pow(1.0 - d * 2.0, 1.8); gl_FragColor = vec4(vColor * a * vFade, 1.0); }`;
 const dustFrag = /* glsl */`
-  uniform float uAlpha; varying vec3 vColor;
-  void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = (1.0 - d * 2.0); gl_FragColor = vec4(vColor, a * a * uAlpha); }`;
+  uniform float uAlpha; varying vec3 vColor; varying float vFade;
+  void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; float a = (1.0 - d * 2.0); gl_FragColor = vec4(vColor, a * a * uAlpha * vFade); }`;
 
 function pointCloud(positions, colors, sizes, frag, opts) {
   const geo = new THREE.BufferGeometry();
@@ -296,6 +313,132 @@ export function createGalaxy({ isTouch = false } = {}) {
     scene.add(bg);
   }
 
+
+  // ---------------------------------------------------------------------------
+  // Andromeda (M31) + companions M32 and M110 — placed at their TRUE distance.
+  // 1 unit = 100 ly → 2.5 million ly = 25,000 units (≈ 25 Milky Way diameters); both galaxies' sizes are to scale.
+  // Direction is realistic: galactic longitude 121.2°, latitude −21.6° as seen from the Sun.
+  // ---------------------------------------------------------------------------
+  const M31_DIST = 25000, M31_R = 1100;                         // ~220,000 ly across
+  const gcDir = SUN_POS.clone().negate().normalize();           // Sun → galactic center (l = 0)
+  const l90Dir = new THREE.Vector3(0, 1, 0).cross(gcDir).normalize(); // l = 90° (direction of rotation; +y = north galactic pole)
+  const L = 121.17 * D2R, B = -21.57 * D2R;
+  const m31Dir = gcDir.clone().multiplyScalar(Math.cos(B) * Math.cos(L)).addScaledVector(l90Dir, Math.cos(B) * Math.sin(L)).addScaledVector(new THREE.Vector3(0, 1, 0), Math.sin(B)).normalize();
+  const M31_POS = SUN_POS.clone().addScaledVector(m31Dir, M31_DIST);
+  const andromeda = new THREE.Group();                          // positioned in the (non-rotating) scene
+  andromeda.position.copy(M31_POS);
+  scene.add(andromeda);
+  const m31Disk = new THREE.Group(), m31Normal = new THREE.Vector3();                            // disk lies in local xz; tilted 77° from face-on as seen from us
+  {
+    const los = m31Dir.clone().negate();                        // M31 → Sun
+    let perp = new THREE.Vector3(0, 1, 0).addScaledVector(los, -los.y).normalize();
+    perp.applyAxisAngle(los, 52 * D2R);                         // position angle of the tilt (cosmetic)
+    m31Normal.copy(los).multiplyScalar(Math.cos(77 * D2R)).addScaledVector(perp, Math.sin(77 * D2R)).normalize();
+    m31Disk.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), m31Normal);
+  }
+  // on-sky axes of M31 as seen from us: major axis (line of nodes) and minor axis
+  const m31Los = m31Dir.clone().negate();
+  const m31Major = new THREE.Vector3().crossVectors(m31Normal, m31Los).normalize();
+  const m31Minor = new THREE.Vector3().crossVectors(m31Los, m31Major).normalize();
+  andromeda.add(m31Disk);
+  const m31Spin = new THREE.Group();                            // slow cosmetic rotation about the disk axis
+  m31Disk.add(m31Spin);
+
+  const NA = isTouch ? 50000 : 140000;
+  const apos = new Float32Array(NA * 3), acol = new Float32Array(NA * 3), asize = new Float32Array(NA);
+  const A_BULGE = new THREE.Color(1.0, 0.8, 0.52), A_INNER = new THREE.Color(1.0, 0.88, 0.7), A_OUTER = new THREE.Color(0.55, 0.68, 1.0);
+  const A_PINK = new THREE.Color(1.0, 0.42, 0.62), A_BLUE = new THREE.Color(0.62, 0.78, 1.0);
+  const AK = 1 / Math.tan(9 * D2R);                             // M31's arms are tightly wound (pitch ~9°), almost ring-like
+  const A_ARM0 = 130, RING_R = 330;                             // famous "10 kpc ring" of star formation at ~33,000 ly
+  const aArm = (k, r) => k * Math.PI + AK * Math.log(r / A_ARM0);
+  for (let i = 0; i < NA; i++) {
+    let x, y, z, sz; const u = Math.random();
+    if (u < 0.24) {                                             // big classical bulge, bright yellowish core
+      const r = 50 * Math.pow(-Math.log(1 - Math.random() * 0.999), 1.45);
+      const ct = Math.random() * 2 - 1, ph = Math.random() * Math.PI * 2, st = Math.sqrt(1 - ct * ct);
+      x = r * st * Math.cos(ph); y = r * ct * 0.7; z = r * st * Math.sin(ph);
+      c.copy(A_BULGE).multiplyScalar(0.3 + 0.28 * Math.exp(-r / 70) + Math.random() * 0.15); sz = 2.4 + Math.random() * 2.8;
+    } else if (u < 0.54) {                                      // two tightly wound spiral arms
+      const k = Math.random() < 0.5 ? 0 : 1;
+      const r = A_ARM0 + (M31_R * 0.85 - A_ARM0) * Math.pow(Math.random(), 1.35);
+      const th = aArm(k, r), sp = 6 + 0.035 * r;
+      x = Math.cos(th) * r + gauss() * sp; z = Math.sin(th) * r + gauss() * sp; y = gauss() * (7 + 6 * (1 - r / M31_R));
+      c.copy(A_INNER).lerp(A_OUTER, Math.min(1, Math.pow(r / (M31_R * 0.8), 0.6))); sz = 1.8 + Math.random() * 2.6;
+      const roll = Math.random();
+      if (roll < 0.03) { c.copy(A_PINK); sz = 4 + Math.random() * 4; } else if (roll < 0.09) { c.copy(A_BLUE); sz = 3.5 + Math.random() * 3; }
+    } else if (u < 0.66) {                                      // the 10-kpc star-forming ring (slightly off-center, as observed)
+      const th = Math.random() * Math.PI * 2, r = RING_R + gauss() * 22 + 18 * Math.cos(th);
+      x = Math.cos(th) * r + 25 + gauss() * 7; z = Math.sin(th) * r + gauss() * 7; y = gauss() * 7;
+      c.copy(A_BLUE).lerp(A_INNER, Math.random() * 0.4); sz = 2 + Math.random() * 2.8;
+      if (Math.random() < 0.06) { c.copy(A_PINK); sz = 4 + Math.random() * 4.5; }
+    } else if (u < 0.95) {                                      // smooth exponential disk (scale length ~17,000 ly)
+      const r = Math.min(M31_R, -Math.log(1 - Math.random() * 0.998) * 170), th = Math.random() * Math.PI * 2;
+      x = Math.cos(th) * r; z = Math.sin(th) * r; y = gauss() * (9 + 10 * Math.exp(-r / 200));
+      c.copy(A_INNER).lerp(A_OUTER, Math.min(1, r / M31_R * 1.3)).multiplyScalar(0.75); sz = 1.4 + Math.random() * 1.8;
+    } else {                                                    // faint extended outer disk / halo
+      const r = 300 + Math.random() * (M31_R * 1.1 - 300), th = Math.random() * Math.PI * 2;
+      x = Math.cos(th) * r; z = Math.sin(th) * r; y = gauss() * 40;
+      c.setRGB(0.55, 0.62, 0.85); sz = 1.2 + Math.random() * 1.5;
+    }
+    apos.set([x, y, z], i * 3); acol.set([c.r, c.g, c.b], i * 3); asize[i] = sz;
+  }
+  const m31Stars = pointCloud(apos, acol, asize, starFrag, { bright: isTouch ? 0.62 : 0.46 });
+  m31Stars.renderOrder = 1;
+  m31Spin.add(m31Stars);
+
+  // dark dust lanes hugging the inner edges of the arms and the ring (they show up strongly in the inclined view)
+  const NAD = isTouch ? 5000 : 14000;
+  const adp = new Float32Array(NAD * 3), adc = new Float32Array(NAD * 3), ads = new Float32Array(NAD);
+  for (let i = 0; i < NAD; i++) {
+    let x, z;
+    if (i % 3 === 0) { const th = Math.random() * Math.PI * 2, r = RING_R - 14 + gauss() * 10 + 18 * Math.cos(th); x = Math.cos(th) * r + 25; z = Math.sin(th) * r; }
+    else { const k = i % 2, r = A_ARM0 * 1.1 + (M31_R * 0.75 - A_ARM0) * Math.pow(Math.random(), 1.2), th = aArm(k, r) - 0.12, sp = 4 + 0.02 * r; x = Math.cos(th) * r + gauss() * sp; z = Math.sin(th) * r + gauss() * sp; }
+    adp.set([x, gauss() * 2.5, z], i * 3); adc.set([0.035, 0.022, 0.015], i * 3); ads[i] = 12 + Math.random() * 14;
+  }
+  const m31Dust = pointCloud(adp, adc, ads, dustFrag, { blending: THREE.NormalBlending, alpha: 0.42 });
+  m31Dust.renderOrder = 2;
+  m31Spin.add(m31Dust);
+
+  // soft glows: disk glow in the M31 plane + bright core (these keep it visible as a smudge from very far away)
+  const m31DiskGlow = new THREE.Mesh(new THREE.PlaneGeometry(M31_R * 2.1, M31_R * 2.1), new THREE.MeshBasicMaterial({
+    map: glowTex([[0, 'rgba(255,215,160,0.6)'], [0.12, 'rgba(255,200,150,0.3)'], [0.35, 'rgba(170,175,230,0.1)'], [0.7, 'rgba(110,140,255,0.035)'], [1, 'rgba(0,0,0,0)']]),
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  m31DiskGlow.rotation.x = -Math.PI / 2;
+  m31Disk.add(m31DiskGlow);
+  const m31Core = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTex([[0, 'rgba(255,240,200,0.85)'], [0.18, 'rgba(255,205,130,0.3)'], [1, 'rgba(255,160,60,0)']]),
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  m31Core.scale.set(420, 420, 1); m31Core.renderOrder = 3;
+  andromeda.add(m31Core);
+
+  // companions: small elliptical galaxies (smooth, yellowish, no arms)
+  const elliptical = (n, re, flat, bright) => {
+    const p = new Float32Array(n * 3), cc = new Float32Array(n * 3), ss = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const r = re * Math.pow(-Math.log(1 - Math.random() * 0.995), 1.25), ct = Math.random() * 2 - 1, ph = Math.random() * Math.PI * 2, st = Math.sqrt(1 - ct * ct);
+      p.set([r * st * Math.cos(ph), r * ct * flat, r * st * Math.sin(ph)], i * 3);
+      c.setRGB(1.0, 0.86, 0.66).multiplyScalar(0.3 + 0.2 * Math.exp(-r / re) + Math.random() * 0.15); cc.set([c.r, c.g, c.b], i * 3); ss[i] = 1.6 + Math.random() * 2;
+    }
+    const pts = pointCloud(p, cc, ss, starFrag, { bright });
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex([[0, 'rgba(255,230,190,0.5)'], [0.3, 'rgba(255,210,150,0.15)'], [1, 'rgba(0,0,0,0)']]), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    glow.scale.setScalar(re * 7); glow.material.opacity = 0.7;
+    const g = new THREE.Group(); g.add(pts, glow); return { group: g, pts };
+  };
+  const m32 = elliptical(isTouch ? 2500 : 6000, 10, 0.8, isTouch ? 0.55 : 0.45);   // M32: compact, ~6,500 ly across
+  const m110 = elliptical(isTouch ? 3500 : 9000, 34, 0.55, isTouch ? 0.34 : 0.27);  // M110: larger, more diffuse, ~17,000 ly
+  // place them where they appear in photos: M32 just off the disk near the core, M110 farther out on the other side
+  // (on-sky offsets as in photos: M32 just beside the nucleus at the disk's edge, M110 well off the disk on the other side)
+  m32.group.position.copy(m31Minor).multiplyScalar(-260).addScaledVector(m31Major, 70).addScaledVector(m31Los, 60);
+  m110.group.position.copy(m31Minor).multiplyScalar(520).addScaledVector(m31Major, -330).addScaledVector(m31Los, -120);
+  m110.group.rotation.set(0.4, 0.8, 0.3);
+  andromeda.add(m32.group, m110.group);
+
+  // distance line Milky Way ↔ Andromeda, labeled (shown only when zoomed far out)
+  const lineGeo = new THREE.BufferGeometry().setFromPoints([SUN_POS.clone().addScaledVector(m31Dir, 700), M31_POS.clone().addScaledVector(m31Dir, -M31_R * 0.75)]);
+  const distLine = new THREE.Line(lineGeo, new THREE.LineDashedMaterial({ color: 0x9fb4ff, transparent: true, opacity: 0.4, dashSize: 260, gapSize: 200, depthWrite: false }));
+  distLine.computeLineDistances();
+  scene.add(distLine);
+
   // "You are here" marker (pulsing ring + dot) and labels
   const marker = new THREE.Group();
   marker.position.copy(SUN_POS);
@@ -324,20 +467,49 @@ export function createGalaxy({ isTouch = false } = {}) {
   marker.add(sunLabel.obj);
   const centerLabel = makeLabel('Galactic center · Sgr A*', 'small');
   group.add(centerLabel.obj);
+  const mwLabel = makeLabel('🌌 Milky Way · <b>you are here</b>', 'mw-far off');
+  scene.add(mwLabel.obj);
+  const m31Label = makeLabel('Andromeda Galaxy · <b>M31</b>', 'm31-label');
+  m31Label.obj.position.copy(m31Minor).multiplyScalar(330);
+  andromeda.add(m31Label.obj);
+  const m32Label = makeLabel('M32', 'small off'); m32.group.add(m32Label.obj);
+  const m110Label = makeLabel('M110', 'small off'); m110.group.add(m110Label.obj);
+  const distLabel = makeLabel('≈ 2.5 million light-years', 'small dist-label off');
+  distLabel.obj.position.copy(SUN_POS).lerp(M31_POS, 0.5);
+  scene.add(distLabel.obj);
 
   const tmp = new THREE.Vector3();
   let t = 0;
   return {
-    scene, group, R, SUN_POS, marker,
-    labelEls: [sunLabel.el, centerLabel.el],
+    scene, group, R, SUN_POS, marker, M31_POS, M31_R, m31Dir, m31Minor, m31Normal, andromeda,
+    labelEls: [sunLabel.el, centerLabel.el, mwLabel.el],
+    m31LabelEls: [m31Label.el, m32Label.el, m110Label.el],
+    m31Counts: { stars: NA, dust: NAD },
     sunWorldPos(out = new THREE.Vector3()) { return marker.getWorldPosition(out); },
-    setScale(pxPerUnitAtDist1) { stars.material.uniforms.uScale.value = pxPerUnitAtDist1; dust.material.uniforms.uScale.value = pxPerUnitAtDist1; bg.material.uniforms.uScale.value = pxPerUnitAtDist1; },
+    setScale(pxPerUnitAtDist1) {
+      for (const p of [stars, dust, bg, m31Stars, m31Dust, m32.pts, m110.pts]) p.material.uniforms.uScale.value = pxPerUnitAtDist1;
+    },
     update(dt, camera, spin) {
       t += dt;
-      if (spin) group.rotation.y -= dt * 0.025;           // cosmetic rotation (hugely sped up)
+      if (spin) { group.rotation.y -= dt * 0.025; m31Spin.rotation.y -= dt * 0.018; } // cosmetic rotation (hugely sped up)
+      bg.position.copy(camera.position);                  // distant background stars stay "at infinity"
+      // what to label depends on how far out we are
+      const dMW = camera.position.length(), dM31 = camera.position.distanceTo(M31_POS);
+      const far = dMW > 4500;
+      sunLabel.el.classList.toggle('off', far);
+      centerLabel.el.classList.toggle('off', far);
+      mwLabel.el.classList.toggle('off', !far);
+      m32Label.el.classList.toggle('off', dM31 > 6000);
+      m110Label.el.classList.toggle('off', dM31 > 6000);
+      // far away, individual particles fade below a pixel; strengthen the soft glows so each galaxy stays a visible smudge
+      const farM31 = THREE.MathUtils.smoothstep(dM31, 3500, 22000), farMW = THREE.MathUtils.smoothstep(dMW, 2500, 22000);
+      m31DiskGlow.material.opacity = 1 + 3.5 * farM31; m31Core.material.opacity = 1 + 0.6 * farM31;
+      disk.material.opacity = 1 + 3.5 * farMW; coreGlow.material.opacity = 1 + 0.6 * farMW;
+      const showLine = dMW > 9000 && dM31 > 9000;
+      distLine.visible = showLine; distLabel.el.classList.toggle('off', !showLine);
       // marker keeps a constant on-screen size
       const dist = camera.position.distanceTo(marker.getWorldPosition(tmp));
-      const s = dist * 0.04;
+      const s = dist * (dist > 4500 ? 0.018 : 0.04);   // smaller when far out, so it doesn't hide the tiny Milky Way
       dot.scale.setScalar(s * 0.45);
       const ph = (t * 0.6) % 1, ph2 = (t * 0.6 + 0.5) % 1;
       ring.scale.setScalar(s * (0.4 + 1.4 * ph)); ring.material.opacity = 1 - ph;
