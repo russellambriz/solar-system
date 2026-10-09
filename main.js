@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { createSkyBand, createGalaxy, GALAXY_INFO } from './galaxy.js';
+import { createGalileanMesh, createPotatoMesh } from './moons.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -41,7 +42,52 @@ const SUN_INFO = {
 };
 const MOON_INFO = {
   name: 'Moon', type: 'Natural satellite of Earth', diameter: 3474, period: 27.32, color: '#bbbbbb',
+  distLabel: 'Distance from Earth', distanceText: '384,400 km (0.00257 AU)', periodText: '27.32 days (around Earth)',
+  dayText: '27.3 days (tidally locked)',
   fact: 'The Moon is tidally locked, so we always see the same side. It drifts about 3.8 cm farther from Earth every year.',
+};
+
+// Moons of Mars and Jupiter. Orbits/sizes are scaled for visibility (order and relative periods are real).
+// Their motion is slowed (Jupiter's 20×, Mars' 60×) — otherwise Io would lap Jupiter 5× per second at the default speed.
+// orbit = scaled distance from planet center (scene units); size = scaled radius; phase = starting angle.
+const MOON_SYSTEMS = {
+  Mars: { slow: 60, moons: [
+    { name: 'Phobos', kind: 'potato', size: 0.21, orbit: 1.6, period: 0.31891, phase: 0.4, color: '#a08f80',
+      type: 'Moon of Mars (captured asteroid?)', diameter: 22.2, diameterText: '22.2 km avg (27 × 22 × 18 km, potato-shaped)',
+      distLabel: 'Distance from Mars', distanceText: '9,376 km (only ~6,000 km above the surface)',
+      periodText: '7 h 39 min (0.319 days)', dayText: 'Tidally locked (= orbital period)',
+      fact: 'Phobos orbits faster than Mars spins, so from Mars it rises in the west and sets in the east — twice a day. ' +
+            'It is spiralling inward ~1.8 m per century and in ~30–50 million years will crash into Mars or break up into a ring. ' +
+            'Its giant crater Stickney (9 km) nearly shattered it.' },
+    { name: 'Deimos', kind: 'potato', size: 0.14, orbit: 2.6, period: 1.263, phase: 2.6, color: '#b5a593',
+      type: 'Moon of Mars', diameter: 12.4, diameterText: '12.4 km avg (15 × 12 × 11 km)',
+      distLabel: 'Distance from Mars', distanceText: '23,463 km', periodText: '30 h 18 min (1.263 days)',
+      dayText: 'Tidally locked (= orbital period)',
+      fact: 'Deimos is so small that its escape velocity is only ~5.6 m/s — a strong throw could send a ball into space. ' +
+            'A thick blanket of dust smooths its surface, and from Mars it looks like a bright star.' },
+  ] },
+  Jupiter: { slow: 20, moons: [
+    { name: 'Io', kind: 'galilean', size: 0.46, orbit: 5.2, period: 1.769, phase: 0.3, color: '#e8c44a',
+      type: 'Galilean moon of Jupiter', diameter: 3643,
+      distLabel: 'Distance from Jupiter', distanceText: '421,700 km', periodText: '1.77 days', dayText: 'Tidally locked (= orbital period)',
+      fact: 'The most volcanic place in the solar system: ~400 active volcanoes, some shooting sulfur plumes 400 km high. ' +
+            'Tidal squeezing by Jupiter heats its interior. Io, Europa and Ganymede are locked in a 1:2:4 orbital resonance.' },
+    { name: 'Europa', kind: 'galilean', size: 0.42, orbit: 6.4, period: 3.551, phase: 2.2, color: '#d9cbb3',
+      type: 'Galilean moon of Jupiter', diameter: 3122,
+      distLabel: 'Distance from Jupiter', distanceText: '671,034 km', periodText: '3.55 days', dayText: 'Tidally locked (= orbital period)',
+      fact: 'Under its cracked ice shell (~15–25 km thick) lies a global salty ocean holding about twice as much water as all of ' +
+            'Earth\'s oceans — one of the best places to look for life. NASA\'s Europa Clipper arrives in 2030.' },
+    { name: 'Ganymede', kind: 'galilean', size: 0.55, orbit: 7.8, period: 7.155, phase: 4.1, color: '#9c948a',
+      type: 'Galilean moon of Jupiter', diameter: 5268,
+      distLabel: 'Distance from Jupiter', distanceText: '1,070,412 km', periodText: '7.15 days', dayText: 'Tidally locked (= orbital period)',
+      fact: 'The largest moon in the solar system — bigger than the planet Mercury — and the only moon with its own magnetic field, ' +
+            'which even makes auroras. Its bright terrain is scored with long parallel grooves.' },
+    { name: 'Callisto', kind: 'galilean', size: 0.53, orbit: 9.6, period: 16.689, phase: 5.4, color: '#6f665c',
+      type: 'Galilean moon of Jupiter', diameter: 4821,
+      distLabel: 'Distance from Jupiter', distanceText: '1,882,709 km', periodText: '16.69 days', dayText: 'Tidally locked (= orbital period)',
+      fact: 'One of the most heavily cratered surfaces known, about 4 billion years old. Its Valhalla impact basin is ringed by ' +
+            'concentric ridges spreading ~3,800 km across — like ripples frozen in ice.' },
+  ] },
 };
 
 // Scaling for visibility
@@ -346,7 +392,6 @@ for (const p of PLANETS) {
     // Moon — size and distance exaggerated so it's clearly visible: real Moon is 0.27× Earth's diameter and
     // ~30 Earth diameters away (which at our compressed scale would sit inside Earth's sphere).
     const moonDist = radius * 3.4;   // ≈ 3.2 units: clearly separated from Earth, still inside the Venus–Mars gap
-    body.moonDist = moonDist;
     const moonPivot = new THREE.Group();
     moonPivot.rotation.z = THREE.MathUtils.degToRad(5.1); // orbit inclination
     group.add(moonPivot);
@@ -357,10 +402,33 @@ for (const p of PLANETS) {
       new THREE.MeshStandardMaterial({ map: TEXTURES.Moon(), roughness: 1, emissive: 0x1a1a1f })); // faint emissive: night side not pitch black
     moonGroup.add(moonMesh);
     moonPivot.add(orbitLine(moonDist, 0xb8c4e6, 0.4));  // faint ring around Earth; follows Earth; toggled with "Orbit lines"
-    const moonBody = { name: 'Moon', info: MOON_INFO, group: moonGroup, mesh: moonMesh, radius: moonR, moonDist, isMoon: true };
+    const moonBody = { name: 'Moon', info: MOON_INFO, group: moonGroup, mesh: moonMesh, radius: moonR, isMoon: true,
+      parent: body, orbitDist: moonDist, period: MOON_INFO.period, slow: 1, phase: 0 };
+    body.moons = [moonBody]; body.systemRadius = moonDist;
     moonBody.labelEl = addLabel(moonGroup, 'Moon', moonR + 0.5, true);
     addPickSphere(moonGroup, moonR * 0.8, moonBody);
     bodies.push(moonBody);
+  }
+  if (MOON_SYSTEMS[p.name]) {
+    // moons orbit in the planet's equatorial plane, so their pivot lives inside the tilt group
+    const sys = MOON_SYSTEMS[p.name];
+    body.moons = [];
+    for (const m of sys.moons) {
+      const pivot = new THREE.Group();
+      tiltGroup.add(pivot);
+      const mg = new THREE.Group();
+      pivot.add(mg);
+      const mesh = m.kind === 'galilean' ? createGalileanMesh(renderer, m.name, m.size, IS_TOUCH) : createPotatoMesh(m.name, m.size, IS_TOUCH);
+      mg.add(mesh);
+      pivot.add(orbitLine(m.orbit, 0xb8c4e6, 0.3));   // faint ring; follows the planet; toggled with "Orbit lines"
+      const mb = { name: m.name, info: m, group: mg, mesh, radius: m.size, isMoon: true,
+        parent: body, orbitDist: m.orbit, period: m.period, slow: sys.slow, phase: m.phase };
+      mb.labelEl = addLabel(mg, m.name, m.size + 0.4, true);
+      addPickSphere(mg, m.size, mb);
+      bodies.push(mb);
+      body.moons.push(mb);
+    }
+    body.systemRadius = sys.moons[sys.moons.length - 1].orbit;
   }
   if (p.name === 'Saturn') tiltGroup.add(makeRing(radius * 1.25, radius * 2.35, ringTexture(), 0.95));
   if (p.name === 'Uranus') tiltGroup.add(makeRing(radius * 1.6, radius * 2.0, uranusRingTexture(), 0.5));
@@ -495,12 +563,13 @@ function showInfo(b) {
   $('info-name').textContent = i.name;
   $('info-name').style.color = i.color;
   $('info-type').textContent = i.type;
-  $('info-diameter').textContent = `${fmtNum(i.diameter)} km` + (b.name !== 'Earth' ? ` (${(i.diameter / EARTH_DIAMETER).toFixed(2)}× Earth)` : '');
+  $('info-diameter').textContent = i.diameterText ||
+    `${fmtNum(i.diameter)} km` + (b.name !== 'Earth' ? ` (${(i.diameter / EARTH_DIAMETER).toFixed(2)}× Earth)` : '');
   if (b.isMoon) {
-    $('info-distance-label').textContent = 'Distance from Earth';
-    $('info-distance').textContent = '384,400 km (0.00257 AU)';
-    $('info-period').textContent = '27.32 days (around Earth)';
-    $('info-day').textContent = '27.3 days (tidally locked)';
+    $('info-distance-label').textContent = i.distLabel;
+    $('info-distance').textContent = i.distanceText;
+    $('info-period').textContent = i.periodText;
+    $('info-day').textContent = i.dayText;
   } else if (b.name === 'Sun') {
     $('info-distance-label').textContent = 'Distance from Sun';
     $('info-distance').textContent = i.distanceText;
@@ -635,7 +704,9 @@ function declutterLabels() {
     const rect = [cx - lw / 2 - 2, cy - lh / 2 - 2, cx + lw / 2 + 2, cy + lh / 2 + 2];
     const hit = placed.some((p) => rect[0] < p[2] && rect[2] > p[0] && rect[1] < p[3] && rect[3] > p[1]);
     // keep Earth+Moon labels together when either is focused
-    const forced = b === focused || b === hovered || (focused && ((focused.name === 'Earth' && b.isMoon) || (focused.isMoon && b.name === 'Earth')));
+    // single-moon systems (Earth): keep planet + Moon labels together when either is focused
+    const forced = b === focused || b === hovered ||
+      (focused && ((b.parent === focused && focused.moons.length === 1) || (focused.isMoon && b === focused.parent && b.moons.length === 1)));
     lab.classList.toggle('overlap', hit && !forced);
     if (!hit || forced) placed.push(rect);
   }
@@ -643,7 +714,8 @@ function declutterLabels() {
 function prio(b) {
   if (b === focused) return 1e6;
   if (b === hovered) return 1e5;
-  if (focused && ((focused.name === 'Earth' && b.isMoon) || (focused.isMoon && b.name === 'Earth'))) return 5e4;
+  // moons of the focused planet (or siblings/parent of a focused moon) outrank everything else
+  if (focused && (b.parent === focused || b === focused.parent || (focused.parent && b.parent === focused.parent))) return 5e4 + b.radius;
   return b.name === 'Sun' ? 1e4 : b.radius;
 }
 
@@ -660,11 +732,14 @@ function bodyWorldPos(b, out) { return b.group.getWorldPosition(out); }
 function focusOffset(b, out) {
   const p = bodyWorldPos(b, tmp2);
   // Earth: back off far enough that the whole Moon orbit is in frame
-  const dist = b.name === 'Sun' ? 32 : b.name === 'Earth' ? b.moonDist * 3.4 : b.radius * 6 + 2.5;
+  // planets with moons: back off far enough that the whole moon system is in frame
+  const dist = b.name === 'Sun' ? 32 : b.systemRadius ? b.systemRadius * 3.4 : b.radius * 6 + 2.5;
   if (p.lengthSq() < 1e-6) out.set(0, 0.45, 1);
   else {
     // start from the outward direction, swing ~110° around toward the Sun so we see the lit (day) side
-    out.copy(p).setY(0).normalize().applyAxisAngle(UP, 1.9).add(new THREE.Vector3(0, 0.4, 0)).normalize();
+    // multi-moon systems (Mars, Jupiter) get a higher viewpoint (~40°) so moons don't hide behind the planet
+    const elev = b.moons && b.moons.length > 1 ? 0.85 : 0.4;
+    out.copy(p).setY(0).normalize().applyAxisAngle(UP, 1.9).add(new THREE.Vector3(0, elev, 0)).normalize();
   }
   return out.multiplyScalar(dist);
 }
@@ -793,8 +868,8 @@ function updateBodies() {
   for (const b of bodies) {
     if (b.name === 'Sun') { b.mesh.rotation.y = (days / 25.4 / SPIN_SLOWDOWN) * Math.PI * 2; continue; }
     if (b.isMoon) {
-      const a = (days / MOON_INFO.period) * Math.PI * 2;
-      b.group.position.set(Math.cos(a) * b.moonDist, 0, -Math.sin(a) * b.moonDist);
+      const a = b.phase + (days / (b.period * b.slow)) * Math.PI * 2;
+      b.group.position.set(Math.cos(a) * b.orbitDist, 0, -Math.sin(a) * b.orbitDist);
       b.mesh.rotation.y = a + Math.PI; // tidally locked: same face toward Earth
       continue;
     }
@@ -859,4 +934,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { THREE, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
+window.solar = { THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };

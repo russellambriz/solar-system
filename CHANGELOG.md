@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-09: Mars & Jupiter moons
+
+### Added
+- **Mars' moons, Phobos and Deimos**, as lumpy, potato-shaped 3D models instead of spheres. Their shapes are built in code from noise lumps and craters, with real proportions (Phobos 27×22×18 km, Deimos 15×12×11 km). Phobos has its big Stickney crater and the long grooves across its surface. Deimos is smoother and dustier.
+- **Jupiter's four Galilean moons**, each with its own detailed surface generated in code and baked once on the GPU into a color map plus a height (bump) map. Maps are 1024×512 on desktop and 512×256 on touch devices.
+  - **Io**: sulfur yellows and oranges, white SO₂ frost, reddish poles, and dark volcanic calderas with red plume rings (like Pele) and bright halos.
+  - **Europa**: icy white, crossed by reddish-brown cracks (lineae) at several sizes with bright ridge centers, plus patches of chaos terrain and very few craters.
+  - **Ganymede**: dark ancient regions and bright grooved terrain, bright-rayed young craters and frosty poles.
+  - **Callisto**: dark, heavily cratered surface with bright crater speckle and the huge multi-ring Valhalla basin.
+- All six moons are tidally locked (they always show the same face to their planet) and orbit in their planet's equatorial plane, in the right order. Their relative periods are real: Io 1.77 d, Europa 3.55 d, Ganymede 7.15 d, Callisto 16.7 d (the 1:2:4 resonance is visible), Phobos 7 h 39 min, Deimos 30 h 18 min.
+- Each moon has a faint orbit ring (toggled with "Orbit lines"), a label, and a finger-sized tap zone. Each also has an info panel with real facts: size, distance from its planet, orbital period, rotation and a fun fact.
+- Moons appear in the body list, indented under their planet.
+
+### Changed
+- **Focusing Mars or Jupiter** frames the whole moon system from ~40° above its plane, so no moon hides behind the planet. All of that system's moon labels get top priority.
+- Moon sizes and orbit distances are exaggerated so they're visible. Their motion is slowed (Jupiter's moons 20×, Mars' 60×) so they don't blur; the scaling note explains this.
+
 ## 2026-10-09: Moon visibility update
 
 ### Changed
