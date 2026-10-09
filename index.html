@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>Interactive 3D Solar System</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22%23ffcc55%22/%3E%3C/svg%3E" />
+  <!-- Relative paths only, so it works from a subpath like https://user.github.io/solar-system/ -->
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <div id="loading">Building the solar system…</div>
+
+  <!-- Top-left: title + body list (collapsible) -->
+  <div class="panel" id="nav-panel">
+    <div class="panel-head">
+      <div>
+        <h1>☀ Solar System</h1>
+        <div id="date">—</div>
+      </div>
+      <button class="collapse-btn" data-target="nav-panel" aria-label="Show or hide planet list" aria-expanded="true">▾</button>
+    </div>
+    <div class="panel-body">
+      <div id="body-list" class="scrollable"></div>
+    </div>
+  </div>
+
+  <!-- Top-right: controls (collapsible) -->
+  <div class="panel" id="controls">
+    <div class="panel-head">
+      <h2>⚙ Controls</h2>
+      <button class="collapse-btn" data-target="controls" aria-label="Show or hide controls" aria-expanded="true">▾</button>
+    </div>
+    <div class="panel-body">
+      <label class="row slider-row" for="speed">
+        <span>Time speed</span>
+        <span id="speed-value">10 days/s</span>
+      </label>
+      <input type="range" id="speed" min="0" max="100" step="1" value="50" aria-label="Time speed" />
+      <div class="row buttons">
+        <button id="pause-btn" title="Space">⏸ Pause</button>
+        <button id="overview-btn" title="Esc">⟲ Overview</button>
+      </div>
+      <label class="row toggle"><input type="checkbox" id="toggle-orbits" checked /> Orbit lines</label>
+      <label class="row toggle"><input type="checkbox" id="toggle-labels" checked /> Labels</label>
+      <div class="help help-desktop">
+        <b>Drag</b> rotate · <b>Scroll</b> zoom · <b>Right-drag</b> pan<br />
+        <b>Click</b> a planet to follow it · <b>Esc</b> overview · <b>Space</b> pause
+      </div>
+      <div class="help help-touch">
+        <b>1 finger</b> rotate · <b>Pinch</b> zoom · <b>2 fingers</b> pan<br />
+        <b>Tap</b> a planet, label or name to follow it · <b>⟲ Overview</b> to return
+      </div>
+    </div>
+  </div>
+
+  <!-- Info panel for selected body (scrolls if it doesn't fit) -->
+  <div class="panel hidden scrollable" id="info-panel">
+    <button id="close-info" title="Back to overview (Esc)" aria-label="Close and return to overview">✕</button>
+    <h2 id="info-name">Planet</h2>
+    <div id="info-type" class="subtitle"></div>
+    <table>
+      <tr><th>Diameter</th><td id="info-diameter"></td></tr>
+      <tr><th id="info-distance-label">Distance from Sun</th><td id="info-distance"></td></tr>
+      <tr><th>Orbital period</th><td id="info-period"></td></tr>
+      <tr><th>Day length</th><td id="info-day"></td></tr>
+    </table>
+    <p id="info-fact"></p>
+  </div>
+
+  <!-- Bottom-left: scaling note -->
+  <div id="scale-note">
+    Not to scale: distances are compressed (∝ AU<sup>0.55</sup>) and planet sizes exaggerated (∝ √diameter) so everything is visible.
+    Orbital periods are correctly proportional; self-rotation is slowed 50× for visibility. Orbits are drawn as circles in one plane;
+    planet positions are approximate mean longitudes for the shown date.
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
