@@ -5,6 +5,8 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { createSkyBand, createGalaxy, GALAXY_INFO, ANDROMEDA_INFO } from './galaxy.js';
 import { createGalileanMesh, createPotatoMesh } from './moons.js';
 import { createSunFX } from './sun.js';
+import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitPoints, createAsteroidBelt, createKuiperBelt,
+  surfaceTexture } from './smallbodies.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -441,6 +443,86 @@ for (const p of PLANETS) {
   if (p.name === 'Uranus') tiltGroup.add(makeRing(radius * 1.6, radius * 2.0, uranusRingTexture(), 0.5));
 }
 
+// ---------------------------------------------------------------------------
+// Small bodies: asteroid belt (+ Trojans, Hildas), Kuiper belt, dwarf planets & Vesta
+// ---------------------------------------------------------------------------
+const beltScale = IS_TOUCH ? 1.15 : 1;          // fewer but slightly bigger particles on touch devices
+const asteroidBelt = createAsteroidBelt({ isTouch: IS_TOUCH, jupiterL0Deg: PLANETS[4].L0, scale: beltScale });
+const kuiperBelt = createKuiperBelt({ isTouch: IS_TOUCH, scale: beltScale });
+scene.add(asteroidBelt, kuiperBelt);
+const belts = [asteroidBelt, kuiperBelt];
+
+function ellipseLine(el, color, opacity) {
+  const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(orbitPoints(el, scaleDistance, 512)),
+    new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+  orbitLines.push(line);
+  return line;
+}
+const smallBodies = [];
+const _au = new THREE.Vector3();
+for (const sb of SMALL_BODIES) {
+  const radius = sb.name === 'Vesta' ? 0.22 : scaleRadius(sb.diameter);
+  const group = new THREE.Group();          // heliocentric position (for Pluto: the Pluto–Charon barycenter)
+  const tiltGroup = new THREE.Group();
+  tiltGroup.rotation.z = THREE.MathUtils.degToRad(sb.tilt);
+  group.add(tiltGroup);
+  scene.add(group);
+  scene.add(ellipseLine(sb, sb.group === 'belt' ? 0xa89a86 : 0x9d8cd9, sb.group === 'belt' ? 0.3 : 0.32));
+  let mesh;
+  if (sb.name === 'Vesta') mesh = createPotatoMesh('Vesta', radius, IS_TOUCH);
+  else {
+    mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 48, 32),
+      new THREE.MeshStandardMaterial({ map: surfaceTexture(sb.name, IS_TOUCH), roughness: 0.95, metalness: 0, emissive: 0x111114 }));
+    if (sb.name === 'Haumea') mesh.scale.set(1, 0.51, 0.8);   // egg/ellipsoid stretched by its 3.9 h spin (shortest axis = spin axis)
+  }
+  const body = { name: sb.name, info: sb, group, mesh, radius, tiltGroup, isSmall: true };
+  let spinner = mesh;                        // what rotates with the body's day
+  if (sb.name === 'Pluto') {
+    // Pluto–Charon binary: both circle their shared barycenter (outside Pluto in reality) once per 6.39 days, and both are
+    // tidally locked, so a single pivot carries Pluto's offset and Charon's orbit — they always face each other.
+    const pivot = new THREE.Group();
+    tiltGroup.add(pivot);                    // Charon orbits in Pluto's equatorial plane (Pluto's axis is tipped 122°)
+    const charonR = scaleRadius(CHARON_INFO.diameter), sep = 1.9;
+    const off = sep * CHARON_MASS_RATIO / (1 + CHARON_MASS_RATIO);
+    mesh.position.set(-off, 0, 0); mesh.rotation.y = Math.PI;   // the heart-hemisphere faces away from Charon (as in reality)
+    pivot.add(mesh);
+    const cGroup = new THREE.Group(); cGroup.position.set(sep - off, 0, 0); pivot.add(cGroup);
+    const cMesh = new THREE.Mesh(new THREE.SphereGeometry(charonR, 40, 28),
+      new THREE.MeshStandardMaterial({ map: surfaceTexture('Charon', IS_TOUCH), roughness: 1, metalness: 0, emissive: 0x111114 }));
+    cGroup.add(cMesh);
+    const ring = orbitLine(sep - off, 0xb8c4e6, 0.35); tiltGroup.add(ring);
+    const slow = 20;                         // shown 20× slower (like Jupiter's moons) so the pair doesn't blur
+    const charon = { name: 'Charon', info: CHARON_INFO, group: cGroup, mesh: cMesh, radius: charonR, isMoon: true, isSmall: true,
+      parent: body, orbitDist: sep - off, period: CHARON_INFO.period, slow, phase: 0, update() {} };
+    charon.labelEl = addLabel(cGroup, 'Charon', charonR + 0.4, true);
+    addPickSphere(cGroup, charonR, charon);
+    body.moons = [charon]; body.systemRadius = sep; body.focusElev = 0.7;
+    body.pivot = pivot; body.slow = slow;
+    spinner = null;
+    smallBodies.push(body, charon);
+  } else {
+    tiltGroup.add(mesh);
+    smallBodies.push(body);
+  }
+  if (sb.name === 'Haumea') {                // its ring (found 2017), ~2,290 km radius, in the equatorial plane
+    tiltGroup.add(makeRing(radius * 1.85, radius * 2.05, uranusRingTexture(), 0.55));
+  }
+  body.update = (days) => {
+    group.position.copy(scaleAU(keplerAU(sb, days, _au), scaleDistance));
+    if (body.pivot) body.pivot.rotation.y = (days / (CHARON_INFO.period * body.slow)) * Math.PI * 2;
+    else if (spinner) spinner.rotation.y = (days / sb.rotation / SPIN_SLOWDOWN) * Math.PI * 2;
+  };
+  body.labelEl = addLabel(group, sb.name, radius + 0.5, true);
+  addPickSphere(group, radius, body);
+}
+// list order: Ceres & Vesta (asteroid belt) right after Mars' moons, the Kuiper-belt dwarf planets after Neptune
+{
+  const belt = smallBodies.filter((b) => b.info.group === 'belt'), outer = smallBodies.filter((b) => b.info.group !== 'belt');
+  belt[0].listHeader = 'Asteroid belt'; outer[0].listHeader = 'Dwarf planets · Kuiper belt';
+  bodies.splice(bodies.findIndex((b) => b.name === 'Jupiter'), 0, ...belt);
+  bodies.push(...outer);
+}
+
 // Starfield
 {
   const N = IS_TOUCH ? 5000 : 9000, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
@@ -508,6 +590,8 @@ speedSlider.addEventListener('input', () => { paused = false; updateSpeed(); });
 pauseBtn.addEventListener('click', togglePause);
 $('toggle-orbits').addEventListener('change', (e) => orbitLines.forEach((l) => (l.visible = e.target.checked)));
 $('toggle-labels').addEventListener('change', (e) => (labelRenderer.domElement.style.display = e.target.checked ? '' : 'none'));
+$('toggle-asteroids').addEventListener('change', (e) => (asteroidBelt.visible = e.target.checked));
+$('toggle-kuiper').addEventListener('change', (e) => (kuiperBelt.visible = e.target.checked));
 $('toggle-milkyway').addEventListener('change', (e) => (skyBand.group.visible = e.target.checked));
 $('overview-btn').addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy() : goOverview()));
 $('galaxy-btn').addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy() : enterGalaxy()));
@@ -527,9 +611,15 @@ updateSpeed();
 // Body list buttons
 const list = $('body-list');
 for (const b of bodies) {
+  if (b.listHeader) {
+    const h = document.createElement('div');
+    h.className = 'list-header'; h.textContent = b.listHeader;
+    list.appendChild(h);
+  }
   const btn = document.createElement('button');
   btn.innerHTML = `<span class="dot" style="background:${b.info.color}"></span>${b.name}`;
-  if (b.isMoon) btn.style.paddingLeft = '22px';
+  if (b.isSmall) btn.classList.add('small-body');
+  if (b.isMoon) btn.style.paddingLeft = b.isSmall ? '30px' : '22px';
   btn.addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy(() => focusOn(b)) : mode === 'solar' && focusOn(b)));
   b.button = btn;
   list.appendChild(btn);
@@ -601,9 +691,9 @@ function showInfo(b) {
     $('info-day').textContent = i.dayText;
   } else {
     $('info-distance-label').textContent = 'Distance from Sun';
-    $('info-distance').textContent = `${i.au} AU (${fmtNum(Math.round(i.au * 149.6))} million km)`;
-    $('info-period').textContent = fmtPeriod(i.period);
-    $('info-day').textContent = fmtDay(i.rotation);
+    $('info-distance').textContent = i.distanceText || `${i.au} AU (${fmtNum(Math.round(i.au * 149.6))} million km)`;
+    $('info-period').textContent = i.periodText || fmtPeriod(i.period);
+    $('info-day').textContent = i.dayText || fmtDay(i.rotation);
   }
   $('info-fact').textContent = '💡 ' + i.fact;
   openInfoPanel();
@@ -719,10 +809,17 @@ document.addEventListener('touchmove', (e) => {
 }, { passive: false });
 document.addEventListener('dblclick', (e) => e.preventDefault());
 
+// The body list is tall now (dwarf planets): if it would cover the bottom-left scale notes, slide the notes to its right.
+function placeNotes() {
+  document.body.style.removeProperty('--note-left');
+  const nav = $('nav-panel').getBoundingClientRect(), note = $('scale-note').getBoundingClientRect();
+  const noteTop = note.height ? note.top : window.innerHeight - 140;
+  if (nav.bottom > noteTop - 6 && nav.right + 12 + 300 < window.innerWidth) document.body.style.setProperty('--note-left', `${Math.round(nav.right + 12)}px`);
+}
 // Collapsible panels (start collapsed on small screens so the view isn't covered)
 for (const btn of document.querySelectorAll('.collapse-btn')) {
   const panel = document.getElementById(btn.dataset.target);
-  const set = (collapsed) => { panel.classList.toggle('collapsed', collapsed); btn.setAttribute('aria-expanded', String(!collapsed)); };
+  const set = (collapsed) => { panel.classList.toggle('collapsed', collapsed); btn.setAttribute('aria-expanded', String(!collapsed)); placeNotes(); };
   btn.addEventListener('click', () => set(!panel.classList.contains('collapsed')));
   if (Math.min(window.innerWidth, window.innerHeight) < 600) set(true);
 }
@@ -780,7 +877,7 @@ function focusOffset(b, out) {
   else {
     // start from the outward direction, swing ~110° around toward the Sun so we see the lit (day) side
     // multi-moon systems (Mars, Jupiter) get a higher viewpoint (~40°) so moons don't hide behind the planet
-    const elev = b.moons && b.moons.length > 1 ? 0.85 : 0.4;
+    const elev = b.focusElev ?? (b.moons && b.moons.length > 1 ? 0.85 : 0.4);
     out.copy(p).setY(0).normalize().applyAxisAngle(UP, 1.9).add(new THREE.Vector3(0, elev, 0)).normalize();
   }
   return out.multiplyScalar(dist);
@@ -984,6 +1081,7 @@ const DAY_MS = 86400000;
 function updateBodies() {
   const days = (simTime - J2000) / DAY_MS;
   for (const b of bodies) {
+    if (b.update) { b.update(days); continue; }
     if (b.name === 'Sun') { b.mesh.rotation.y = (days / 25.4 / SPIN_SLOWDOWN) * Math.PI * 2; continue; }
     if (b.isMoon) {
       const a = b.phase + (days / (b.period * b.slow)) * Math.PI * 2;
@@ -1028,6 +1126,8 @@ function animate() {
   if (mode === 'galaxy' && !transition && glideEnabled) glideGalaxyTarget();
   if (activeScene === galaxy.scene) document.body.classList.toggle('lg-view', galaxyFocus === 'm31' || camera.position.length() > 4500);
   if (activeScene === scene) {
+    const days = (simTime - J2000) / DAY_MS;
+    for (const bt of belts) bt.material.uniforms.uDays.value = days;
     skyBand.update(camera);
     sunFX.update(dt, camera, sunGroup.position, true);
     const nearSun = sunFX.stats().near;
@@ -1046,7 +1146,12 @@ function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   labelRenderer.setSize(window.innerWidth, window.innerHeight);
   // galaxy point sprites: pixels per world unit at distance 1
+  for (const bt of belts) {
+    bt.material.uniforms.uScale.value = window.innerHeight * renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+    bt.material.uniforms.uMaxPx.value = (IS_TOUCH ? 3 : 4) * renderer.getPixelRatio();
+  }
   sunFX.setScale(window.innerHeight * renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)));
+  placeNotes();
   galaxy.setScale(window.innerHeight * renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)));
 }
 window.addEventListener('resize', onResize);
@@ -1060,4 +1165,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
+window.solar = { isTransitioning: () => !!transition, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };

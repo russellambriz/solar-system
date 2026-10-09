@@ -178,6 +178,9 @@ const POTATO = {
             base: [0.37, 0.33, 0.30], crater: 0.9 },
   Deimos: { axes: [1.0, 0.80, 0.73], lump: 0.10, nCraters: 30, seed: 8, stickney: false, grooves: false,
             base: [0.47, 0.42, 0.37], crater: 0.45 },  // Deimos: smoother — craters filled by dust
+  // Vesta (asteroid belt): nearly round but lumpy, with the giant Rheasilvia impact basin at its south pole
+  Vesta:  { axes: [1.0, 0.78, 0.97], lump: 0.07, nCraters: 45, seed: 13, stickney: false, grooves: false,
+            basin: { d: [0, -1, 0.1], r: 0.95, depth: 0.16 }, base: [0.50, 0.46, 0.41], crater: 0.6 },
 };
 
 export function createPotatoMesh(name, radius, isTouch) {
@@ -192,7 +195,8 @@ export function createPotatoMesh(name, radius, isTouch) {
   const randDir = () => { const u = N.rand() * 2 - 1, t = N.rand() * Math.PI * 2, s = Math.sqrt(1 - u * u); return new THREE.Vector3(s * Math.cos(t), u, s * Math.sin(t)); };
   const craters = [];
   for (let i = 0; i < cfg.nCraters; i++) { const r = 0.06 + Math.pow(N.rand(), 2.2) * 0.28; craters.push({ d: randDir(), r, depth: r * 0.35 * cfg.crater }); }
-  const stickney = cfg.stickney ? { d: new THREE.Vector3(0.82, 0.12, 0.56).normalize(), r: 0.6, depth: 0.17 } : null;
+  const stickney = cfg.stickney ? { d: new THREE.Vector3(0.82, 0.12, 0.56).normalize(), r: 0.6, depth: 0.17 }
+    : cfg.basin ? { d: new THREE.Vector3(...cfg.basin.d).normalize(), r: cfg.basin.r, depth: cfg.basin.depth } : null;
   if (stickney) craters.push(stickney);
   const grooveDirs = [new THREE.Vector3(0.15, 1, 0.2).normalize(), new THREE.Vector3(-0.3, 0.9, 0.5).normalize(), new THREE.Vector3(0.1, 0.8, -0.6).normalize()];
   const profile = (t) => (t < 1 ? t * t - 1 : 0) + 0.3 * Math.exp(-(((t - 1) / 0.22) ** 2));

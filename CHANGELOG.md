@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-09: Asteroid belt, Kuiper belt and dwarf planets update
+
+### Added
+- **Main asteroid belt** between Mars and Jupiter (new module `smallbodies.js`): ~13,000 asteroids on desktop and ~4,500 on touch devices. Each one has its own tilted, slightly eccentric Kepler orbit, so the inner ones lap the outer ones. The **Kirkwood gaps** (3:1, 5:2, 7:3 and 2:1 resonances with Jupiter) are carved out, and the belt has grey, brown and bluish rock colors.
+- **Jupiter Trojans**: two swarms of asteroids sharing Jupiter's orbit, 60° ahead of and behind it, plus the Hilda group at 4 AU.
+- **Kuiper belt** beyond Neptune: a sparse ring of icy bluish and reddish particles (6,000 on desktop, 2,000 on iPad). It has the dense classical belt at 42–48 AU, plutinos at 39.4 AU (in step with Neptune like Pluto) and scattered-disk objects on long, eccentric orbits.
+- **Ceres** (dwarf planet) with a cratered surface and the bright salt spots of Occator crater, and **Vesta** as a lumpy 3D shape with its giant Rheasilvia basin at the south pole.
+- **Pluto and Charon** as a tidally locked double world. Both circle their shared center and always show each other the same face. Pluto has its bright heart (Tombaugh Regio) and dark Cthulhu band, and Charon its reddish north pole (Mordor Macula).
+- Pluto follows its **real eccentric (e = 0.25), 17°-tilted orbit**, which you can see dip inside Neptune's.
+- **Eris, Haumea and Makemake** on their real tilted, stretched orbits. Haumea is egg-shaped, spins every 3.9 hours and has its ring.
+- Every new body can be selected: label, info panel with real facts (diameter, distance range, orbital period, day length, fun fact), click or tap to fly there and follow it, and its own orbit line (sandy for the asteroid belt, violet for the Kuiper belt).
+- The body list has **"Asteroid belt"** (Ceres, Vesta, between Mars and Jupiter) and **"Dwarf planets · Kuiper belt"** (Pluto with Charon indented, Eris, Haumea, Makemake) sections.
+- **Asteroid belt** and **Kuiper belt** checkboxes in Controls.
+- The scaling note explains that the belts are drawn as huge glowing dots (the real belts are mostly empty space) and that Charon's orbit is shrunk and slowed 20×.
+
+### Changed
+- Info panels can show custom distance, period and day text, used for eccentric orbits and odd shapes.
+- When the taller body list would cover the bottom-left scale note, the note now slides to the right of the list.
+
+### Performance
+- Both belts are computed entirely on the GPU (one draw call each, no per-frame CPU work). iPad uses about a third of the particles, a bit bigger. Sub-pixel particles fade instead of flickering, and particle size is capped up close.
+- The 900-unit zoom-out into the galaxy view still works. Eris, the farthest body, sits at about 180 units.
+
 ## 2026-10-09: Nebulae & star clusters in the galaxy view
 
 ### Added

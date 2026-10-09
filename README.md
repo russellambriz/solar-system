@@ -5,10 +5,12 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 **Live demo:** https://russellambriz.github.io/solar-system/
 
 ## Features
-- The Sun (glowing, and it's the light source) plus all 8 planets in the right order, with correctly proportional orbital periods
+- The Sun (glowing, and it's the light source) plus all 8 planets and 5 dwarf planets in the right order, with correctly proportional orbital periods
 - Real axial tilts and day lengths (spin is slowed 50× so you can see it), Saturn's and Uranus's rings, Earth's clouds, the Moon clearly orbiting Earth with its own orbit ring, and Mars' (Phobos, Deimos) and Jupiter's (Io, Europa, Ganymede, Callisto) moons with detailed procedural surfaces
 - Click or tap any planet to fly to it and follow it, with an info panel: diameter, distance from the Sun (AU), orbital period, day length and a fun fact
 - Time speed slider (paused up to about 2.7 years per second), checkboxes for orbit lines and labels, and collapsible panels
+- **Asteroid belt & Kuiper belt**: thousands of GPU-animated asteroids (with the Kirkwood gaps and Jupiter's Trojans) and an icy Kuiper belt beyond Neptune, each with its own on/off checkbox
+- **Dwarf planets**: Ceres and Vesta in the asteroid belt; Pluto with Charon (a tidally locked double world) on its real eccentric, tilted orbit that crosses inside Neptune's; plus Eris, Haumea (egg-shaped, with a ring) and Makemake, all selectable with info panels
 - **Milky Way**: a glowing galactic band across the sky, tilted realistically to the planets' orbital plane (toggle it in Controls)
 - **Galaxy view**: zoom far out (or press 🌌 Galaxy view) to see the whole Milky Way as a 4-armed barred spiral, with a pulsing "You are here: Sun" marker 26,000 light-years from the center
 - **Solar flares**: zoom into the Sun to see its boiling granulated surface, sunspots, glowing prominence loops, and random solar flares and CMEs erupting off the edge
@@ -30,6 +32,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 | Andromeda | `A`, 🔭 Andromeda, zoom far out from the galaxy, or click it | 🔭 Andromeda, pinch far out, or tap it |
 | Back from Andromeda | `Esc` or 🌌 Back to Milky Way | 🌌 Back to Milky Way |
 | Milky Way sky band on/off | Controls checkbox | Controls checkbox |
+| Asteroid / Kuiper belt on/off | Controls checkboxes | Controls checkboxes |
 
 ## Run locally
 Browsers block ES modules on `file://` pages, so serve the folder with any static server:
@@ -47,7 +50,8 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 - `main.js`: scene, procedural textures, picking, camera focus/follow, view switching and UI code (commented)
 - `galaxy.js`: Milky Way sky band shader, the particle-based Milky Way, and Andromeda (M31) with M32/M110
 - `sun.js`: animated close-up Sun (granulation, sunspots, limb darkening), prominences, solar flares and CMEs
-- `moons.js`: GPU-baked surfaces of the Galilean moons and the potato-shaped Phobos and Deimos
+- `moons.js`: GPU-baked surfaces of the Galilean moons and the potato-shaped Phobos, Deimos and Vesta
+- `smallbodies.js`: asteroid belt, Trojans and Kuiper belt particles (Kepler orbits on the GPU), plus dwarf-planet orbits, facts and surfaces
 - `style.css`: dark space-themed UI that adapts to touch screens
 - `.nojekyll`: tells GitHub Pages to serve the files as they are
 
