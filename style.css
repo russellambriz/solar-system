@@ -93,8 +93,12 @@ button.active { background: rgba(255, 200, 90, 0.25); border-color: rgba(255, 21
 #controls { top: calc(var(--gap) + var(--sat)); right: calc(var(--gap) + var(--sar)); width: 260px;
   max-height: calc(100% - 2 * var(--gap) - var(--sat) - var(--sab)); overflow-y: auto; }
 /* views: one compact row; extra buttons simply add columns */
-.view-row { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin: 6px 0; }
-.view-row button { padding: 4px 6px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.view-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.view-row button { min-width: 0; min-height: var(--btn-h); padding: 3px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1.1; }
+body.touch .view-row button { min-height: 48px; }
+.view-row .ico { font-size: 16px; }
+.view-row .lbl { font-size: 11px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+#controls .view-row button.active { background: rgba(255, 200, 90, 0.25); border-color: rgba(255, 210, 120, 0.7); }
 /* layers: compact 2-column grid inside a disclosure */
 .layers { margin: 6px 0 0; }
 .layers summary { cursor: pointer; font-size: 13.5px; color: #9fb7ff; min-height: var(--btn-h); display: flex; align-items: center;
@@ -185,6 +189,22 @@ body.lg-view .galaxy-label.deep-label { display: none; }
 .galaxy-label.dist-label { color: #aebfff; background: rgba(0, 0, 20, 0.55); transform: none; pointer-events: none !important; }
 body.touch .galaxy-label.dist-label::before { display: none; }
 #andromeda-btn { background: rgba(200, 140, 70, 0.2); border-color: rgba(255, 200, 140, 0.35); }
+/* Deep space (Sombrero, Sgr A*, TON 618) */
+.galaxy-label.sombrero-label { color: #fff0c8; border-color: rgba(255, 225, 160, 0.65); background: rgba(40, 30, 10, 0.6); pointer-events: auto; cursor: pointer; }
+.galaxy-label.sombrero-dist { color: #ffe2b0; }
+.galaxy-label.sgra-label { color: #ffd0a0; border-color: rgba(255, 170, 100, 0.65); background: rgba(40, 18, 6, 0.62); pointer-events: auto; cursor: pointer; }
+.galaxy-label.sgra-note { color: #c9b8a6; background: rgba(0, 0, 0, 0.5); border-color: rgba(255, 170, 100, 0.25); transform: translateY(20px); pointer-events: none !important; }
+body.touch .galaxy-label.sgra-note::before { display: none; }
+body.sgra-close .galaxy-label:not(.sgra-label):not(.sgra-note) { display: none; }   /* close-up: hide unrelated galaxy labels */
+.galaxy-label.ton-label { color: #d6e6ff; border-color: rgba(160, 200, 255, 0.75); background: rgba(8, 18, 45, 0.65); pointer-events: auto; cursor: pointer; }
+.galaxy-label.ton-dist { color: #bcd0ff; }
+.galaxy-label.ton-home { color: #cdd6ff; background: rgba(0, 0, 20, 0.55); transform: translateY(22px); }
+.galaxy-label.ton-note { color: #b8c6dc; background: rgba(0, 0, 0, 0.5); border-color: rgba(150, 190, 255, 0.25); transform: translateY(20px); pointer-events: none !important; }
+.galaxy-label.ton-nep { color: #d8e6ff; background: rgba(0, 0, 0, 0.55); border-color: rgba(150, 190, 255, 0.35); transform: translate(calc(50% + 4px), 0); pointer-events: none !important; }
+body.touch .galaxy-label.ton-note::before, body.touch .galaxy-label.ton-nep::before, body.touch .galaxy-label.ton-home::before { display: none; }
+#sombrero-btn { background: rgba(200, 170, 90, 0.2); border-color: rgba(255, 225, 150, 0.35); }
+#sgra-btn { background: rgba(200, 110, 50, 0.2); border-color: rgba(255, 170, 100, 0.35); }
+#ton618-btn { background: rgba(110, 150, 255, 0.2); border-color: rgba(170, 200, 255, 0.4); }
 body.galaxy-mode #galaxy-note { display: block; }
 body.galaxy-mode #scale-note { display: none; }
 body.galaxy-mode #body-list button { opacity: 0.75; }

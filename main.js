@@ -3,6 +3,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { createSkyBand, createGalaxy, GALAXY_INFO, ANDROMEDA_INFO } from './galaxy.js';
+import { addSombrero, SOMBRERO_INFO } from './sombrero.js';
+import { addSgrA } from './sgra.js';
+import { addTon618 } from './ton618.js';
 import { createGalileanMesh, createPotatoMesh } from './moons.js';
 import { createSunFX } from './sun.js';
 import { createEarth } from './earth/index.js';
@@ -553,11 +556,18 @@ scene.add(skyBand.group);
 
 // Galaxy view lives in its own scene with its own units (1 unit = 100 ly) → no float/depth precision issues
 const galaxy = createGalaxy({ isTouch: IS_TOUCH });
+// Deep-space objects (all live in galaxy.scene, same units: 1 unit = 100 ly)
+const sombrero = addSombrero(galaxy, { isTouch: IS_TOUCH, labels: true });   // M104 at its true distance (31 Mly = 310,000 units)
+const M104_MIN_DIST = 120;
+const UNIVERSE_MID = galaxy.SUN_POS.clone().lerp(sombrero.POS, 0.46);         // framing point for the MW + M31 + M104 view
+const sgra = addSgrA(galaxy, { isTouch: IS_TOUCH, labels: true });           // Sgr A* at the galactic center (enlarged; LOD close-up); replaces the old center label
+const ton618 = addTon618(galaxy, { isTouch: IS_TOUCH, labels: true });       // TON 618 at its true light-travel distance (1.08e8 units)
+const TON618_MAX_DIST = 3e8;                                                 // zoom-out limit while focused on TON 618 (the far view sits at ~1.6e8)
 const GALAXY_POS = new THREE.Vector3(0, 620, 720);
-const GALAXY_MIN_DIST = 90, GALAXY_MAX_DIST = 60000;   // zooming far out reveals the Local Group (Andromeda at its true distance)
-const GALAXY_FAR = 200000;                              // galaxy-scene camera far plane (units of 100 ly)
+const GALAXY_MIN_DIST = 90, GALAXY_MAX_DIST = 700000;  // zooming far out reveals the Local Group, then the Sombrero (31 Mly)
+const GALAXY_FAR = 2000000;                             // galaxy-scene camera far plane (units of 100 ly); must exceed ~1.1 M to see M104 from the far view
 const M31_MIN_DIST = 160;
-let galaxyFocus = 'mw';              // what the galaxy-view camera orbits: 'mw' (Milky Way) | 'm31' (Andromeda)
+let galaxyFocus = 'mw';              // what the galaxy-view camera orbits: 'mw' (Milky Way) | 'm31' (Andromeda) | 'm104' (Sombrero) | 'sgra' (Sgr A*) | 'ton618'
 const LG_MID = galaxy.SUN_POS.clone().lerp(galaxy.M31_POS, 0.5);
 let activeScene = scene;
 let mode = 'solar';                  // 'solar' | 'galaxy' | 'transit'
@@ -600,10 +610,25 @@ $('andromeda-btn').addEventListener('click', () => {
   if (mode === 'solar') enterGalaxy(() => flyToAndromeda());
   else if (mode === 'galaxy') (galaxyFocus === 'm31' ? flyToMilkyWay() : flyToAndromeda());
 });
+$('sombrero-btn').addEventListener('click', () => {
+  if (mode === 'solar') enterGalaxy(() => flyToSombrero());
+  else if (mode === 'galaxy') (galaxyFocus === 'm104' ? flyToMilkyWay() : flyToSombrero());
+});
+$('sgra-btn').addEventListener('click', () => {
+  if (mode === 'solar') enterGalaxy(() => flyToSgrA());
+  else if (mode === 'galaxy') (galaxyFocus === 'sgra' ? leaveSgrA() : flyToSgrA());
+});
+$('ton618-btn').addEventListener('click', () => {
+  if (mode === 'solar') enterGalaxy(() => flyToTon618());
+  else if (mode === 'galaxy') (galaxyFocus === 'ton618' ? leaveTon618() : flyToTon618());
+});
 $('close-info').addEventListener('click', () => (mode === 'galaxy' ? hideInfo() : goOverview()));
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { if (mode === 'galaxy') (galaxyFocus === 'm31' ? flyToMilkyWay() : exitGalaxy()); else if (mode === 'solar') goOverview(); }
+  if (e.key === 'Escape') { if (mode === 'galaxy') (galaxyFocus !== 'mw' ? flyToMilkyWay() : exitGalaxy()); else if (mode === 'solar') goOverview(); }
   if ((e.key === 'a' || e.key === 'A') && !e.metaKey && !e.ctrlKey) $('andromeda-btn').click();
+  if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey) $('sombrero-btn').click();
+  if ((e.key === 'c' || e.key === 'C') && !e.metaKey && !e.ctrlKey) $('sgra-btn').click();     // C = galactic Center
+  if ((e.key === 't' || e.key === 'T') && !e.metaKey && !e.ctrlKey) $('ton618-btn').click();
   if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey) { if (mode === 'galaxy') exitGalaxy(); else enterGalaxy(); }
   if (e.code === 'Space' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') { e.preventDefault(); togglePause(); }
 });
@@ -685,6 +710,14 @@ function showGalaxyInfo() {
 }
 function showAndromedaInfo() {
   const g = ANDROMEDA_INFO;
+  $('info-name').textContent = g.name; $('info-name').style.color = g.color; $('info-type').textContent = g.type;
+  setRowLabels(...g.rows.map((r) => r[0]));
+  ['info-diameter', 'info-distance', 'info-period', 'info-day'].forEach((id, k) => ($(id).textContent = g.rows[k][1]));
+  $('info-fact').textContent = '💡 ' + g.fact;
+  openInfoPanel();
+}
+function showSombreroInfo() {
+  const g = SOMBRERO_INFO;
   $('info-name').textContent = g.name; $('info-name').style.color = g.color; $('info-type').textContent = g.type;
   setRowLabels(...g.rows.map((r) => r[0]));
   ['info-diameter', 'info-distance', 'info-period', 'info-day'].forEach((id, k) => ($(id).textContent = g.rows[k][1]));
@@ -787,6 +820,9 @@ function pickAndromeda(clientX, clientY, slopPx) {
   return Math.hypot(sx - clientX, sy - clientY) < rpx + slopPx;
 }
 function onAndromedaTap() { if (galaxyFocus === 'm31') showAndromedaInfo(); else flyToAndromeda(); }
+sombrero.labelEls[0]?.addEventListener('click', (e) => { e.stopPropagation(); if (mode === 'galaxy') (galaxyFocus === 'm104' ? showSombreroInfo() : flyToSombrero()); });
+sgra.labelEl?.addEventListener('click', (e) => { e.stopPropagation(); if (mode === 'galaxy') (galaxyFocus === 'sgra' ? sgra.showInfo() : flyToSgrA()); });
+ton618.labelEl?.addEventListener('click', (e) => { e.stopPropagation(); if (mode === 'galaxy') (galaxyFocus === 'ton618' ? ton618.showInfo() : flyToTon618()); });
 for (const lab of galaxy.m31LabelEls) {
   lab.addEventListener('click', (e) => { e.stopPropagation(); if (mode === 'galaxy') onAndromedaTap(); });
 }
@@ -804,7 +840,7 @@ el.addEventListener('pointerdown', (e) => {
 el.addEventListener('pointermove', (e) => {
   if (tap && e.pointerId === tap.id && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > TAP_SLOP()) tap = null;
   if (e.pointerType === 'mouse' && !e.buttons) {
-    if (mode === 'galaxy') { hovered = null; el.style.cursor = pickAndromeda(e.clientX, e.clientY, 8) || pickGalaxy(e.clientX, e.clientY) ? 'pointer' : 'grab'; return; }
+    if (mode === 'galaxy') { hovered = null; el.style.cursor = ton618.pick(e.clientX, e.clientY, camera, el, 8) || sgra.pick(e.clientX, e.clientY, camera, el, 8) || pickAndromeda(e.clientX, e.clientY, 8) || pickGalaxy(e.clientX, e.clientY) ? 'pointer' : 'grab'; return; }
     hovered = mode === 'solar' ? pick(e.clientX, e.clientY, 8) : null;
     el.style.cursor = hovered ? 'pointer' : 'grab';
   }
@@ -816,7 +852,9 @@ const endPointer = (e) => {
   tap = null;
   if (!ok || mode === 'transit') return;
   if (mode === 'galaxy') {
-    if (pickAndromeda(e.clientX, e.clientY, e.pointerType === 'mouse' ? 10 : 28)) onAndromedaTap();
+    if (ton618.pick(e.clientX, e.clientY, camera, renderer.domElement, e.pointerType === 'mouse' ? 10 : 28)) (galaxyFocus === 'ton618' ? ton618.showInfo() : flyToTon618());
+    else if (sgra.pick(e.clientX, e.clientY, camera, renderer.domElement, e.pointerType === 'mouse' ? 10 : 28)) (galaxyFocus === 'sgra' ? sgra.showInfo() : flyToSgrA());
+    else if (pickAndromeda(e.clientX, e.clientY, e.pointerType === 'mouse' ? 10 : 28)) onAndromedaTap();
     else if (pickGalaxy(e.clientX, e.clientY)) showGalaxyInfo();
     return;
   }
@@ -959,9 +997,20 @@ function beginTransit() {
 }
 function updateGalaxyButton() {
   const g = activeScene === galaxy.scene;
-  $('galaxy-btn').textContent = g ? '☀ Solar System' : '🌌 Galaxy';
-  $('andromeda-btn').textContent = g && galaxyFocus === 'm31' ? '🌌 Milky Way' : '🔭 Andromeda';
+  $('galaxy-btn').innerHTML = g ? '<span class="ico">☀</span><span class="lbl">Solar System</span>' : '<span class="ico">🌌</span><span class="lbl">Galaxy</span>';
+  // view row: compact icon + short label; the focused object's button turns into "back to the Milky Way"
+  setDeepBtn('andromeda-btn', g && galaxyFocus === 'm31', '🔭', 'Andromeda');
+  setDeepBtn('sombrero-btn', g && galaxyFocus === 'm104', '🎩', 'Sombrero');
+  setDeepBtn('sgra-btn', g && galaxyFocus === 'sgra', '⚫', 'Sgr A*');
+  setDeepBtn('ton618-btn', g && galaxyFocus === 'ton618', '✴', 'TON 618');
   document.body.classList.toggle('galaxy-mode', g);
+}
+
+function setDeepBtn(id, focusedHere, icon, label) {
+  const b = $(id);
+  b.innerHTML = focusedHere ? '<span class="ico">🌌</span><span class="lbl">Milky Way</span>' : `<span class="ico">${icon}</span><span class="lbl">${label}</span>`;
+  b.classList.toggle('active', focusedHere);
+  b.setAttribute('aria-label', focusedHere ? 'Back to the Milky Way' : label);
 }
 
 function enterGalaxy(after) {
@@ -1023,6 +1072,8 @@ function galaxyFly(midCam, midTarget, endCam, endTarget, onDone) {
   }));
 }
 function flyToAndromeda() {
+  if (galaxyFocus === 'sgra') { leaveSgrA(() => flyToAndromeda()); return; }
+  if (galaxyFocus === 'ton618') { leaveTon618(() => flyToAndromeda()); return; }
   if (mode !== 'galaxy' || galaxyFocus === 'm31') return;
   // final view: from our side of Andromeda (as we see it from the Milky Way: tilted 77°), slightly above and to one side
   const toUs = galaxy.m31Dir.clone().negate();
@@ -1038,6 +1089,8 @@ function flyToAndromeda() {
   });
 }
 function flyToMilkyWay() {
+  if (galaxyFocus === 'sgra') { leaveSgrA(); return; }
+  if (galaxyFocus === 'ton618') { leaveTon618(); return; }
   if (mode !== 'galaxy' || galaxyFocus === 'mw') return;
   galaxyFly(...lgPair(), GALAXY_POS, new THREE.Vector3(), () => {
     galaxyFocus = 'mw';
@@ -1045,6 +1098,90 @@ function flyToMilkyWay() {
     updateGalaxyButton();
   });
 }
+
+// ---- Deep space: Sombrero (M104), Sagittarius A*, TON 618 ----
+// Far view: Milky Way + Andromeda + Sombrero for scale (look perpendicular to the plane through all three)
+function universeView() {
+  const a = galaxy.M31_POS.clone().sub(galaxy.SUN_POS), b = sombrero.POS.clone().sub(galaxy.SUN_POS);
+  const n = new THREE.Vector3().crossVectors(a, b).normalize(); if (n.y < 0) n.negate();
+  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2), half = b.length() * 0.5 / 0.72;
+  const dist = camera.aspect >= 1 ? half / tanH / camera.aspect : half / tanH;
+  return { cam: UNIVERSE_MID.clone().addScaledVector(n, dist), target: UNIVERSE_MID.clone() };
+}
+function flyToSombrero() {
+  if (galaxyFocus === 'sgra') { leaveSgrA(() => flyToSombrero()); return; }
+  if (galaxyFocus === 'ton618') { leaveTon618(() => flyToSombrero()); return; }
+  if (mode !== 'galaxy' || galaxyFocus === 'm104') return;
+  const I = sombrero.info, tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  // end on our own line of sight → the famous near-edge-on view (6° from edge-on), framed to fit the screen
+  const endDist = sombrero.R * (camera.aspect > 1 ? 1.2 : 0.95) / tanH / camera.aspect;
+  const u = universeView();
+  galaxyFly(u.cam, u.target, sombrero.POS.clone().addScaledVector(I.los, endDist), sombrero.POS.clone(), () => {
+    galaxyFocus = 'm104';
+    controls.minDistance = M104_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST;
+    updateGalaxyButton();
+    showSombreroInfo();
+  });
+}
+// Sagittarius A*: fly to an (enlarged) close-up of the central black hole, as seen from the Sun's direction
+function flyToSgrA() {
+  if (galaxyFocus === 'ton618') { leaveTon618(() => flyToSgrA()); return; }
+  if (mode !== 'galaxy' || galaxyFocus === 'sgra') return;
+  const fromFar = galaxyFocus !== 'mw';   // Andromeda / Sombrero: come home through the Local Group view first
+  beginTransit();
+  glideBase = null;
+  const goIn = () => {
+    const f = sgra.focusView(camera);
+    flyTo(GALAXY_POS.clone().lerp(f.position, 0.55), f.target, 1.6, () => flyTo(f.position, f.target, 2.2, () => {
+      mode = 'galaxy'; galaxyFocus = 'sgra';
+      controls.minDistance = f.minDistance; controls.maxDistance = GALAXY_MAX_DIST;
+      controls.enabled = true;
+      updateGalaxyButton();
+      sgra.showInfo();
+    }));
+  };
+  if (fromFar) flyTo(...lgPair(), 2.6, () => flyTo(GALAXY_POS, new THREE.Vector3(), 2.4, goIn)); else goIn();
+}
+function leaveSgrA(after) {
+  if (mode !== 'galaxy' || galaxyFocus !== 'sgra') return;
+  beginTransit();
+  flyTo(GALAXY_POS, new THREE.Vector3(), 2.4, () => {
+    mode = 'galaxy'; galaxyFocus = 'mw';
+    controls.minDistance = GALAXY_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST;
+    controls.enabled = true;
+    updateGalaxyButton();
+    if (after) after();
+  });
+}
+// TON 618: pull back until the Milky Way and TON 618 are both on screen (10.8 billion ly apart, "every dash = 1 billion ly"),
+// glide out to the quasar (host galaxy + jets + glare), then drop into the enlarged black-hole close-up
+function flyToTon618() {
+  if (galaxyFocus === 'sgra') { leaveSgrA(() => flyToTon618()); return; }
+  if (mode !== 'galaxy' || galaxyFocus === 'ton618') return;
+  beginTransit();
+  glideBase = null;
+  const far = ton618.farView(camera), app = ton618.focusView(camera, { view: 'approach' }), close = ton618.focusView(camera);
+  flyTo(far.position, far.target, 2.6, () => flyTo(app.position, app.target, 2.8, () => flyTo(close.position, close.target, 2.2, () => {
+    mode = 'galaxy'; galaxyFocus = 'ton618';
+    controls.minDistance = close.minDistance; controls.maxDistance = TON618_MAX_DIST;
+    controls.enabled = true;
+    updateGalaxyButton();
+    ton618.showInfo();
+  })));
+}
+function leaveTon618(after) {
+  if (mode !== 'galaxy' || galaxyFocus !== 'ton618') return;
+  beginTransit();
+  const far = ton618.farView(camera);
+  flyTo(far.position, far.target, 2.6, () => flyTo(GALAXY_POS, new THREE.Vector3(), 2.6, () => {
+    mode = 'galaxy'; galaxyFocus = 'mw';
+    controls.minDistance = GALAXY_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST;
+    controls.enabled = true;
+    updateGalaxyButton();
+    if (after) after();
+  }));
+}
+
 // While zoomed far out, slide the orbit target from the focused galaxy toward the Local Group midpoint,
 // so zooming out reveals both galaxies (and zooming back in returns to the focused one).
 const _glide = new THREE.Vector3();
@@ -1053,14 +1190,16 @@ function glideGalaxyTarget() {
   const d = camera.position.distanceTo(controls.target);
   if (d < 2500) { glideBase = null; return; }
   if (!glideBase) glideBase = controls.target.clone();
-  const t = THREE.MathUtils.smoothstep(d, 2500, 26000);
-  _glide.copy(glideBase).lerp(LG_MID, t).sub(controls.target);
+  const t = THREE.MathUtils.smoothstep(d, 2500, 26000), t2 = THREE.MathUtils.smoothstep(d, 60000, 450000);
+  _glide.copy(glideBase).lerp(LG_MID, t).lerp(UNIVERSE_MID, t2).sub(controls.target);   // ...and further out toward MW + M31 + M104
   if (_glide.lengthSq() > 1e-6) { camera.position.add(_glide); controls.target.add(_glide); }
 }
 
 function exitGalaxy(after) {
   if (mode !== 'galaxy') return;
-  if (galaxyFocus === 'm31') { // come home first, then drop into the Solar System
+  if (galaxyFocus === 'sgra') { leaveSgrA(() => exitGalaxy(after)); return; }
+  if (galaxyFocus === 'ton618') { leaveTon618(() => exitGalaxy(after)); return; }
+  if (galaxyFocus !== 'mw') { // come home first, then drop into the Solar System
     galaxyFly(...lgPair(), GALAXY_POS, new THREE.Vector3(), () => {
       galaxyFocus = 'mw'; updateGalaxyButton(); exitGalaxy(after);
     });
@@ -1164,9 +1303,10 @@ function animate() {
   if (!transition) {
     if (mode === 'solar' && controls.getDistance() >= SOLAR_MAX_DIST * 0.99) enterGalaxy();
     else if (mode === 'galaxy' && galaxyFocus === 'mw' && controls.getDistance() <= GALAXY_MIN_DIST * 1.02) exitGalaxy();
+    else if (mode === 'galaxy' && galaxyFocus === 'sgra' && controls.getDistance() > 1200) { galaxyFocus = 'mw'; controls.minDistance = GALAXY_MIN_DIST; updateGalaxyButton(); }
   }
-  if (mode === 'galaxy' && !transition && glideEnabled) glideGalaxyTarget();
-  if (activeScene === galaxy.scene) document.body.classList.toggle('lg-view', galaxyFocus === 'm31' || camera.position.length() > 4500);
+  if (mode === 'galaxy' && !transition && glideEnabled && galaxyFocus !== 'ton618') glideGalaxyTarget();
+  if (activeScene === galaxy.scene) document.body.classList.toggle('lg-view', (galaxyFocus !== 'mw' && galaxyFocus !== 'sgra') || camera.position.length() > 4500);
   if (activeScene === scene) {
     const days = (simTime - J2000) / DAY_MS;
     for (const bt of belts) bt.material.uniforms.uDays.value = days;
@@ -1175,7 +1315,7 @@ function animate() {
     const nearSun = sunFX.stats().near;
     glow1.material.opacity = 1 - 0.55 * nearSun; glow2.material.opacity = 1 - 0.4 * nearSun; // let surface detail show up close
   }
-  else galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0);
+  else { galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0); sombrero.update(camera); sgra.update(camera, renderer); ton618.update(camera, renderer); }
   dateEl.textContent = 'Date: ' + new Date(simTime).toISOString().slice(0, 10) + (paused || daysPerSecond === 0 ? '  ⏸' : '');
   renderer.render(activeScene, camera);
   declutterLabels();
@@ -1207,4 +1347,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { isTransitioning: () => !!transition, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
+window.solar = { isTransitioning: () => !!transition, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };

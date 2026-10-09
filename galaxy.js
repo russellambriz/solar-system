@@ -103,7 +103,7 @@ export function createSkyBand({ isTouch = false, renderer } = {}) {
     fragmentShader: /* glsl */`
       uniform sampler2D tBand; uniform float uOpacity; varying vec2 vUv;
       void main() { gl_FragColor = vec4(texture2D(tBand, vUv).rgb * uOpacity, 1.0); }`,
-    side: THREE.BackSide, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+    side: THREE.BackSide, transparent: false, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,   // opaque pass + renderOrder -10: drawn first, so planets (incl. night sides) cover it
   });
   const band = new THREE.Mesh(new THREE.SphereGeometry(3200, 96, 48), mat);
   band.renderOrder = -10;
@@ -511,7 +511,7 @@ export function createGalaxy({ isTouch = false } = {}) {
       const farM31 = THREE.MathUtils.smoothstep(dM31, 3500, 22000), farMW = THREE.MathUtils.smoothstep(dMW, 2500, 22000);
       m31DiskGlow.material.opacity = 1 + 3.5 * farM31; m31Core.material.opacity = 1 + 0.6 * farM31;
       disk.material.opacity = 1 + 3.5 * farMW; coreGlow.material.opacity = 1 + 0.6 * farMW;
-      const showLine = dMW > 9000 && dM31 > 9000;
+      const showLine = dMW > 9000 && dM31 > 9000 && dMW < 150000;   // hide in the far MW + M31 + M104 view (overlaps the M31 label)
       distLine.visible = showLine; distLabel.el.classList.toggle('off', !showLine);
       // marker keeps a constant on-screen size
       const dist = camera.position.distanceTo(marker.getWorldPosition(tmp));

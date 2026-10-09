@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-10-09: Deep space: Sombrero Galaxy, Sagittarius A* and TON 618
+
+Built by **Galaxy Builder/Coder** (deep-space batch), integrated onto the compact iPad UI and EarthBot's Earth module.
+
+### Added
+- **Sombrero Galaxy (M104)** (new module `sombrero.js`) at its true distance, ~31 million light-years (12× farther than Andromeda), and to scale (~50,000 ly across): bright bulge, dark dust lane, near-edge-on as we see it. Far away it is marked with a glow, a labeled dashed line and a smudge so you can find it. Fly there with the 🎩 button, the **S** key or by clicking its label; the info panel has its facts.
+- **Sagittarius A\*** (new module `sgra.js`): the Milky Way's central black hole, enlarged so it can be seen, with a ray-traced close-up (shadow, lensed accretion disk) when you fly in. It replaces the old "Galactic center" label with a clickable "Sagittarius A\* · black hole" label. ⚫ button, **C** key (galactic Center), label click or tap on it; Esc flies back out.
+- **TON 618** (new module `ton618.js`): one of the most massive black holes known, a quasar at its light-travel distance of ~10.8 billion light-years. The trip pulls back until the Milky Way and TON 618 are both on screen (one dash per billion light-years), then glides in past the host galaxy, jets and glowing gas into an enlarged black-hole close-up with Neptune's orbit drawn to scale inside the shadow. ✴ button, **T** key, label click or tap.
+- Zooming far out from the galaxy view now slides past the Local Group to a view of the Milky Way, Andromeda and the Sombrero together.
+
+### Changed
+- The Galaxy and Andromeda buttons now share **one compact view row** with the new Sombrero, Sgr A\* and TON 618 buttons. Each shows an icon above a short name and is at least 44 px tall on touch screens, and the row wraps to two lines. The button for the object you are visiting turns into "🌌 Milky Way".
+- Galaxy-view camera range: far plane 200,000 → 2,000,000 units and maximum zoom-out 60,000 → 700,000 units (1 unit = 100 ly), so the Sombrero is reachable.
+- Esc, the ☀ Solar System button and the Andromeda button now come home correctly from any of the new objects.
+- The "≈ 2.5 million light-years" Andromeda distance label is hidden in the far Milky Way + Andromeda + Sombrero view, where it covered the Andromeda label.
+
+### Fixed
+- **The Milky Way sky band no longer shows through night sides.** Its material is now opaque-pass (`transparent: false`) with additive blending and `depthWrite: false`, so planets, Earth's night side and the Moon block it.
+
 ## 2026-10-09: Compact UI for iPad portrait & easier Moon taps
 
 ### Changed

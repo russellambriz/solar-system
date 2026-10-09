@@ -56,10 +56,13 @@
         <button id="pause-btn" title="Space">⏸ Pause</button>
         <button id="overview-btn" title="Esc">⟲ Overview</button>
       </div>
-      <!-- Views: one compact row (room for more, e.g. a future Sombrero button) -->
-      <div class="view-row">
-        <button id="galaxy-btn" title="Galaxy view (G)">🌌 Galaxy</button>
-        <button id="andromeda-btn" title="Andromeda (A)">🔭 Andromeda</button>
+      <!-- Views: one compact row of icon + short label buttons (wraps to 2 lines) -->
+      <div class="view-row deep-row">
+        <button id="galaxy-btn" title="Galaxy view (G)"><span class="ico">🌌</span><span class="lbl">Galaxy</span></button>
+        <button id="andromeda-btn" title="Andromeda (A)" aria-label="Andromeda"><span class="ico">🔭</span><span class="lbl">Andromeda</span></button>
+        <button id="sombrero-btn" title="Sombrero Galaxy, M104 (S)" aria-label="Sombrero"><span class="ico">🎩</span><span class="lbl">Sombrero</span></button>
+        <button id="sgra-btn" title="Sagittarius A*, our galaxy's black hole (C)" aria-label="Sgr A*"><span class="ico">⚫</span><span class="lbl">Sgr A*</span></button>
+        <button id="ton618-btn" title="TON 618 quasar (T)" aria-label="TON 618"><span class="ico">✴</span><span class="lbl">TON 618</span></button>
       </div>
       <details id="layers" class="layers" open>
         <summary>🗂 Layers</summary>
@@ -74,7 +77,8 @@
       <div class="help help-desktop">
         <b>Drag</b> rotate · <b>Scroll</b> zoom · <b>Right-drag</b> pan<br />
         <b>Click</b> a planet to follow it · <b>Esc</b> overview · <b>Space</b> pause<br />
-        <b>Zoom far out</b> or <b>G</b> for the galaxy view · <b>A</b> Andromeda
+        <b>Zoom far out</b> or <b>G</b> for the galaxy view · <b>A</b> Andromeda<br />
+        <b>S</b> Sombrero · <b>C</b> Sgr A* (galactic center) · <b>T</b> TON 618
       </div>
       <div class="help help-touch">
         <b>1 finger</b> rotate · <b>Pinch</b> zoom · <b>2 fingers</b> pan<br />
@@ -110,7 +114,11 @@
   <div id="galaxy-note">
     <span class="note-lg"><b>Local Group: true scale.</b> Andromeda is shown at its real distance, ~2.5 million light-years away (about 25 Milky Way
     diameters), and both galaxies are drawn to scale. Andromeda is ~220,000 ly across, about twice the Milky Way. The dwarf companions M32 and M110
-    are shown in approximate positions. Tap 🌌 Back to Milky Way or press Esc to return.</span>
+    are shown in approximate positions. Tap 🌌 Milky Way or press Esc to return.
+    The Sombrero Galaxy (M104) is also at its true distance, ~31 million light-years (12× farther than Andromeda), and to scale (~50,000 ly
+    across); far away it is marked with a glow so you can find it.
+    TON 618, a quasar powered by one of the most massive black holes known, is shown at its light-travel distance of
+    ~10.8 billion light-years (~350× farther than the Sombrero); its black-hole core is enlarged ~16,000× so you can see it.</span>
     <span class="note-mw"><b>Galaxy view: scale is wildly compressed.</b> 1 grid unit ≈ 100 light-years. At this scale the whole Solar System
     (out to Neptune, ~0.0005 light-years across) would be far smaller than a single pixel, so the Sun marker is hugely exaggerated.
     Particles stand in for billions of stars; the galaxy's rotation is sped up by trillions of times. Zoom in, press Esc or tap ☀ Solar System to go back.
