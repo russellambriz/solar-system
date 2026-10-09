@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-09: Solar flares & close-up Sun
+
+### Added
+- **Animated close-up Sun** (new module `sun.js`): the surface is now a live shader instead of a static texture.
+  - Boiling convection granules (cellular noise that slowly churns) and drifting supergranule turbulence.
+  - Sunspots with dark umbrae and filament-like penumbrae, and bright faculae toward the limb.
+  - Realistic limb darkening (the edge is dimmer and redder) and a thin reddish chromosphere rim.
+- **Prominences:** glowing magnetic loops arching off the surface (11 on desktop, 6 on iPad). Plasma threads stream along them, they writhe gently, and they fade out and re-form elsewhere every 20–40 s. Loops prefer the limb, so they stand out against space.
+- **Solar flares:** every ~5–13 s a random eruption fires near the limb, with a bright flash, a local surface brightening, and plasma blasting out and falling back. About 30% of flares launch a **CME**, a wider, faster particle burst that keeps expanding outward and fades.
+- The Sun's info panel now mentions prominences, flares and CMEs.
+
+### Performance
+- Level of detail: the effects only exist near the Sun. They fade in when the camera is within ~110 units and are fully on at the Sun focus distance; farther out they're hidden and nothing is updated. Granulation is only computed within 100 units.
+- iPad uses fewer loops, plasma particles (40 vs 90 per loop) and flare particles (260 vs 700), and a cheaper surface detail layer.
+- The Sun's big glow sprites dim when you're close, so the surface detail shows.
+
 ## 2026-10-09: Andromeda Galaxy & Local Group
 
 ### Added

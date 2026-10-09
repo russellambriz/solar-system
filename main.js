@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { createSkyBand, createGalaxy, GALAXY_INFO, ANDROMEDA_INFO } from './galaxy.js';
 import { createGalileanMesh, createPotatoMesh } from './moons.js';
+import { createSunFX } from './sun.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -38,7 +39,10 @@ const PLANETS = [
 const SUN_INFO = {
   name: 'Sun', type: 'G-type main-sequence star', diameter: 1392700, color: '#ffcc55',
   distanceText: '— (center)', periodText: '~230 million years around the galaxy', dayText: '~25 days (equator)',
-  fact: 'The Sun holds 99.86% of all the mass in the solar system. About 1.3 million Earths could fit inside it.',
+  fact: 'The Sun holds 99.86% of all the mass in the solar system. About 1.3 million Earths could fit inside it. ' +
+        'Zoom in close to watch its boiling surface: glowing loops of plasma (prominences) arch along magnetic field lines, and solar flares ' +
+        'release more energy in minutes than humanity uses in a million years. Sometimes they hurl billions of tons of plasma into space (a CME), ' +
+        'which can spark auroras on Earth days later.',
 };
 const MOON_INFO = {
   name: 'Moon', type: 'Natural satellite of Earth', diameter: 3474, period: 27.32, color: '#bbbbbb',
@@ -359,6 +363,9 @@ glow1.scale.set(SUN_RADIUS * 5, SUN_RADIUS * 5, 1);
 const glow2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture('rgba(255,200,120,0.5)', 'rgba(255,140,40,0.12)'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
 glow2.scale.set(SUN_RADIUS * 11, SUN_RADIUS * 11, 1);
 sunGroup.add(glow1, glow2);
+// close-up effects: animated granulation, sunspots, limb darkening, prominences, flares/CMEs (LOD: only when near)
+const sunFX = createSunFX({ radius: SUN_RADIUS, isTouch: IS_TOUCH, mesh: sunMesh });
+sunGroup.add(sunFX.group);
 const sunBody = { name: 'Sun', info: SUN_INFO, group: sunGroup, mesh: sunMesh, radius: SUN_RADIUS };
 sunBody.labelEl = addLabel(sunGroup, 'Sun', SUN_RADIUS + 1.5);
 addPickSphere(sunGroup, SUN_RADIUS / 1.4, sunBody);
@@ -1020,7 +1027,12 @@ function animate() {
   }
   if (mode === 'galaxy' && !transition && glideEnabled) glideGalaxyTarget();
   if (activeScene === galaxy.scene) document.body.classList.toggle('lg-view', galaxyFocus === 'm31' || camera.position.length() > 4500);
-  if (activeScene === scene) skyBand.update(camera);
+  if (activeScene === scene) {
+    skyBand.update(camera);
+    sunFX.update(dt, camera, sunGroup.position, true);
+    const nearSun = sunFX.stats().near;
+    glow1.material.opacity = 1 - 0.55 * nearSun; glow2.material.opacity = 1 - 0.4 * nearSun; // let surface detail show up close
+  }
   else galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0);
   dateEl.textContent = 'Date: ' + new Date(simTime).toISOString().slice(0, 10) + (paused || daysPerSecond === 0 ? '  ⏸' : '');
   renderer.render(activeScene, camera);
@@ -1034,6 +1046,7 @@ function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   labelRenderer.setSize(window.innerWidth, window.innerHeight);
   // galaxy point sprites: pixels per world unit at distance 1
+  sunFX.setScale(window.innerHeight * renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)));
   galaxy.setScale(window.innerHeight * renderer.getPixelRatio() / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)));
 }
 window.addEventListener('resize', onResize);
@@ -1047,4 +1060,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
+window.solar = { sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
