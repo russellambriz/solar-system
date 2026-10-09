@@ -619,10 +619,23 @@ for (const b of bodies) {
   const btn = document.createElement('button');
   btn.innerHTML = `<span class="dot" style="background:${b.info.color}"></span>${b.name}`;
   if (b.isSmall) btn.classList.add('small-body');
-  if (b.isMoon) btn.style.paddingLeft = b.isSmall ? '30px' : '22px';
-  btn.addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy(() => focusOn(b)) : mode === 'solar' && focusOn(b)));
+  if (b.isMoon) { btn.style.paddingLeft = b.isSmall ? '30px' : '22px'; btn.classList.add('moon-item', 'folded'); }
+  btn.addEventListener('click', () => {
+    if (mode === 'galaxy') exitGalaxy(() => focusOn(b)); else if (mode === 'solar') focusOn(b);
+    if (isCompact()) setPanelCollapsed('nav-panel', true);       // small screens: get the list out of the way
+  });
   b.button = btn;
-  list.appendChild(btn);
+  if (b.moons && b.moons.length) {
+    // planet row with an expand arrow that shows/hides its moons
+    const row = document.createElement('div'); row.className = 'list-row';
+    const ex = document.createElement('button');
+    ex.className = 'expand-btn'; ex.setAttribute('aria-label', `Show ${b.name}'s moons`); ex.setAttribute('aria-expanded', 'false');
+    ex.innerHTML = `▸<span class="n">${b.moons.length}</span>`;
+    ex.addEventListener('click', () => setMoonsExpanded(b, ex.getAttribute('aria-expanded') !== 'true'));
+    b.expandBtn = ex;
+    row.append(btn, ex);
+    list.appendChild(row);
+  } else list.appendChild(btn);
   b.labelEl.addEventListener('click', (e) => {
     e.stopPropagation();
     // A label can sit on top of another planet's disc (e.g. the Sun's label over Mars).
@@ -634,6 +647,12 @@ for (const b of bodies) {
   b.labelEl.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && hovered === b) hovered = null; });
 }
 
+function setMoonsExpanded(b, open) {
+  if (!b.expandBtn) return;
+  b.expandBtn.setAttribute('aria-expanded', String(open));
+  b.expandBtn.firstChild.textContent = open ? '▾' : '▸';
+  for (const m of b.moons) m.button.classList.toggle('folded', !open);
+}
 function fmtNum(n) { return n.toLocaleString('en-US'); }
 function fmtPeriod(days) {
   return days < 1000 ? `${fmtNum(+days.toFixed(2))} days` : `${(days / 365.25).toFixed(2)} years (${fmtNum(Math.round(days))} days)`;
@@ -732,7 +751,13 @@ function pick(clientX, clientY, slopPx) {
     }
     if (centerDist === Infinity) continue;
     if (centerDist > screenR + slopPx && b !== rayBody) continue;
-    const score = centerDist / (screenR + slopPx) * (b === rayBody ? 0.8 : 1);
+    // 1) the tap is well inside a body's visible disc → that body (front-most wins if discs overlap)
+    // 2) otherwise → the body whose center is nearest the finger (so a tiny moon right next to a bigger
+    //    planet's edge is still easy to hit); moons of the focused planet get a small head start
+    const inside = centerDist <= screenR * 0.8;
+    const camDist = b.group.getWorldPosition(_hist).distanceTo(camera.position);
+    const boost = focused && (b.parent === focused || b.parent === focused.parent) ? 0.75 : 1;
+    const score = inside ? -1e6 + camDist : centerDist * boost;
     if (score < bestScore) { bestScore = score; best = b; }
   }
   return best;
@@ -816,13 +841,28 @@ function placeNotes() {
   const noteTop = note.height ? note.top : window.innerHeight - 140;
   if (nav.bottom > noteTop - 6 && nav.right + 12 + 300 < window.innerWidth) document.body.style.setProperty('--note-left', `${Math.round(nav.right + 12)}px`);
 }
-// Collapsible panels (start collapsed on small screens so the view isn't covered)
-for (const btn of document.querySelectorAll('.collapse-btn')) {
-  const panel = document.getElementById(btn.dataset.target);
-  const set = (collapsed) => { panel.classList.toggle('collapsed', collapsed); btn.setAttribute('aria-expanded', String(!collapsed)); placeNotes(); };
-  btn.addEventListener('click', () => set(!panel.classList.contains('collapsed')));
-  if (Math.min(window.innerWidth, window.innerHeight) < 600) set(true);
+// Collapsible panels. Compact screens (portrait tablets, phones, short landscape) start with both panels collapsed
+// and the Layers group closed, so planets and moons aren't hidden behind the UI.
+function isCompact() { return window.innerHeight > window.innerWidth || Math.min(window.innerWidth, window.innerHeight) < 600; }
+function setPanelCollapsed(id, collapsed) {
+  const panel = $(id), btn = panel.querySelector('.collapse-btn');
+  panel.classList.toggle('collapsed', collapsed); btn.setAttribute('aria-expanded', String(!collapsed)); placeNotes();
 }
+for (const btn of document.querySelectorAll('.collapse-btn')) {
+  const id = btn.dataset.target;
+  btn.addEventListener('click', () => setPanelCollapsed(id, !$(id).classList.contains('collapsed')));
+}
+let wasCompact = null;
+function applyCompact() {
+  const c = isCompact();
+  if (c === wasCompact) return;
+  wasCompact = c;
+  document.body.classList.toggle('compact', c);
+  if (c) { setPanelCollapsed('nav-panel', true); setPanelCollapsed('controls', true); $('layers').open = false; }
+  else $('layers').open = true;
+}
+applyCompact();
+window.addEventListener('resize', applyCompact);
 
 // ---------------------------------------------------------------------------
 // Label de-cluttering: hide labels whose screen rectangles overlap a higher-priority label
@@ -885,6 +925,7 @@ function focusOffset(b, out) {
 
 function focusOn(b) {
   focused = b;
+  setMoonsExpanded(b.moons && b.moons.length ? b : b.parent || b, true);
   transition = { fromCam: camera.position.clone(), fromTarget: controls.target.clone(), t: 0, offset: focusOffset(b, new THREE.Vector3()) };
   controls.minDistance = Math.max(b.radius * 1.5, 0.3);
   bodies.forEach((o) => { o.labelEl.classList.toggle('active', o === b); o.button.classList.toggle('active', o === b); });
@@ -917,8 +958,8 @@ function beginTransit() {
 }
 function updateGalaxyButton() {
   const g = activeScene === galaxy.scene;
-  $('galaxy-btn').textContent = g ? '☀ Solar System' : '🌌 Galaxy view';
-  $('andromeda-btn').textContent = g && galaxyFocus === 'm31' ? '🌌 Back to Milky Way' : '🔭 Andromeda';
+  $('galaxy-btn').textContent = g ? '☀ Solar System' : '🌌 Galaxy';
+  $('andromeda-btn').textContent = g && galaxyFocus === 'm31' ? '🌌 Milky Way' : '🔭 Andromeda';
   document.body.classList.toggle('galaxy-mode', g);
 }
 

@@ -56,17 +56,21 @@
         <button id="pause-btn" title="Space">⏸ Pause</button>
         <button id="overview-btn" title="Esc">⟲ Overview</button>
       </div>
-      <div class="row buttons">
-        <button id="galaxy-btn" title="G">🌌 Galaxy view</button>
+      <!-- Views: one compact row (room for more, e.g. a future Sombrero button) -->
+      <div class="view-row">
+        <button id="galaxy-btn" title="Galaxy view (G)">🌌 Galaxy</button>
+        <button id="andromeda-btn" title="Andromeda (A)">🔭 Andromeda</button>
       </div>
-      <div class="row buttons">
-        <button id="andromeda-btn" title="A">🔭 Andromeda</button>
-      </div>
-      <label class="row toggle"><input type="checkbox" id="toggle-orbits" checked /> Orbit lines</label>
-      <label class="row toggle"><input type="checkbox" id="toggle-labels" checked /> Labels</label>
-      <label class="row toggle"><input type="checkbox" id="toggle-asteroids" checked /> Asteroid belt</label>
-      <label class="row toggle"><input type="checkbox" id="toggle-kuiper" checked /> Kuiper belt</label>
-      <label class="row toggle"><input type="checkbox" id="toggle-milkyway" checked /> Milky Way (sky band)</label>
+      <details id="layers" class="layers" open>
+        <summary>🗂 Layers</summary>
+        <div class="layer-grid">
+          <label class="toggle"><input type="checkbox" id="toggle-orbits" checked /> Orbits</label>
+          <label class="toggle"><input type="checkbox" id="toggle-labels" checked /> Labels</label>
+          <label class="toggle"><input type="checkbox" id="toggle-asteroids" checked /> Asteroids</label>
+          <label class="toggle"><input type="checkbox" id="toggle-kuiper" checked /> Kuiper belt</label>
+          <label class="toggle"><input type="checkbox" id="toggle-milkyway" checked /> Milky Way</label>
+        </div>
+      </details>
       <div class="help help-desktop">
         <b>Drag</b> rotate · <b>Scroll</b> zoom · <b>Right-drag</b> pan<br />
         <b>Click</b> a planet to follow it · <b>Esc</b> overview · <b>Space</b> pause<br />
@@ -75,7 +79,7 @@
       <div class="help help-touch">
         <b>1 finger</b> rotate · <b>Pinch</b> zoom · <b>2 fingers</b> pan<br />
         <b>Tap</b> a planet, label or name to follow it · <b>⟲ Overview</b> to return<br />
-        <b>Pinch far out</b> or tap <b>🌌 Galaxy view</b> to see the Milky Way
+        <b>Pinch far out</b> or tap <b>🌌 Galaxy</b> to see the Milky Way · <b>▸</b> shows a planet’s moons
       </div>
     </div>
   </div>

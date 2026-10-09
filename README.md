@@ -8,11 +8,12 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 - The Sun (glowing, and it's the light source) plus all 8 planets and 5 dwarf planets in the right order, with correctly proportional orbital periods
 - Real axial tilts and day lengths (spin is slowed 50× so you can see it), Saturn's and Uranus's rings, Earth's clouds, the Moon clearly orbiting Earth with its own orbit ring, and Mars' (Phobos, Deimos) and Jupiter's (Io, Europa, Ganymede, Callisto) moons with detailed procedural surfaces
 - Click or tap any planet to fly to it and follow it, with an info panel: diameter, distance from the Sun (AU), orbital period, day length and a fun fact
-- Time speed slider (paused up to about 2.7 years per second), checkboxes for orbit lines and labels, and collapsible panels
+- Time speed slider (paused up to about 2.7 years per second), a compact Layers group (orbits, labels, belts, Milky Way), and collapsible panels; on portrait/small screens both panels start collapsed and the planet list folds away after you pick something
+- Planet list with moons folded under their planet (tap ▸ to show them; focusing a planet unfolds its moons)
 - **Asteroid belt & Kuiper belt**: thousands of GPU-animated asteroids (with the Kirkwood gaps and Jupiter's Trojans) and an icy Kuiper belt beyond Neptune, each with its own on/off checkbox
 - **Dwarf planets**: Ceres and Vesta in the asteroid belt; Pluto with Charon (a tidally locked double world) on its real eccentric, tilted orbit that crosses inside Neptune's; plus Eris, Haumea (egg-shaped, with a ring) and Makemake, all selectable with info panels
 - **Milky Way**: a glowing galactic band across the sky, tilted realistically to the planets' orbital plane (toggle it in Controls)
-- **Galaxy view**: zoom far out (or press 🌌 Galaxy view) to see the whole Milky Way as a 4-armed barred spiral, with a pulsing "You are here: Sun" marker 26,000 light-years from the center
+- **Galaxy view**: zoom far out (or press 🌌 Galaxy) to see the whole Milky Way as a 4-armed barred spiral, with a pulsing "You are here: Sun" marker 26,000 light-years from the center
 - **Solar flares**: zoom into the Sun to see its boiling granulated surface, sunspots, glowing prominence loops, and random solar flares and CMEs erupting off the edge
 - **Andromeda & the Local Group**: zoom even farther out (or press 🔭 Andromeda / `A`) to see the Andromeda Galaxy (M31) with its companions M32 and M110, shown at its true distance of ~2.5 million light-years
 - Distances and sizes are scaled so everything is visible (in the galaxy view, *wildly* so); see the note in the bottom-left corner of the page
@@ -26,7 +27,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 | Follow a planet | Click planet, label or list item | Tap planet, label or list item |
 | Back to overview | `Esc` or ⟲ Overview | ⟲ Overview or ✕ |
 | Pause / play | `Space` or button | Pause button |
-| Galaxy view | `G`, 🌌 Galaxy view, or zoom far out | 🌌 Galaxy view, or pinch far out |
+| Galaxy view | `G`, 🌌 Galaxy, or zoom far out | 🌌 Galaxy, or pinch far out |
 | Back from galaxy | `Esc`, ☀ Solar System, or zoom all the way in | ☀ Solar System, or pinch all the way in |
 | Galaxy info | Click the galaxy or "You are here" | Tap the galaxy or "You are here" |
 | Andromeda | `A`, 🔭 Andromeda, zoom far out from the galaxy, or click it | 🔭 Andromeda, pinch far out, or tap it |

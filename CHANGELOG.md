@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-09: Compact UI for iPad portrait & easier Moon taps
+
+### Changed
+- **Panels no longer hide planets on iPad portrait.**
+  - On portrait and small screens (portrait, or shorter side under 600 px), the planet list and Controls start collapsed and Layers starts closed.
+  - The list folds away after you pick a body, and rotating to landscape restores the full panels.
+- **Planet list:**
+  - Moons are folded under their planet, with a ▸ arrow showing how many there are.
+  - Focusing a planet or one of its moons unfolds that group automatically.
+  - The list is a scrollable panel capped at 78% of the screen height.
+- **Controls:**
+  - Galaxy and Andromeda sit in one compact row of icon + short-label buttons (it has room for more, e.g. a future Sombrero button). In the galaxy view they read ☀ Solar System / 🌌 Milky Way.
+  - The checkboxes are grouped in a **🗂 Layers** disclosure as a 2-column grid: Orbits, Labels, Asteroids, Kuiper belt, Milky Way.
+  - The Controls panel scrolls if it ever gets taller than the screen.
+- Touch targets stay at least 44 px, including the moon-group arrows, the Layers header and each layer toggle.
+
+### Fixed
+- **The Moon is easy to tap next to Venus in the far overview.** Picking now works in two steps:
+  - If the tap is well inside a body's visible disc, that body wins (the front-most one if discs overlap).
+  - Otherwise the body whose center is nearest the finger wins, so a tiny moon beside a bigger planet's edge is no longer stolen by the planet.
+  - Moons of the focused planet get a small priority boost.
+- The galaxy view's "☀ You are here" marker now stays on top of nearby star-cluster labels (e.g. M4), so it is always tappable.
+
 ## 2026-10-09: Asteroid belt, Kuiper belt and dwarf planets update
 
 ### Added
