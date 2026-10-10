@@ -36,7 +36,7 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uEarthPos: { value: new THREE.Vector3() },
     uEarthLit: { value: 0.5 },                              // how much of Earth's day side faces the Moon (0..1)
     uEarthTint: { value: new THREE.Color(0.55, 0.66, 0.9) }, // replaced by EarthBot's shared uniform when available
-    uEarthshine: { value: 0.08 },
+    uEarthshine: { value: 0.3 },                             // scaled for EarthBot's uEarthTint (~0.31 grey-blue)
   };
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG });
 
