@@ -38,7 +38,7 @@ void main() {
   // clouds scatter light, so use a slightly wrapped Lambert; same reddened twilight as the ground
   float diff = smoothstep(-0.12, 0.25, NdL) * clamp((NdL + 0.15) / 1.15, 0.0, 1.0);
   vec3 sunTint = mix(vec3(1.0, 0.6, 0.38), vec3(1.0), smoothstep(0.0, 0.35, NdL));
-  vec3 col = vec3(0.95) * (uSunColor * sunTint * diff + uAmbient * 0.35); // dim on the night side
+  vec3 col = vec3(0.95) * (uSunColor * sunTint * diff + uAmbient * 0.5); // dim on the night side
   // thin clouds at the limb pick up a little sky blue
   float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
   col = mix(col, uAtmoColor * diff * 1.6, fres * 0.35);

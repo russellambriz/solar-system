@@ -3,7 +3,7 @@
 // Per fragment:
 //   • day map lit by the Sun (Lambert, optional normal map on land), with a soft, slightly reddened terminator
 //   • night city lights that fade in across the terminator (and are dimmed under thick cloud)
-//   • ocean specular glint (Blinn-Phong) masked by the water map
+//   • ocean sun glint (normalised Blinn-Phong + Fresnel, noise-varied roughness) masked by the water map
 //   • soft cloud shadows: the cloud texture is sampled a little "towards the Sun" from each point, in the cloud
 //     layer's own (separately rotating) frame, so the shadows slide with the clouds and fall on the anti-sun side
 //   • a thin blue Fresnel rim (the atmosphere seen against the disc), brighter on the day side
@@ -11,7 +11,7 @@
 // Lighting units follow MeshStandardMaterial under three r155+ physical lights: radiance = albedo · (I/π) · N·L,
 // so Earth matches the brightness of the other planets lit by the same PointLight.
 import * as THREE from 'three';
-import { DIR_TO_UV, CLOUD_CURVE } from './glsl.js';
+import { DIR_TO_UV, CLOUD_CURVE, VALUE_NOISE } from './glsl.js';
 
 const vertexShader = /* glsl */ `
 varying vec2 vUv;
@@ -51,6 +51,7 @@ uniform float uCloudsReady;     // 0 until the cloud texture has loaded
 uniform float uCloudShadow;     // max darkening under full cloud (0..1)
 uniform float uNightGain;       // city-light brightness
 uniform float uSpecular;        // ocean glint strength
+uniform float uGlintShininess;  // Blinn-Phong exponent of the calmest sea
 uniform float uNormalStrength;  // land relief strength (desktop only)
 uniform vec3  uAtmoColor;       // linear sky colour used for the limb rim
 
@@ -62,6 +63,7 @@ varying vec3 vWorldPos;
 
 ${DIR_TO_UV}
 ${CLOUD_CURVE}
+${VALUE_NOISE}
 
 // Cloud coverage above a ground direction (object space). textureGrad with the ground UV derivatives avoids
 // the mip-level glitch an atan()-generated UV would otherwise show along the date-line seam.
@@ -106,10 +108,20 @@ void main() {
   col += day * uAmbient;
 
   // ---- ocean glint ------------------------------------------------------------------------------------------
-  vec3 H = normalize(L + V);
-  float NdH = max(dot(N, H), 0.0);
-  float glint = (pow(NdH, 220.0) * 1.6 + pow(NdH, 24.0) * 0.05) * uSpecular;
-  col += uSunColor * sunTint * glint * water * term * (1.0 - shadow) * (1.0 - 0.8 * overhead);
+  // Energy-conserving (normalised) Blinn-Phong with Schlick Fresnel (water F0 ≈ 0.02). The exponent is high, so
+  // the lobe is a tight glint rather than a broad white blob, and it varies a little with a cheap 3-D value noise
+  // (patches of calmer / rougher sea). Fresnel brightens it towards the limb; 1 − exp(−x) soft-clips the result
+  // so it can never flatten into a saturated white disc.
+  vec3  H    = normalize(L + V);
+  float NdH  = max(dot(N, H), 0.0);
+  float VdH  = max(dot(V, H), 0.0);
+  float sea  = vnoise(vObjDir * 22.0) * 0.65 + vnoise(vObjDir * 61.0) * 0.35;  // 0..1 "calmness"
+  float shin = mix(uGlintShininess * 0.35, uGlintShininess, sea);
+  float norm = (shin + 8.0) * 0.03978874;                                       // (n + 8) / (8π)
+  float fres = 0.02 + 0.98 * pow(1.0 - VdH, 5.0);
+  float glint = norm * pow(NdH, shin) * fres * max(NdLgeo, 0.0) * uSpecular;
+  glint *= water * term * (1.0 - shadow) * (1.0 - 0.85 * overhead);
+  col += uSunColor * sunTint * (1.0 - exp(-glint));
 
   // ---- night lights -------------------------------------------------------------------------------------------
   // The source map has a faint blue base layer; keep only the bright city cores and warm them up a little.
@@ -119,9 +131,10 @@ void main() {
   col += vec3(1.0, 0.78, 0.48) * lights * nightSide * (1.0 - 0.75 * overhead) * uNightGain;
 
   // ---- atmosphere rim on the disc + faint day-side haze -------------------------------------------------------
-  float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
-  float dayRim = smoothstep(-0.25, 0.55, NdLgeo);
-  col += uAtmoColor * (fres * 0.9 + 0.04) * dayRim;
+  // (kept subtle so the disc edge isn't washed out; the crisp halo itself lives in atmosphere.js)
+  float rim = pow(1.0 - max(dot(N, V), 0.0), 5.0);
+  float dayRim = smoothstep(-0.15, 0.55, NdLgeo);
+  col += uAtmoColor * (rim * 0.45 + 0.02) * dayRim;
 
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>

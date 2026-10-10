@@ -31,13 +31,15 @@ void main() {
   vec3 cp = ro + rd * b;
   float d = length(cp - uCenter);
   float h = clamp((uRa - d) / (uRa - uR), 0.0, 1.0); // 1 at the surface, 0 at the shell edge
-  float glow = h * h * (0.6 + 0.4 * h);
+  // Falloff concentrated right at the limb: density ~ exp(-altitude), normalised so the shell edge is 0.
+  float glow = (exp(-4.0 * (1.0 - h)) - 0.0183) / 0.9817;
+  glow *= glow;
   vec3 up = (cp - uCenter) / max(d, 1e-5);
   float mu = dot(up, normalize(uSunDir));
-  float dayF = smoothstep(-0.30, 0.45, mu);
-  float sunset = (1.0 - smoothstep(0.0, 0.22, abs(mu + 0.10))) * 0.45;  // just past the terminator
-  vec3 col = mix(uAtmoColor, vec3(1.0, 0.42, 0.18), sunset);
-  gl_FragColor = vec4(col * glow * (0.03 + dayF) * uAtmoIntensity, 1.0);
+  float dayF = smoothstep(-0.12, 0.40, mu);                                   // ~0 on the night side
+  float sunset = (1.0 - smoothstep(0.0, 0.18, abs(mu + 0.06))) * 0.28;         // faint, just at the terminator
+  vec3 col = mix(uAtmoColor, vec3(1.0, 0.45, 0.2), sunset);
+  gl_FragColor = vec4(col * glow * dayF * uAtmoIntensity, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

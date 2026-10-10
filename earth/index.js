@@ -27,15 +27,16 @@ export const EARTH_TINT = DAY_MEAN.clone().multiplyScalar(1 - CLOUD_FRACTION).ad
 // Tunables (exposed on earth.params for console experiments)
 const DEFAULTS = {
   cloudAltitude: 0.02,     // cloud sphere radius = radius · (1 + cloudAltitude)  (matches the old main.js value)
-  atmoThickness: 0.06,     // halo shell radius = radius · (1 + atmoThickness)
-  atmoColor: new THREE.Color(0.30, 0.55, 1.0),   // linear
-  atmoIntensity: 1.0,
+  atmoThickness: 0.03,     // halo shell radius = radius · (1 + atmoThickness): thin, crisp limb
+  atmoColor: new THREE.Color(0.10, 0.30, 1.0),   // linear, deep sky blue
+  atmoIntensity: 1.3,
   cloudOpacity: 0.95,
   cloudShadow: 0.45,
   nightGain: 1.25,
-  specular: 1.0,
+  specular: 1.6,
+  glintShininess: 900,     // calm-sea exponent; rough patches drop to ~35% of this
   normalStrength: 0.9,
-  ambient: 0.035,
+  ambient: 0.015,          // a bit below the scene's MeshStandard ambient so city lights read on the night side
 };
 
 /**
@@ -71,6 +72,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uCloudOpacity:  { value: P.cloudOpacity },
     uNightGain:     { value: P.nightGain },
     uSpecular:      { value: P.specular },
+    uGlintShininess:{ value: P.glintShininess },
     uNormalStrength:{ value: P.normalStrength },
     uAtmoColor:     { value: P.atmoColor },
     uAtmoIntensity: { value: P.atmoIntensity },
