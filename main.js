@@ -9,6 +9,7 @@ import { addTon618 } from './ton618.js';
 import { createGalileanMesh, createPotatoMesh } from './moons.js';
 import { createSunFX } from './sun.js';
 import { createEarth } from './earth/index.js';
+import { createMoonMesh, updateMoon } from './moon/index.js';
 import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitPoints, createAsteroidBelt, createKuiperBelt,
   surfaceTexture } from './smallbodies.js';
 
@@ -411,12 +412,11 @@ for (const p of PLANETS) {
     const moonR = radius * 0.5;      // shown at ~half Earth's size (real: 0.27×) so it reads at overview zoom
     const moonGroup = new THREE.Group();
     moonPivot.add(moonGroup);
-    const moonMesh = new THREE.Mesh(new THREE.SphereGeometry(moonR, 32, 24),
-      new THREE.MeshStandardMaterial({ map: TEXTURES.Moon(), roughness: 1, emissive: 0x1a1a1f })); // faint emissive: night side not pitch black
+    const moonMesh = createMoonMesh({ radius: moonR, isTouch: IS_TOUCH }); // moon/: NASA LRO maps, lunar shading, earthshine, LOD
     moonGroup.add(moonMesh);
     moonPivot.add(orbitLine(moonDist, 0xb8c4e6, 0.4));  // faint ring around Earth; follows Earth; toggled with "Orbit lines"
     const moonBody = { name: 'Moon', info: MOON_INFO, group: moonGroup, mesh: moonMesh, radius: moonR, isMoon: true,
-      parent: body, orbitDist: moonDist, period: MOON_INFO.period, slow: 1, phase: 0 };
+      parent: body, orbitDist: moonDist, period: MOON_INFO.period, slow: 1, phase: 0, baseRadius: moonR };
     body.moons = [moonBody]; body.systemRadius = moonDist;
     moonBody.labelEl = addLabel(moonGroup, 'Moon', moonR + 0.5, true);
     addPickSphere(moonGroup, moonR * 0.8, moonBody);
@@ -1290,12 +1290,15 @@ function recordHistory() {
   }
 }
 
+const MOON = bodies.find((b) => b.name === 'Moon');
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.1);
   if (!paused) simTime += daysPerSecond * dt * DAY_MS;
   updateBodies();
   scene.updateMatrixWorld();
+  if (MOON) updateMoon(MOON, camera, sunLight);   // moon/: lighting, earthshine, 0.5x -> 0.273x size easing
   recordHistory();
   updateCamera(dt);
   controls.update();
