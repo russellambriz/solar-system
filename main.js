@@ -19,6 +19,8 @@ import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitP
 import { createSpacecraft } from './spacecraft/index.js';
 import { createComets } from './comets/index.js';
 import { createRealPositions } from './ephemeris/index.js';
+import { createSearch } from './search/index.js';
+import { createPerfGuard } from './perf/index.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -1522,7 +1524,7 @@ function animate() {
     glow1.material.opacity = (1 - 0.55 * nearSun) * sunAxisFade; glow2.material.opacity = (1 - 0.4 * nearSun) * sunAxisFade; // let surface detail show up close
     glow1.visible = glow2.visible = sunAxisFade > 0;
   }
-  else { galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0 && !localGroup.isNear(galaxyFocus)); sombrero.update(camera); sgra.update(camera, renderer); ton618.update(camera, renderer); localGroup.update(camera); }
+  else { galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0 && !localGroup.isNear(galaxyFocus) && !search.holdsSpin()); sombrero.update(camera); sgra.update(camera, renderer); ton618.update(camera, renderer); localGroup.update(camera); }
   dateEl.textContent = 'Date: ' + new Date(simTime).toISOString().slice(0, 10) + (paused || daysPerSecond === 0 ? '  ⏸' : '');
   renderer.render(activeScene, camera);
   declutterLabels();
@@ -1546,6 +1548,14 @@ function onResize() {
 window.addEventListener('resize', onResize);
 window.addEventListener('orientationchange', () => setTimeout(onResize, 250)); // iOS reports new size a bit late
 
+// search/: find any object by name and fly there (cinematic past the orbits/belts on long trips); grouped, filterable list
+const search = createSearch({ bodies, spacecraft, comets, localGroup, galaxy, camera, controls, focusOn, flyTo, flyToFixed, galaxyFly,
+  enterGalaxy, exitGalaxy, getMode: () => mode, getGalaxyFocus: () => galaxyFocus, isTransitioning: () => !!transition, flyToAndromeda,
+  flyToMilkyWay, flyToSombrero, flyToSgrA, flyToTon618, flyToLocalGroup, showGalaxyInfo, scaleDistance, scene, isCompact, setPanelCollapsed,
+  releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
+// perf/: if the frame rate stays low, thin out the big particle clouds (stars, belts, galaxies); "Restore" in Controls
+const perfGuard = createPerfGuard({ scenes: [scene, galaxy.scene], exclude: [sunFX.group, sgra.group, ton618.group], isTouch: IS_TOUCH });
+
 updateBodies();
 onResize();
 animate();
@@ -1554,4 +1564,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions };
+window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard };

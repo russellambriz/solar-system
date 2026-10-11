@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-10-11: Search with cinematic fly-to, grouped object list, frame-rate guard (Claude Code)
+
+### Added
+- **Search box** (new module `search/`), at the top of the object list. Press `/` to jump to it on a keyboard.
+  - It finds anything by name or nickname: the Sun, planets, moons, dwarf planets, spacecraft, comets, Moon landing sites, the Milky Way, Andromeda, the Sombrero, Sgr A*, TON 618, the Magellanic Clouds, M33 and the 13 named nebulae and clusters. Nicknames include "JWST", "ISS", "M31", "black hole" and "LMC".
+  - Results show a type icon and a short description. Arrow keys and Enter pick a result, and Esc clears the box.
+  - While you type, keystrokes stay out of the app's single-key shortcuts (A, S, C, T, G).
+- **Fly-to uses `main.js`'s own camera functions only.**
+  - Planets, moons, dwarf planets and the Sun use `focusOn`.
+  - Voyager 1 and 2, New Horizons, Parker and the comets use `flyTo` with function goals, so the moving object stays tracked during the flight. Their info card opens on arrival.
+  - The ISS and JWST ride with Earth, so they focus Earth and then open their card. Moon landing sites focus the Moon.
+  - Galaxies use the existing `flyToAndromeda`, `flyToSombrero`, `flyToSgrA`, `flyToTon618`, `flyToLocalGroup` and `flyToMilkyWay`, entering the galaxy view first if needed.
+  - Nebulae and clusters use two `galaxyFly` stages, coming home to the Milky Way first if you are looking at another galaxy. They open a card with distance, light travel time, galactic position and a fact. The disk's cosmetic spin holds still while you look at one (one extra condition on the spin flag), so it stays in view.
+- **Cinematic long trips.**
+  - When the destination is more than ~2.5× farther from (or closer to) the Sun than where you are, the camera passes up to three landmarks on the way. Landmarks include the orbits of Mercury through Neptune, the main asteroid belt, the Kuiper belt and the heliopause.
+  - Each landmark gets ~1.5 s, a temporary label (for example "Main asteroid belt · 2.2–3.3 AU · sunlight takes 22 min") and a glowing band on its orbit or across the belt.
+  - A **Skip ⏭** button at the top of the screen jumps straight to the destination. A trip also ends cleanly if something else takes over the camera (Esc, a tap on a planet).
+- **Grouped, filterable object list.**
+  - A "Sun & planets" header sits at the top. Collapsible groups (with counts) for 🛰 Spacecraft, ☄ Comets, ⚑ Moon landings, 🌌 Galaxies & black holes and ✺ Nebulae & star clusters follow the dwarf planets. Each entry has a colour dot.
+  - Typing in the search box filters the whole list, including folded moons and collapsed groups.
+- **Frame-rate guard** (new module `perf/`).
+  - It measures the real frame rate in 2-second windows, after a 5 s warm-up and ignoring hidden tabs.
+  - Below ~40 fps (~36 on touch devices) it thins the big particle clouds: 100% → 60% → 35%, at most one step every 6 s. The clouds are the background stars, the asteroid and Kuiper belts, the Milky Way, Andromeda, the Sombrero and the Local Group dwarfs.
+  - It uses each cloud's draw range, after a one-time shuffle so the reduced set is an even sample (the asteroid belt keeps its Trojans).
+  - A note in Controls says what's happening and has a **Restore** button.
+  - The Sun effects, Sgr A* and TON 618 are left alone.
+
+### `main.js` hook lines
+- Two imports.
+- `createSearch({...})` and `createPerfGuard({...})` just before the first frame. `createSearch` also gets a small `releaseFocus` callback: the same three lines `goOverview` starts with (stop following, stop the Earth/Moon arrival drift, un-highlight). Search calls it before flying to a spacecraft or comet, so the camera isn't pulled back to the planet or moon you were looking at.
+- `&& !search.holdsSpin()` on the galaxy spin flag.
+- `search` and `perfGuard` on `window.solar`.
+
 ## 2026-10-11: Real planet positions and a date picker (Claude Code)
 
 ### Added
