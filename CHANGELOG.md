@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-11: Spacecraft and Moon landing sites (Claude Code)
+
+### Added
+- **New module `spacecraft/`**, hooked into `main.js` with three lines (import, `createSpacecraft(...)`, and `spacecraft.update(days, camera, dt)` in the solar-view frame), plus `spacecraft` on `window.solar` for tests. Two new Layers checkboxes, **Spacecraft** and **Moon landings**, are in `index.html`. The probes' paths and orbits also follow the Orbits checkbox.
+- **Voyager 1, Voyager 2 and New Horizons** at approximate real positions for the sim date. Each one starts at Earth on its launch date and arcs to each flyby planet on the flyby date (Jupiter, Saturn, Uranus, Neptune, Pluto). The planet positions come from `main.js`'s own model, so the path passes through the planet. From the last flyby each probe coasts in a straight line to its measured mid-2026 distance and sky direction, then keeps going at today's speed: 17.0, 15.4 and about 13.7 km/s. On 2026-10-14 the model gives Voyager 1 at 172.2 AU (ecliptic longitude 256.8°, latitude +35.4°), Voyager 2 at 144.2 AU (290.2°, −38.8°) and New Horizons at 65.9 AU (288.8°, +2.0°). Each has a faint trail of its past path.
+- **Parker Solar Probe** on its final orbit: perihelion 0.0459 AU (9.86 solar radii), aphelion ~0.73 AU, perihelia 88.4 days apart, timed from 4 Sep 2026 14:53 UTC. The orbit is near Venus's plane, with perihelion on the far side of the Sun from Earth in September. Its position uses the same `keplerAU()` as the dwarf planets, and the orbit is drawn.
+- **JWST** at Sun–Earth L2, on the Sun–Earth line beyond Earth, with a 6-month halo loop. The real distance (~4× the Moon's) would put it beyond Mars at this scale, so it is drawn just outside the Moon's orbit. It is hidden before launch, and before arrival (25 Dec 2021 to 24 Jan 2022) it moves out from Earth.
+- **ISS** placed every frame with `body.earth.latLonToWorld(lat, lon, 1500, out)` on a 51.6° orbit, so it follows Earth's tilt and spin. The real altitude (~420 km) would sit on the drawn surface, so it flies at 1,500 km, and the info card says so. Its 93-minute orbit is slowed 300×: one lap every ~1.9 s at the default 10 days/s, and never faster than one lap per 1.5 s at high time-warp. Its orbit ring shows near Earth.
+- **Moon landing sites**: Apollo 11, 12, 14, 15, 16 and 17 at their published coordinates, placed every frame with `body.moon.latLonToWorld(lat, lon, 0, out)`, so they follow the tidal lock, libration and size easing. The **Artemis** marker sits at ~89.5° S. The sites appear only once the Moon's disc is at least 110 px in radius on screen, and only on the hemisphere facing the camera.
+- Small procedural models (Voyager, New Horizons, Parker with its heat shield toward the Sun, JWST with its sunshield toward the Sun and an 18-segment mirror, ISS) are merged per material. They are drawn only once they are over ~1 px. Farther out, a constant-size marker dot shows where each craft is.
+- **Labels and info cards for everything.** Tapping a label fills the existing info panel with launch or landing dates, crew, live distance from the Sun, one-way signal time from Earth, Parker's live speed and days to its next perihelion, and a fact. Labels use the standard `.label` style, so they get 44 px touch targets on touch screens. They are placed after `main.js`'s labels and never cover a planet's label. Among themselves they are nudged below the marker or hidden, and they hide behind the Sun, a planet or the Moon. ISS/JWST markers and labels only show near Earth.
+- On a spacecraft or landing-site card, ✕ just closes the card and keeps the current view. It does not fly back to the overview. Esc and planet taps work as before.
+- `index.html` scale note: one sentence on spacecraft sizes, the ISS altitude and the JWST distance.
+
+### Notes
+- The task list asked for the south pole to be marked as the Artemis III target. In 2026 NASA changed Artemis III into a 2027 Earth-orbit docking test, and the first south-pole landing is now planned for Artemis IV (2028). The marker is labelled "Artemis (planned)" and its card explains the change.
+
 ## 2026-10-11: Arrival drift stays on the day/night line at any time speed (ScaleBot)
 
 ### Fixed

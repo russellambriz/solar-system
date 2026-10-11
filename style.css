@@ -165,6 +165,14 @@ body.touch .label::before { content: ""; position: absolute; inset: -10px -6px; 
 .label.active { border-color: #ffd27a; color: #ffd27a; }
 .label.small { font-size: 10px; opacity: 0.85; }
 .label.overlap { opacity: 0 !important; pointer-events: none; }
+/* Spacecraft and Moon landing-site labels (spacecraft/): the wrapper is positioned by CSS2DRenderer, the label is nudged */
+.sc-wrap { pointer-events: none; }
+.label.sc-label { color: #cfe8ff; border-color: rgba(120, 200, 255, 0.45); background: rgba(6, 16, 30, 0.6); }
+.label.sc-label.site { color: #ffe9c4; border-color: rgba(255, 215, 150, 0.45); background: rgba(30, 20, 6, 0.55); }
+.label.sc-label.artemis { color: #e4d8ff; border-color: rgba(195, 170, 255, 0.6); background: rgba(20, 12, 40, 0.6); }
+.label.sc-label.active { border-color: #ffd27a; color: #ffd27a; }
+body.touch .label.sc-label { font-size: 12px; }
+body.touch .label.sc-label::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
 
 /* Galaxy view */
 .galaxy-label-wrap { pointer-events: none; }
