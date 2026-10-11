@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-11: Halley's Comet and Comet Hale-Bopp (Claude Code)
+
+### Added
+- **New module `comets/`** (`index.js`, `data.js`), hooked into `main.js` with three lines (import, `createComets(...)`, and `comets.update(days, camera, dt)` in the solar-view frame), plus `comets` on `window.solar` for tests. A new **Comets** checkbox in the Layers group shows or hides them, and their orbits also follow the Orbits checkbox.
+- **Real elliptical orbits** from J2000 ecliptic elements, with the same radial distance compression as the dwarf planets. Kepler's equation uses Danby's starting guess, which converges even at Hale-Bopp's e = 0.995. Orbit lines are sampled densely around perihelion so the hairpin turn stays smooth.
+  - **Halley (1P):** q = 0.586 AU, e = 0.967, i = 162.3° (retrograde), Ω = 58.4°, ω = 111.3°. Perihelion is 9 Feb 1986, and the period is set so the next perihelion comes out on 28 Jul 2061. In Oct 2026 it is ~35 AU out, just past aphelion.
+  - **Hale-Bopp (C/1995 O1):** q = 0.914 AU, e = 0.995, i = 89.4°, Ω = 282.5°, ω = 130.6°, perihelion 1 Apr 1997. It is ~50 AU out in 2026, and its aphelion is ~370 AU.
+- **Two tails that point away from the Sun and grow near perihelion.**
+  - The **ion tail** is narrow and blue, runs straight away from the Sun, and has faint drifting streamers.
+  - The **dust tail** is broader and cream-coloured, and curves back along the orbit, away from the direction of motion.
+  - Tail length and brightness follow an activity factor ∝ 1/r². It switches on inside 5 AU for Halley and 8 AU for Hale-Bopp (which had a coma at 7 AU when it was found) and peaks at perihelion. Peak lengths are about real: Halley 0.25 AU ion and 0.15 AU dust, Hale-Bopp 0.6 AU and 0.4 AU.
+  - The tails use one uniform local scale (the compressed orbit's sideways scale at the comet), so their shape and their size next to the nearby orbits stay true.
+  - Each tail is a camera-facing additive ribbon: 56 vertices updated per frame and one draw call. The coma swells near the Sun, a constant-size marker dot keeps each comet findable far out, and a small dark nucleus shows only when the comet is inactive.
+- **Labels and info cards.** Tapping "Halley" or "Hale-Bopp" opens a card with the orbit, the live distance from the Sun (heading in or out), perihelion dates, the live length of each tail, and a fact. Labels use the standard `.label` style, with 44 px touch targets on touch screens. They never cover `main.js`'s labels, and they hide behind the Sun and planets. ✕ on a comet card closes it without flying back to the overview.
 ## 2026-10-11: Spacecraft and Moon landing sites (Claude Code)
 
 ### Added

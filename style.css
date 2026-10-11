@@ -173,6 +173,12 @@ body.touch .label::before { content: ""; position: absolute; inset: -10px -6px; 
 .label.sc-label.active { border-color: #ffd27a; color: #ffd27a; }
 body.touch .label.sc-label { font-size: 12px; }
 body.touch .label.sc-label::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
+/* Comet labels (comets/): the wrapper is positioned by CSS2DRenderer, the label is nudged off the marker */
+.comet-wrap { pointer-events: none; }
+.label.comet-label { color: #d2f4ff; border-color: rgba(140, 220, 255, 0.45); background: rgba(6, 20, 30, 0.6); }
+.label.comet-label.active { border-color: #ffd27a; color: #ffd27a; }
+body.touch .label.comet-label { font-size: 12px; }
+body.touch .label.comet-label::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
 
 /* Galaxy view */
 .galaxy-label-wrap { pointer-events: none; }

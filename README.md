@@ -17,6 +17,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 - **Galaxy view**: zoom far out (or press 🌌 Galaxy) to see the whole Milky Way as a 4-armed barred spiral, with a pulsing "You are here: Sun" marker 26,000 light-years from the center
 - **Solar flares**: zoom into the Sun to see its boiling granulated surface, sunspots, glowing prominence loops, and random solar flares and CMEs erupting off the edge
 - **Spacecraft**: Voyager 1 and 2, New Horizons (with their paths past the planets they visited), Parker Solar Probe on its 88-day orbit and JWST at Sun–Earth L2, at approximate real positions for the shown date; the ISS circling Earth (shown at ~1,500 km instead of ~420 km so it clears the surface); and markers for the six Apollo landing sites and the planned Artemis south-pole landing area, which appear when you zoom in on the Moon. Tap any label for facts; the Layers group has a checkbox for each
+- **Comets**: Halley's Comet and Hale-Bopp on their real elliptical orbits, with a blue ion tail pointing straight away from the Sun and a curved dust tail, both growing as the comet nears the Sun (Halley's next visit is 2061). Tap a comet's label for facts; Layers has a Comets checkbox
 - **Andromeda & the Local Group**: zoom even farther out (or press 🔭 Andromeda / `A`) to see the Andromeda Galaxy (M31) with its companions M32 and M110, shown at its true distance of ~2.5 million light-years
 - Distances and sizes are scaled so everything is visible (in the galaxy view, *wildly* so); see the note in the bottom-left corner of the page
 
@@ -60,6 +61,7 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 - `smallbodies.js`: asteroid belt, Trojans and Kuiper belt particles (Kepler orbits on the GPU), plus dwarf-planet orbits, facts and surfaces
 - `planets/index.js`: real texture maps for Mercury, Venus, Jupiter, Saturn, Uranus and Neptune (`textures/planets/`, 2K on desktop, 1K on touch devices; the procedural map stays if a file fails to load), sun-facing atmosphere rims, and sun-lit rings with planet/ring shadows
 - `spacecraft/`: spacecraft positions (flyby trajectories, Parker's Kepler orbit, JWST's L2 halo loop, the ISS via `earth.latLonToWorld`), small procedural models, the Moon landing sites (via `moon.latLonToWorld`), their labels and info cards
+- `comets/`: Halley's and Hale-Bopp's orbits (robust Kepler solver), coma, ion and dust tails, labels and info cards
 - `style.css`: dark space-themed UI that adapts to touch screens
 - `.nojekyll`: tells GitHub Pages to serve the files as they are
 
