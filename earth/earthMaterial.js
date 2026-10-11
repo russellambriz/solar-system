@@ -6,7 +6,10 @@
 //   • ocean sun glint (normalised Blinn-Phong + Fresnel, noise-varied roughness) masked by the water map
 //   • soft cloud shadows: the cloud texture is sampled a little "towards the Sun" from each point, in the cloud
 //     layer's own (separately rotating) frame, so the shadows slide with the clouds and fall on the anti-sun side
-//   • a thin blue Fresnel rim (the atmosphere seen against the disc), brighter on the day side
+//   • level of detail: uDetail (from Earth's on-screen size, see index.js) fades the cloud shadows and widens /
+//     dims the glint at overview distances, where the tight lobe and the offset shadow lookup would shimmer
+// The blue limb haze over the disc is no longer faked here: earth/atmosphere.js adds physically-based aerial
+// perspective (single scattering) on top of ground + clouds.
 //
 // Lighting units follow MeshStandardMaterial under three r155+ physical lights: radiance = albedo · (I/π) · N·L,
 // so Earth matches the brightness of the other planets lit by the same PointLight.
@@ -53,7 +56,7 @@ uniform float uNightGain;       // city-light brightness
 uniform float uSpecular;        // ocean glint strength
 uniform float uGlintShininess;  // Blinn-Phong exponent of the calmest sea
 uniform float uNormalStrength;  // land relief strength (desktop only)
-uniform vec3  uAtmoColor;       // linear sky colour used for the limb rim
+uniform float uDetail;          // 1 = close-up detail, 0 = overview (glint broadened, cloud shadows off)
 
 varying vec2 vUv;
 varying vec3 vObjDir;
@@ -101,8 +104,8 @@ void main() {
 
   // ---- cloud shadows ----------------------------------------------------------------------------------------
   // The cloud deck sits ~2% of a radius up, so the cloud that shades a point lies slightly towards the Sun.
-  float shadow = cloudCover(vObjDir + normalize(uSunDirObj) * 0.03) * uCloudShadow;
   float overhead = cloudCover(vObjDir);
+  float shadow = uDetail > 0.001 ? cloudCover(vObjDir + normalize(uSunDirObj) * 0.03) * uCloudShadow * uDetail : 0.0;
 
   vec3 col = day * uSunColor * sunTint * diff * (1.0 - shadow);
   col += day * uAmbient;
@@ -116,11 +119,14 @@ void main() {
   float NdH  = max(dot(N, H), 0.0);
   float VdH  = max(dot(V, H), 0.0);
   float sea  = vnoise(vObjDir * 22.0) * 0.65 + vnoise(vObjDir * 61.0) * 0.35;  // 0..1 "calmness"
+  sea = mix(0.5, sea, uDetail);                                                 // no sub-pixel noise far away
   float shin = mix(uGlintShininess * 0.35, uGlintShininess, sea);
+  // overview: a broad, dim sheen instead of a sub-pixel glint (the normalisation keeps the energy comparable)
+  shin = mix(60.0, shin, uDetail);
   float norm = (shin + 8.0) * 0.03978874;                                       // (n + 8) / (8π)
   float fres = 0.02 + 0.98 * pow(1.0 - VdH, 5.0);
   float glint = norm * pow(NdH, shin) * fres * max(NdLgeo, 0.0) * uSpecular;
-  glint *= water * term * (1.0 - shadow) * (1.0 - 0.85 * overhead);
+  glint *= water * term * (1.0 - shadow) * (1.0 - 0.85 * overhead) * mix(0.6, 1.0, uDetail);
   col += uSunColor * sunTint * (1.0 - exp(-glint));
 
   // ---- night lights -------------------------------------------------------------------------------------------
@@ -129,12 +135,6 @@ void main() {
   float lights = smoothstep(0.06, 0.55, max(night.r, night.g));
   float nightSide = 1.0 - smoothstep(-0.20, 0.02, NdLgeo);
   col += vec3(1.0, 0.78, 0.48) * lights * nightSide * (1.0 - 0.75 * overhead) * uNightGain;
-
-  // ---- atmosphere rim on the disc + faint day-side haze -------------------------------------------------------
-  // (kept subtle so the disc edge isn't washed out; the crisp halo itself lives in atmosphere.js)
-  float rim = pow(1.0 - max(dot(N, V), 0.0), 5.0);
-  float dayRim = smoothstep(-0.15, 0.55, NdLgeo);
-  col += uAtmoColor * (rim * 0.45 + 0.02) * dayRim;
 
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>

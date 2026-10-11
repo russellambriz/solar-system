@@ -41,7 +41,7 @@ void main() {
   vec3 col = vec3(0.95) * (uSunColor * sunTint * diff + uAmbient * 0.5); // dim on the night side
   // thin clouds at the limb pick up a little sky blue
   float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-  col = mix(col, uAtmoColor * diff * 1.6, fres * 0.35);
+  col = mix(col, uAtmoColor * diff * 1.6, fres * 0.15);   // most of the limb haze now comes from atmosphere.js
   gl_FragColor = vec4(col, a * mix(1.0, 0.6, fres));   // a touch thinner at grazing angles
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
