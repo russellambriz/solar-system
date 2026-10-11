@@ -1326,7 +1326,7 @@ function animate() {
   if (!paused) simTime += daysPerSecond * dt * DAY_MS;
   updateBodies();
   scene.updateMatrixWorld();
-  if (MOON) updateMoon(MOON, camera, sunLight);   // moon/: lighting, earthshine, 0.5x -> 0.273x size easing
+  if (MOON) updateMoon(MOON, camera, sunLight, (simTime - J2000) / DAY_MS);   // moon/: lighting, earthshine, 0.5x -> 0.273x size easing
   recordHistory();
   updateCamera(dt);
   controls.update();
