@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026-10-10: Moons of Saturn, Uranus & Neptune
+
+### Added
+- **Saturn's seven major moons** (new module `outermoons.js`). Each has its own detailed surface generated in code and baked once on the GPU into a color map plus a height (bump) map, like the Galilean moons.
+  - **Mimas**: cratered ice with the giant Herschel crater and its central peak (the "Death Star" look).
+  - **Enceladus**: the whitest surface in the solar system, fractured plains and the four bluish "tiger stripe" fissures at the south pole.
+  - **Tethys**: icy and cratered, with the huge Odysseus basin and the Ithaca Chasma canyon running most of the way around.
+  - **Dione** and **Rhea**: cratered leading sides and darker trailing sides streaked with bright ice cliffs ("wispy terrain"). Rhea has the bright-rayed young crater Inktomi.
+  - **Titan**: wrapped in a **hazy orange atmosphere**, a translucent sunlit shell with a bluish haze layer at the edge and a glowing ring when backlit. The dark dune seas, bright Xanadu and the northern lakes show faintly through it.
+  - **Iapetus**: **two-tone**, with a coal-dark leading hemisphere (Cassini Regio), a snow-bright trailing side and its equatorial ridge. Its orbit is tilted 15.5°.
+- **Uranus's five major moons**, orbiting in Uranus's **sideways (97.8°) equatorial plane**, the same plane as its rings:
+  - **Miranda**: patchwork "Frankenstein" surface with three grooved coronae (including Inverness's bright chevron) and the Verona Rupes cliff.
+  - **Ariel**: bright, with rift canyons that have smooth floors.
+  - **Umbriel**: dark and cratered, with the bright Wunda ring.
+  - **Titania**: huge fault canyons (Messina Chasmata), bright-rayed craters and the Gertrude basin.
+  - **Oberon**: old, reddish and heavily cratered, with dark crater floors and Hamlet.
+- **Neptune's moons**:
+  - **Triton** orbits **backwards** on an orbit tilted 157°, with its **pinkish south polar cap**, dark windblown geyser streaks, bluish cap fringe and "cantaloupe" terrain.
+  - **Proteus**: a dark, lumpy potato-shaped moon with the Pharos crater.
+  - **Nereid**: a small potato-shaped moon on its real, very stretched orbit (e = 0.75). It follows Kepler's law, so it speeds up near Neptune.
+- The moons are in the right order, with real relative periods (Mimas 0.94 d → Iapetus 79.3 d, Miranda 1.41 d → Oberon 13.5 d, Proteus 1.12 d, Triton 5.88 d, Nereid 360 d). Round moons are tidally locked, so the right face always leads: Iapetus's dark side, for example.
+- Every moon has a faint orbit ring (toggled with "Orbits"), a label, and a finger-sized tap zone. Each also has an info panel with real facts: size, distance from its planet, orbital period, rotation and a fun fact.
+- They are folded under Saturn (7), Uranus (5) and Neptune (3) in the body list.
+
+### Changed
+- **Focusing Saturn, Uranus or Neptune** frames the moon system from ~40° above, like Mars and Jupiter. Neptune is framed on Proteus and Triton, and Nereid swings out of the frame at the far end of its orbit.
+- **Scaling.** Moon sizes are enlarged the same way as Jupiter's. Distances are compressed logarithmically, so each system fits between the planets while keeping the order and spacing. The innermost moons sit just outside Saturn's and Uranus's rings. Motion is slowed 30× so the moons don't blur. The scaling note explains this.
+- `main.js`: one import and one `createOuterMoons(...)` call in the planet loop, next to `planets/`' `createPlanetRing(...)` calls. `moons.js` now exports `bake`, `POTATO` and `GLSL_COMMON` for reuse. The `planets/`, `earth/`, `moon/` and `mars/` modules are untouched.
+
+### Fixed
+- **Moons no longer steal taps meant for their planet** in the overview. With 15 new moons around Saturn, Uranus and Neptune, a tap just off a planet's edge could pick a tiny moon. Picking now has a third step: when a moon's planet isn't focused and the planet is also within reach, the planet wins if the finger is at the planet's edge or isn't right on the moon. Focused systems still use nearest-center picking with the moon boost.
+- A label tap can only be redirected to a planet whose visible disc is under the finger (as with the Sun's label over Mars). A tiny moon or asteroid that happens to sit under a label no longer steals the tap.
+
+### Performance
+- On iPad and phones the surface maps are 512×256 for big moons and 256×128 for small ones (1024×512 / 512×256 on desktop), with fewer sphere segments. All maps are baked once at startup.
+- Titan's haze is one extra draw call. Moon motion is a few lines of math per frame.
+
 ## 2026-10-10: Mars night side matches the new scene ambient
 
 ### Changed

@@ -9,7 +9,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 // ---------------------------------------------------------------------------
 // GLSL helpers: value-noise fbm + a cellular crater field
 // ---------------------------------------------------------------------------
-const GLSL_COMMON = /* glsl */`
+export const GLSL_COMMON = /* glsl */`
   precision highp float;
   float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
   vec3 hash33(vec3 p) {
@@ -116,7 +116,7 @@ const SURFACES = {
   `,
 };
 
-function bake(renderer, body, mode, w) {
+export function bake(renderer, body, mode, w) {
   const rt = new THREE.WebGLRenderTarget(w, w / 2, {
     depthBuffer: false, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter });
   const mat = new THREE.ShaderMaterial({
@@ -172,7 +172,7 @@ function jsNoise(seed) {
   return { rand, fbm: (x, y, z, oct = 5) => { let sum = 0, a = 0.5, f = 1, nrm = 0; for (let o = 0; o < oct; o++) { sum += a * n3(x * f, y * f, z * f); nrm += a; a *= 0.5; f *= 2; } return sum / nrm; } };
 }
 
-const POTATO = {
+export const POTATO = {
   //           axes (long axis = x, points at the planet)  lumpiness  craters  seed
   Phobos: { axes: [1.0, 0.81, 0.67], lump: 0.13, nCraters: 55, seed: 3, stickney: true, grooves: true,
             base: [0.37, 0.33, 0.30], crater: 0.9 },

@@ -7,6 +7,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 ## Features
 - The Sun (glowing, and it's the light source) plus all 8 planets and 5 dwarf planets in the right order, with correctly proportional orbital periods
 - Real axial tilts and day lengths (spin is slowed 50× so you can see it), Saturn's and Uranus's rings, Earth's clouds, the Moon clearly orbiting Earth with its own orbit ring, and Mars' (Phobos, Deimos) and Jupiter's (Io, Europa, Ganymede, Callisto) moons with detailed procedural surfaces
+- **Saturn's, Uranus's and Neptune's major moons**: Mimas, Enceladus, Tethys, Dione, Rhea, hazy orange Titan and two-tone Iapetus; Miranda, Ariel, Umbriel, Titania and Oberon orbiting in Uranus's sideways equatorial plane; and Neptune's backwards-orbiting Triton (pink polar cap), Proteus and Nereid (on its stretched-out orbit). Each has a detailed procedural surface, orbit ring, label and info panel
 - Click or tap any planet to fly to it and follow it, with an info panel: diameter, distance from the Sun (AU), orbital period, day length and a fun fact
 - Time speed slider (paused up to about 2.7 years per second), a compact Layers group (orbits, labels, belts, Milky Way), and collapsible panels; on portrait/small screens both panels start collapsed and the planet list folds away after you pick something
 - Planet list with moons folded under their planet (tap ▸ to show them; focusing a planet unfolds its moons)
@@ -52,6 +53,7 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 - `galaxy.js`: Milky Way sky band shader, the particle-based Milky Way, and Andromeda (M31) with M32/M110
 - `sun.js`: animated close-up Sun (granulation, sunspots, limb darkening), prominences, solar flares and CMEs
 - `moons.js`: GPU-baked surfaces of the Galilean moons and the potato-shaped Phobos, Deimos and Vesta
+- `outermoons.js`: moons of Saturn, Uranus and Neptune: GPU-baked surfaces, Titan's haze, tilted/retrograde/eccentric orbits and their facts
 - `smallbodies.js`: asteroid belt, Trojans and Kuiper belt particles (Kepler orbits on the GPU), plus dwarf-planet orbits, facts and surfaces
 - `planets/index.js`: real texture maps for Mercury, Venus, Jupiter, Saturn, Uranus and Neptune (`textures/planets/`, 2K on desktop, 1K on touch devices; the procedural map stays if a file fails to load), sun-facing atmosphere rims, and sun-lit rings with planet/ring shadows
 - `style.css`: dark space-themed UI that adapts to touch screens

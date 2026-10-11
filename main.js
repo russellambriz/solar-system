@@ -7,6 +7,7 @@ import { addSombrero, SOMBRERO_INFO } from './sombrero.js';
 import { addSgrA } from './sgra.js';
 import { addTon618 } from './ton618.js';
 import { createGalileanMesh, createPotatoMesh } from './moons.js';
+import { OUTER_MOON_SYSTEMS, createOuterMoons } from './outermoons.js';
 import { createSunFX } from './sun.js';
 import { createEarth } from './earth/index.js';
 import { createMoonMesh, updateMoon } from './moon/index.js';
@@ -449,6 +450,11 @@ for (const p of PLANETS) {
     }
     body.systemRadius = sys.moons[sys.moons.length - 1].orbit;
   }
+  if (OUTER_MOON_SYSTEMS[p.name]) {
+    // Saturn, Uranus, Neptune: major moons in the planet's equatorial plane (see outermoons.js)
+    body.moons = createOuterMoons(p.name, { renderer, isTouch: IS_TOUCH, tiltGroup, parent: body, orbitLine, addLabel, addPickSphere });
+    bodies.push(...body.moons);
+  }
   // planets/: sun-lit rings with planet shadow + ring shadow on the planet; radii are real multiples of the drawn radius
   if (p.name === 'Saturn') tiltGroup.add(createPlanetRing({ name: p.name, mesh, radius, sunLight, isTouch: IS_TOUCH, fallback: ringTexture }));
   if (p.name === 'Uranus') tiltGroup.add(createPlanetRing({ name: p.name, mesh, radius, sunLight, isTouch: IS_TOUCH, fallback: uranusRingTexture }));
@@ -673,8 +679,9 @@ for (const b of bodies) {
     e.stopPropagation();
     // A label can sit on top of another planet's disc (e.g. the Sun's label over Mars).
     // If the tap is on a planet's visible disc (±4px), prefer that planet; otherwise focus the label's body.
-    const under = pick(e.clientX, e.clientY, IS_TOUCH ? 4 : 2);
-    focusOn(under && under !== b && under.name !== 'Sun' ? under : b);
+    const under = pick(e.clientX, e.clientY, IS_TOUCH ? 4 : 2, true);
+    // (only planets override a label: a tiny moon or asteroid that happens to sit under it never steals the tap)
+    focusOn(under && under !== b && under.name !== 'Sun' && !under.isMoon && !under.isSmall ? under : b);
   });
   b.labelEl.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') hovered = b; });
   b.labelEl.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && hovered === b) hovered = null; });
@@ -770,13 +777,14 @@ let hovered = null;
 // Picking: every body gets a score = (screen distance from tap to its center) / (its on-screen radius + finger slop).
 // Lowest score wins, so tiny planets near a big one (e.g. Mars in front of the Sun) are still easy to tap.
 // The invisible enlarged hit spheres are raycast too; the body they hit gets a small bonus (helps with occlusion).
-function pick(clientX, clientY, slopPx) {
+function pick(clientX, clientY, slopPx, discOnly = false) {   // discOnly: only bodies whose visible disc (± slop) is under the finger
   const r = renderer.domElement.getBoundingClientRect();
   pointer.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
   raycaster.setFromCamera(pointer, camera);
   const hits = raycaster.intersectObjects(pickTargets, false);
   const rayBody = hits.length ? hits[0].object.userData.body : null;
   let best = null, bestScore = Infinity;
+  const reach = new Map();   // body → { centerDist, screenR } for every body within reach of the finger
   const fovScale = r.height / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
   for (const b of bodies) {
     // Test the body's current position AND where it was over the last ~400 ms: fast movers (the Moon laps Earth
@@ -791,7 +799,8 @@ function pick(clientX, clientY, slopPx) {
       if (d < centerDist) { centerDist = d; screenR = (b.radius / dist) * fovScale; }
     }
     if (centerDist === Infinity) continue;
-    if (centerDist > screenR + slopPx && b !== rayBody) continue;
+    if (centerDist > screenR + slopPx && (discOnly || b !== rayBody)) continue;
+    reach.set(b, { centerDist, screenR });
     // 1) the tap is well inside a body's visible disc → that body (front-most wins if discs overlap)
     // 2) otherwise → the body whose center is nearest the finger (so a tiny moon right next to a bigger
     //    planet's edge is still easy to hit); moons of the focused planet get a small head start
@@ -800,6 +809,14 @@ function pick(clientX, clientY, slopPx) {
     const boost = focused && (b.parent === focused || b.parent === focused.parent) ? 0.75 : 1;
     const score = inside ? -1e6 + camDist : centerDist * boost;
     if (score < bestScore) { bestScore = score; best = b; }
+  }
+  // 3) moons of a planet that isn't focused (e.g. Saturn's in the overview) don't steal a tap aimed at their own planet:
+  //    the planet wins if the finger is at its disc's edge, or if it is within reach and the finger isn't right on the moon
+  if (best && best.isMoon && best.parent && focused !== best.parent && (!focused || focused.parent !== best.parent)) {
+    const pc = reach.get(best.parent), mc = reach.get(best), near = slopPx * 0.35;
+    // outer systems (Saturn/Uranus/Neptune) pack many moons just outside the planet: there the planet wins unless the finger is right on the moon's disc
+    const outer = !!OUTER_MOON_SYSTEMS[best.parent.name];
+    if (pc && (pc.centerDist <= pc.screenR + near || (pc.centerDist <= pc.screenR + slopPx && mc.centerDist > (outer ? mc.screenR + 2 : Math.max(mc.screenR, near))))) best = best.parent;
   }
   return best;
 }
@@ -922,6 +939,8 @@ function declutterLabels() {
   const placed = [];
   for (const b of ordered) {
     const lab = b.labelEl;
+    // moons of Saturn/Uranus/Neptune: labels only while their system is focused (in the overview they crowd the planet and steal its taps)
+    if (b.isMoon && OUTER_MOON_SYSTEMS[b.parent.name] && b !== hovered && focused !== b.parent && (!focused || focused.parent !== b.parent)) { lab.classList.add('overlap'); continue; }
     lab._obj.getWorldPosition(_proj).project(camera);
     if (_proj.z > 1) continue;
     const cx = (_proj.x + 1) / 2 * w, cy = (1 - _proj.y) / 2 * h;
