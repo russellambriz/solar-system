@@ -23,6 +23,9 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 - **Comets**: Halley's Comet and Hale-Bopp on their real elliptical orbits, with a blue ion tail pointing straight away from the Sun and a curved dust tail, both growing as the comet nears the Sun (Halley's next visit is 2061). Tap a comet's label for facts; Layers has a Comets checkbox
 - **Andromeda & the Local Group**: zoom even farther out (or press 🔭 Andromeda / `A`) to see the Andromeda Galaxy (M31) with its companions M32 and M110, shown at its true distance of ~2.5 million light-years
 - **Magellanic Clouds & Triangulum (M33)**: the Large and Small Magellanic Clouds (~160,000 and ~200,000 light-years, joined by the Magellanic Bridge) and the Triangulum Galaxy (~2.7 million light-years, near Andromeda) at their true distances and sizes in the galaxy view. Tap one or its label to fly there; Layers has an LMC · SMC · M33 checkbox
+- **Scale slider**: morph from the comfortable compressed view to true distance ratios (with a live "Neptune is drawn N× too close" readout), and watch the planets spread out
+- **Distance HUD** (Layers → Distances): how far the camera and the selected object are from the Sun and Earth, with light and radio-signal travel times (light-years in the galaxy view)
+- **True-size comparisons** in each info card: size in Earth diameters, a ghost Earth at true relative size, and true-scale moon orbits (the Moon really is 60 Earth radii away)
 - Distances and sizes are scaled so everything is visible (in the galaxy view, *wildly* so); see the note in the bottom-left corner of the page
 
 ## Controls
@@ -36,6 +39,9 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 | Search and fly to anything | `/`, type, `Enter` (↑/↓ to pick) | Tap the search box |
 | Pause / play | `Space` or button | Pause button |
 | Jump to a date | Controls → Date field, or Today | Controls → Date field, or Today |
+| Compressed ↔ true distances | Controls → Scale slider | Controls → Scale slider |
+| Distance / light-time readout | Layers → Distances | Layers → Distances |
+| Ghost Earth / true moon orbits | Buttons in a planet's info card | Buttons in a planet's info card |
 | Galaxy view | `G`, 🌌 Galaxy, or zoom far out | 🌌 Galaxy, or pinch far out |
 | Back from galaxy | `Esc`, ☀ Solar System, or zoom all the way in | ☀ Solar System, or pinch all the way in |
 | Galaxy info | Click the galaxy or "You are here" | Tap the galaxy or "You are here" |
@@ -69,6 +75,7 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 - `smallbodies.js`: asteroid belt, Trojans and Kuiper belt particles (Kepler orbits on the GPU), plus dwarf-planet orbits, facts and surfaces
 - `planets/index.js`: real texture maps for Mercury, Venus, Jupiter, Saturn, Uranus and Neptune (`textures/planets/`, 2K on desktop, 1K on touch devices; the procedural map stays if a file fails to load), sun-facing atmosphere rims, and sun-lit rings with planet/ring shadows
 - `search/`: object index, search box, fly-to (cinematic past orbits and belts on long trips) and the grouped, filterable list
+- `scale/`: the scale slider (compressed ↔ true distance ratios), the distance / light-time HUD, and the info card's true-size comparisons (ghost Earth, true-scale moon orbits)
 - `perf/`: frame-rate guard that thins particle clouds on slow devices
 - `ephemeris/`: JPL Keplerian elements for the planets (real positions and tilted, eccentric orbits for any date from 3000 BC to 3000 AD) and the Controls date picker
 - `spacecraft/`: spacecraft positions (flyby trajectories, Parker's Kepler orbit, JWST's L2 halo loop, the ISS via `earth.latLonToWorld`), small procedural models, the Moon landing sites (via `moon.latLonToWorld`), their labels and info cards

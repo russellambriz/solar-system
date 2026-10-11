@@ -21,6 +21,7 @@ import { createComets } from './comets/index.js';
 import { createRealPositions } from './ephemeris/index.js';
 import { createSearch } from './search/index.js';
 import { createPerfGuard } from './perf/index.js';
+import { createScaleTools } from './scale/index.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -112,7 +113,9 @@ const MOON_SYSTEMS = {
 
 // Scaling for visibility
 const SUN_RADIUS = 5;
-const scaleDistance = (au) => 6 + 14 * Math.pow(au, 0.55);
+// drawn distance = a + b·AU^p; scale/ morphs these toward true ratios and everything reads them live
+const DIST_SCALE = { a: 6, b: 14, p: 0.55 };
+const scaleDistance = (au) => DIST_SCALE.a + DIST_SCALE.b * Math.pow(au, DIST_SCALE.p);
 const scaleRadius = (km) => 0.95 * Math.sqrt(km / EARTH_DIAMETER);
 
 // ---------------------------------------------------------------------------
@@ -138,7 +141,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 2;
-const SOLAR_MAX_DIST = 900;          // zooming out to this distance switches to the galaxy view
+let SOLAR_MAX_DIST = 900;            // zooming out to this distance switches to the galaxy view (scale/ raises it at true distances)
 controls.maxDistance = SOLAR_MAX_DIST;
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.04));   // low so night sides read as night (was 0.12); planets/ adds a faint night fill so silhouettes stay readable
@@ -493,7 +496,8 @@ for (const sb of SMALL_BODIES) {
   tiltGroup.rotation.z = THREE.MathUtils.degToRad(sb.tilt);
   group.add(tiltGroup);
   scene.add(group);
-  scene.add(ellipseLine(sb, sb.group === 'belt' ? 0xa89a86 : 0x9d8cd9, sb.group === 'belt' ? 0.3 : 0.32));
+  const sbOrbit = ellipseLine(sb, sb.group === 'belt' ? 0xa89a86 : 0x9d8cd9, sb.group === 'belt' ? 0.3 : 0.32);   // scale/ redraws it
+  scene.add(sbOrbit);
   let mesh;
   if (sb.name === 'Vesta') mesh = createPotatoMesh('Vesta', radius, IS_TOUCH);
   else {
@@ -501,7 +505,7 @@ for (const sb of SMALL_BODIES) {
       new THREE.MeshStandardMaterial({ map: surfaceTexture(sb.name, IS_TOUCH), roughness: 0.95, metalness: 0, emissive: 0x111114 }));
     if (sb.name === 'Haumea') mesh.scale.set(1, 0.51, 0.8);   // egg/ellipsoid stretched by its 3.9 h spin (shortest axis = spin axis)
   }
-  const body = { name: sb.name, info: sb, group, mesh, radius, tiltGroup, isSmall: true };
+  const body = { name: sb.name, info: sb, group, mesh, radius, tiltGroup, isSmall: true, orbit: sbOrbit };
   let spinner = mesh;                        // what rotates with the body's day
   if (sb.name === 'Pluto') {
     // Pluto–Charon binary: both circle their shared barycenter (outside Pluto in reality) once per 6.39 days, and both are
@@ -549,7 +553,8 @@ for (const sb of SMALL_BODIES) {
   bodies.push(...outer);
 }
 
-// Starfield
+// Starfield (scale/ keeps it centred on the camera so it stays "at infinity" when distances are stretched)
+let starfield;
 {
   const N = IS_TOUCH ? 5000 : 9000, pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
   const c = new THREE.Color();
@@ -568,8 +573,9 @@ for (const sb of SMALL_BODIES) {
   const g = dot.getContext('2d'); const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
   gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,0.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
-  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
-    size: 7, vertexColors: true, map: new THREE.CanvasTexture(dot), transparent: true, depthWrite: false, sizeAttenuation: true })));
+  starfield = new THREE.Points(geo, new THREE.PointsMaterial({
+    size: 7, vertexColors: true, map: new THREE.CanvasTexture(dot), transparent: true, depthWrite: false, sizeAttenuation: true }));
+  scene.add(starfield);
 }
 
 // Milky Way sky band (galactic plane tilted ~60° to the ecliptic, center toward Sagittarius)
@@ -1525,6 +1531,7 @@ function animate() {
     glow1.visible = glow2.visible = sunAxisFade > 0;
   }
   else { galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0 && !localGroup.isNear(galaxyFocus) && !search.holdsSpin()); sombrero.update(camera); sgra.update(camera, renderer); ton618.update(camera, renderer); localGroup.update(camera); }
+  scaleTools.update((simTime - J2000) / DAY_MS, camera, activeScene === galaxy.scene);
   dateEl.textContent = 'Date: ' + new Date(simTime).toISOString().slice(0, 10) + (paused || daysPerSecond === 0 ? '  ⏸' : '');
   renderer.render(activeScene, camera);
   declutterLabels();
@@ -1554,6 +1561,10 @@ const search = createSearch({ bodies, spacecraft, comets, localGroup, galaxy, ca
   flyToMilkyWay, flyToSombrero, flyToSgrA, flyToTon618, flyToLocalGroup, showGalaxyInfo, scaleDistance, scene, isCompact, setPanelCollapsed,
   releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
 // perf/: if the frame rate stays low, thin out the big particle clouds (stars, belts, galaxies); "Restore" in Controls
+// scale/: distance-scale slider (compressed ↔ true distances), distance/light-time HUD, size comparisons and true-scale ghosts
+const scaleTools = createScaleTools({ DIST_SCALE, scaleDistance, bodies, smallBodies, belts, starfield, realPositions, spacecraft, comets, camera,
+  controls, OVERVIEW_POS, setSolarMaxDist: (d) => { SOLAR_MAX_DIST = d; if (mode === 'solar') controls.maxDistance = d; }, getMode: () => mode,
+  getFocused: () => focused, galaxy, scene });
 const perfGuard = createPerfGuard({ scenes: [scene, galaxy.scene], exclude: [sunFX.group, sgra.group, ton618.group], isTouch: IS_TOUCH });
 
 updateBodies();
@@ -1564,4 +1575,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard };
+window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools };
