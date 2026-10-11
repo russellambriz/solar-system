@@ -28,11 +28,16 @@ uniform float uAerial;        // 0..1 strength of the haze over the ground (1 = 
 varying vec3 vWorldPos;
 void main() {
   vec3 rd = normalize(vWorldPos - cameraPosition);
-  float ground;
-  vec4 s = atmoScatter(cameraPosition, rd, ground);
-  float k = mix(1.0, uAerial, ground);
-  vec3 col = s.rgb * k;
-  float trans = mix(1.0, s.a, k);
+  float ground, gNdL;
+  vec3 mie;
+  vec4 s = atmoScatter(cameraPosition, rd, ground, gNdL, mie);
+  // Over the disc: a thin, mostly-Rayleigh (blue) veil that only exists where the ground below is sunlit.
+  // The exaggerated shell stays lit a few degrees past the terminator, which otherwise lays a grey sheet over
+  // the twilight/night side and drowns the city lights.
+  float lit = smoothstep(-0.02, 0.25, gNdL);
+  float k = mix(1.0, uAerial * lit, ground);
+  vec3 col = (s.rgb + mie * mix(1.0, 0.25, ground)) * k;
+  float trans = mix(1.0, s.a, mix(1.0, uAerial, ground));   // transmittance (dimming) applies day and night
   gl_FragColor = vec4(col, trans);
   #include <colorspace_fragment>
 }

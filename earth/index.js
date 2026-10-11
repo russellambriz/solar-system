@@ -38,16 +38,18 @@ const DEFAULTS = {
                            // and the physical forward peak is weak; real eclipse views see it at ~1°)
   scaleR: 0.22,            // Rayleigh scale height as a fraction of the shell thickness
   scaleM: 0.10,            // Mie scale height (aerosols sit lower)
-  aerial: 0.35,            // strength of the haze over the ground relative to the limb
+  aerial: 0.25,            // strength of the haze over the ground relative to the limb
   atmoSamples: 6,          // view-ray samples (mobile: atmoSamplesMobile)
   atmoSamplesMobile: 4,
   detailNear: 140,         // Earth's on-screen radius (px) above which glint + cloud shadows are at full detail
   detailFar: 45,           //   … and below which they are fully faded (overview distances: avoids shimmer)
   cloudOpacity: 0.95,
   cloudShadow: 0.45,
-  nightGain: 1.25,
-  specular: 1.6,
-  glintShininess: 900,     // calm-sea exponent; rough patches drop to ~35% of this
+  nightGain: 1.7,          // city lights (warm); night side is otherwise near-black
+  specular: 0.15,         // glint strength (calm-sea peak ≈ 0.5 × sun before the knee → stays peaked)
+  glintCap: 0.5,           // max glint radiance relative to the sun colour (desktop) — never a white disc
+  glintCapMobile: 0.32,    // lower on the iPad tier (1K water mask, bigger blurrier hotspot)
+  glintShininess: 5000,    // calm-sea exponent (tight, small glint, ~1° lobe); rough patches drop to 60% of this
   normalStrength: 0.9,
   ambient: 0.015,          // a bit below the scene's MeshStandard ambient so city lights read on the night side
 };
@@ -85,6 +87,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uCloudOpacity:  { value: P.cloudOpacity },
     uNightGain:     { value: P.nightGain },
     uSpecular:      { value: P.specular },
+    uGlintCap:      { value: isMobile ? P.glintCapMobile : P.glintCap },
     uGlintShininess:{ value: P.glintShininess },
     uNormalStrength:{ value: P.normalStrength },
     uAtmoColor:     { value: P.atmoColor },

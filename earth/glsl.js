@@ -75,9 +75,13 @@ float chapman(float X, float h, float coschi) {
 }
 
 // Inscattered radiance (rgb, linear) along the part of the ray inside the shell, stopping at the ground.
-// a = grey transmittance of that segment. hitGround = 1 if the ray ends on the planet.
-vec4 atmoScatter(vec3 roW, vec3 rd, out float hitGround) {
+// rgb = Rayleigh part, a = grey transmittance of that segment; mieCol = Mie part (kept separate so the aerial
+// haze over the disc can use less of it). hitGround = 1 if the ray ends on the planet; groundNdL = sun cosine
+// at that ground point (so callers can keep the haze off the night side).
+vec4 atmoScatter(vec3 roW, vec3 rd, out float hitGround, out float groundNdL, out vec3 mieCol) {
   hitGround = 0.0;
+  groundNdL = 1.0;
+  mieCol = vec3(0.0);
   vec3 ro = roW - uCenter;
   vec2 ta = raySphere(ro, rd, uRa);
   if (ta.x > ta.y || ta.y <= 0.0) return vec4(0.0, 0.0, 0.0, 1.0);
@@ -121,11 +125,13 @@ vec4 atmoScatter(vec3 roW, vec3 rd, out float hitGround) {
     sumM += exp(-hm) * T * dt;
   }
   vec3 E = uSunColor * 3.14159265 * uAtmoIntensity;  // solar irradiance (uSunColor is I/π)
-  vec3 col = E * (uRayleigh / Hr * phR * sumR + uMie * uMieGain / Hm * phM * sumM);
+  vec3 col = E * (uRayleigh / Hr * phR * sumR);
+  mieCol = E * (uMie * uMieGain / Hm * phM * sumM);
 
   vec3  pEnd = ro + rd * t1;
   float rEnd = length(pEnd);
   float cEnd = dot(pEnd, -rd) / rEnd;
+  groundNdL = dot(pEnd / rEnd, L);
   vec3 Tv = exp(-(uRayleigh * max(chapman(Xr, (rEnd - uR) / Hr, cEnd) - odR0, 0.0) +
                   uMie * 1.1 * max(chapman(Xm, (rEnd - uR) / Hm, cEnd) - odM0, 0.0)));
   return vec4(col, dot(Tv, vec3(0.25, 0.5, 0.25)));

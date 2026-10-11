@@ -56,6 +56,7 @@ uniform float uNightGain;       // city-light brightness
 uniform float uSpecular;        // ocean glint strength
 uniform float uGlintShininess;  // Blinn-Phong exponent of the calmest sea
 uniform float uNormalStrength;  // land relief strength (desktop only)
+uniform float uGlintCap;        // peak glint radiance (× sun colour); soft knee below it, never a flat white disc
 uniform float uDetail;          // 1 = close-up detail, 0 = overview (glint broadened, cloud shadows off)
 
 varying vec2 vUv;
@@ -97,7 +98,7 @@ void main() {
 
   // ---- soft terminator ------------------------------------------------------------------------------------
   // Lambert, multiplied by a smooth ramp across the terminator so the edge is a band, not a hard line.
-  float term = smoothstep(-0.10, 0.20, NdLgeo);
+  float term = smoothstep(-0.06, 0.20, NdLgeo);
   float diff = max(NdL, 0.0) * term;
   // sunlight reddens as it grazes through more air near the terminator
   vec3 sunTint = mix(vec3(1.0, 0.55, 0.32), vec3(1.0), smoothstep(0.0, 0.35, NdLgeo));
@@ -108,7 +109,7 @@ void main() {
   float shadow = uDetail > 0.001 ? cloudCover(vObjDir + normalize(uSunDirObj) * 0.03) * uCloudShadow * uDetail : 0.0;
 
   vec3 col = day * uSunColor * sunTint * diff * (1.0 - shadow);
-  col += day * uAmbient;
+  col += day * uAmbient * smoothstep(-0.3, 0.1, NdLgeo);   // no ambient fill deep on the night side
 
   // ---- ocean glint ------------------------------------------------------------------------------------------
   // Energy-conserving (normalised) Blinn-Phong with Schlick Fresnel (water F0 ≈ 0.02). The exponent is high, so
@@ -120,21 +121,25 @@ void main() {
   float VdH  = max(dot(V, H), 0.0);
   float sea  = vnoise(vObjDir * 22.0) * 0.65 + vnoise(vObjDir * 61.0) * 0.35;  // 0..1 "calmness"
   sea = mix(0.5, sea, uDetail);                                                 // no sub-pixel noise far away
-  float shin = mix(uGlintShininess * 0.35, uGlintShininess, sea);
+  float shin = mix(uGlintShininess * 0.6, uGlintShininess, sea);
   // overview: a broad, dim sheen instead of a sub-pixel glint (the normalisation keeps the energy comparable)
   shin = mix(60.0, shin, uDetail);
   float norm = (shin + 8.0) * 0.03978874;                                       // (n + 8) / (8π)
   float fres = 0.02 + 0.98 * pow(1.0 - VdH, 5.0);
   float glint = norm * pow(NdH, shin) * fres * max(NdLgeo, 0.0) * uSpecular;
   glint *= water * term * (1.0 - shadow) * (1.0 - 0.85 * overhead) * mix(0.6, 1.0, uDetail);
-  col += uSunColor * sunTint * (1.0 - exp(-glint));
+  // Gentle (Reinhard) knee with a low ceiling: ≈ linear for small values, approaches uGlintCap only very slowly,
+  // so the lobe keeps its peaked profile instead of flattening into a uniform white plateau. The lobe is tight
+  // (high exponent) and the strength low, so the typical peak stays below the knee; the colour is the Sun's
+  // (warm), never clipped white.
+  col += uSunColor * sunTint * vec3(1.0, 0.86, 0.62) * (glint / (1.0 + glint / uGlintCap));
 
   // ---- night lights -------------------------------------------------------------------------------------------
   // The source map has a faint blue base layer; keep only the bright city cores and warm them up a little.
   vec3 night = texture2D(uNightMap, vUv).rgb;
   float lights = smoothstep(0.06, 0.55, max(night.r, night.g));
-  float nightSide = 1.0 - smoothstep(-0.20, 0.02, NdLgeo);
-  col += vec3(1.0, 0.78, 0.48) * lights * nightSide * (1.0 - 0.75 * overhead) * uNightGain;
+  float nightSide = 1.0 - smoothstep(-0.16, 0.0, NdLgeo);
+  col += vec3(1.0, 0.74, 0.42) * lights * nightSide * (1.0 - 0.6 * overhead) * uNightGain;
 
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>

@@ -36,13 +36,16 @@ void main() {
   vec3 V = normalize(cameraPosition - vWorldPos);
   float NdL = dot(N, L);
   // clouds scatter light, so use a slightly wrapped Lambert; same reddened twilight as the ground
-  float diff = smoothstep(-0.12, 0.25, NdL) * clamp((NdL + 0.15) / 1.15, 0.0, 1.0);
-  vec3 sunTint = mix(vec3(1.0, 0.6, 0.38), vec3(1.0), smoothstep(0.0, 0.35, NdL));
-  vec3 col = vec3(0.95) * (uSunColor * sunTint * diff + uAmbient * 0.5); // dim on the night side
+  // (only a few degrees of wrap past the terminator, so the night-side deck is essentially black)
+  float diff = smoothstep(-0.06, 0.22, NdL) * clamp((NdL + 0.08) / 1.08, 0.0, 1.0);
+  vec3 sunTint = mix(vec3(1.0, 0.55, 0.32), vec3(1.0), smoothstep(0.0, 0.35, NdL));
+  vec3 col = vec3(0.95) * (uSunColor * sunTint * diff + uAmbient * 0.12); // night side: faint ambient only
   // thin clouds at the limb pick up a little sky blue
   float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
   col = mix(col, uAtmoColor * diff * 1.6, fres * 0.15);   // most of the limb haze now comes from atmosphere.js
-  gl_FragColor = vec4(col, a * mix(1.0, 0.6, fres));   // a touch thinner at grazing angles
+  // On the night side the deck is drawn thinner so the (already cloud-dimmed) city lights below stay visible.
+  float nightThin = mix(0.55, 1.0, smoothstep(-0.25, 0.05, NdL));
+  gl_FragColor = vec4(col, a * mix(1.0, 0.6, fres) * nightThin);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
