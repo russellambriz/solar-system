@@ -1011,7 +1011,19 @@ function goOverview() {
 // Fly out → fade to black → swap scene + camera range → fade in → fly to the destination.
 // ---------------------------------------------------------------------------
 const fadeEl = $('fade');
-function flyTo(goalCam, goalTarget, duration, onDone) {
+// ScaleBot: longer fly-tos scale with how far they really travel. `duration` is now a minimum: each factor of ten in
+// camera distance adds FLY_SEC_PER_DECADE seconds, and moving the target far relative to the view adds a little more,
+// capped per stage. Pass fixed = true for a stage that is timed against something else (e.g. the fade-to-black).
+const FLY_SEC_PER_DECADE = 1.5, FLY_SEC_TRAVEL = 1.2, FLY_STAGE_MAX = 9;
+function flyDuration(goalCam, goalTarget, duration) {
+  const d0 = Math.max(camera.position.distanceTo(controls.target), 1e-6), d1 = Math.max(goalCam.distanceTo(goalTarget), 1e-6);
+  const decades = Math.abs(Math.log10(d1 / d0));
+  const travel = Math.log10(1 + controls.target.distanceTo(goalTarget) / Math.max(d0, d1));
+  return Math.min(FLY_STAGE_MAX, Math.max(duration * 1.3, 1.2 + decades * FLY_SEC_PER_DECADE + travel * FLY_SEC_TRAVEL));
+}
+function flyToFixed(goalCam, goalTarget, duration, onDone) { flyTo(goalCam, goalTarget, duration, onDone, true); }
+function flyTo(goalCam, goalTarget, duration, onDone, fixed = false) {
+  if (!fixed) duration = flyDuration(goalCam, goalTarget, duration);
   transition = { fly: true, fromCam: camera.position.clone(), fromTarget: controls.target.clone(), t: 0,
     goalCam: goalCam.clone(), goalTarget: goalTarget.clone(), duration, onDone };
 }
@@ -1050,7 +1062,7 @@ function enterGalaxy(after) {
   const dir = tmp.subVectors(camera.position, controls.target).normalize();
   if (dir.lengthSq() < 0.5) dir.set(0, 0.5, 0.86);
   setTimeout(() => fadeEl.classList.add('on'), 550);
-  flyTo(controls.target.clone().addScaledVector(dir, 2200), new THREE.Vector3(), 1.0, () => {
+  flyToFixed(controls.target.clone().addScaledVector(dir, 2200), new THREE.Vector3(), 1.0, () => {
     // swap to the galaxy scene: start close to the Sun marker, then pull back to the full galaxy
     activeScene = galaxy.scene;
     setCameraRange(1, GALAXY_FAR);
@@ -1237,7 +1249,7 @@ function exitGalaxy(after) {
   const sun = galaxy.sunWorldPos();
   const dir = tmp.subVectors(camera.position, sun).normalize();
   setTimeout(() => fadeEl.classList.add('on'), 1100);
-  flyTo(sun.clone().addScaledVector(dir, 25), sun, 1.6, () => {
+  flyToFixed(sun.clone().addScaledVector(dir, 25), sun, 1.6, () => {
     activeScene = scene;
     setCameraRange(0.05, 6000);
     updateGalaxyButton();
@@ -1252,6 +1264,7 @@ function exitGalaxy(after) {
     });
   });
 }
+const _flyA = new THREE.Vector3(), _flyB = new THREE.Vector3();
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 function updateCamera(dt) {
@@ -1263,7 +1276,18 @@ function updateCamera(dt) {
     else if (transition.overview) { goalTarget = new THREE.Vector3(); goalCam = OVERVIEW_POS; }
     else { goalTarget = bodyWorldPos(focused, new THREE.Vector3()); goalCam = goalTarget.clone().add(transition.offset); }
     controls.target.lerpVectors(transition.fromTarget, goalTarget, e);
-    camera.position.lerpVectors(transition.fromCam, goalCam, e);
+    if (transition.fly) {
+      // ScaleBot: log-space fly. The camera's distance to its target changes by the same factor per unit of eased time,
+      // so every power of ten gets equal screen time (instead of racing through the near part of a huge jump).
+      const o0 = _flyA.subVectors(transition.fromCam, transition.fromTarget), o1 = _flyB.subVectors(goalCam, goalTarget);
+      const d0 = Math.max(o0.length(), 1e-6), d1 = Math.max(o1.length(), 1e-6);
+      const dir = o0.divideScalar(d0).lerp(o1.divideScalar(d1), e);
+      if (dir.lengthSq() < 1e-8) dir.set(0, 0.5, 0.86);
+      dir.normalize();
+      camera.position.copy(controls.target).addScaledVector(dir, Math.exp(Math.log(d0) + (Math.log(d1) - Math.log(d0)) * e));
+    } else {
+      camera.position.lerpVectors(transition.fromCam, goalCam, e);
+    }
     if (transition.t >= 1) {
       const done = transition.onDone;
       transition = null;

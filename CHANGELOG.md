@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-11: Longer, log-scale fly-to animations (ScaleBot)
+
+### Changed
+- Scripted fly-tos (`flyTo` in `main.js`) now move the camera's distance to its target in log space, so every factor of ten gets equal screen time instead of racing through the near part of a huge jump like the one to TON 618. The view direction blends smoothly between the start and end angles.
+- Fly-tos last longer the farther they travel: the `duration` each caller passes is now a minimum, and each stage gets about 1.5 s per factor of ten zoomed plus a little extra for moving across the view, capped at 9 s per stage. Short hops stay quick.
+- The two stages timed against the fade to black between the Solar System and the galaxy keep their old lengths (`flyToFixed`) so the fade still lines up. Tapping a planet still uses the older focus move.
 ## 2026-10-11: Galaxy animations and label cleanup
 
 ### Added
