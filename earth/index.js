@@ -10,8 +10,10 @@
 // Uniforms are refreshed automatically right before the ground is drawn (mesh.onBeforeRender), so no extra call
 // is needed in the render loop; earth.update(camera) can still be called manually.
 //
-// Cinematic framing helper for camera code: earth.getCinematicStart() (or getCinematicStart(earth, sunLight)), see
-// the JSDoc at the bottom of this file.
+// Camera / marker helpers (JSDoc at the bottom of this file):
+//   earth.getCinematicStart(out?, opts?)   cinematic arrival framing (offset/target in Earth radii, drift in rad/s)
+//   earth.latLonToWorld(latDeg, lonDeg, altitudeKm = 0, out?)   world-space point that follows tilt + spin
+//   earth.radius                           ground radius in scene units (object space; world radius = uniforms.uR)
 //
 // Earthshine hook for the Moon: `earth.uEarthTint` (also earth.uniforms.uEarthTint) is a THREE uniform
 // { value: THREE.Vector3 } holding Earth's mean linear reflectance colour (land/ocean + cloud cover).
@@ -251,10 +253,29 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     surfaceMat.dispose();
   }
 
-  const api = { group, surface, clouds, atmosphere, uniforms: U, uEarthTint: U.uEarthTint, params: P, textureInfo, lod,
+  const api = { radius, group, surface, clouds, atmosphere, uniforms: U, uEarthTint: U.uEarthTint, params: P, textureInfo, lod,
     cloudClock, update, dispose };
-  api.getCinematicStart = (opts) => getCinematicStart(api, sunLight, opts);
+  api.getCinematicStart = (out, opts) => getCinematicStart(api, sunLight, out, opts);
+  api.latLonToWorld = (latDeg, lonDeg, altitudeKm = 0, out) => latLonToWorld(api, latDeg, lonDeg, altitudeKm, out);
   return api;
+}
+
+// ---- cinematic framing helper ------------------------------------------------------------------------------------
+// Module-level scratch (no per-call allocations).
+const _cC = new THREE.Vector3(), _cS = new THREE.Vector3(), _cA = new THREE.Vector3(), _cE = new THREE.Vector3(),
+  _cUp = new THREE.Vector3(), _cQ = new THREE.Quaternion();
+const OPT_KEYS = ['distance', 'sunAngleDeg', 'elevationDeg', 'driftSpeed'];
+
+/**
+ * Is `a` an options object rather than an `out` object? An out object either already carries one of the output
+ * vectors (offset / target / driftAxis) or carries no option keys at all (e.g. a fresh `{}`); anything else with an
+ * option key (distance, sunAngleDeg, elevationDeg, driftSpeed) is options. With MoonBot's helper the first argument is
+ * always `out`; the two agree for every out-object call and for the no-argument call.
+ */
+function isOptsObject(a) {
+  if (!a || typeof a !== 'object') return false;
+  if (a.offset !== undefined || a.target !== undefined || a.driftAxis !== undefined) return false;
+  return OPT_KEYS.some((k) => a[k] !== undefined);
 }
 
 /**
@@ -262,45 +283,80 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
  * one side (~75° from the view axis, so a bit more day than night is visible), the camera raised ~15° towards
  * Earth's north pole, plus a slow drift that carries the view across the terminator towards the night side.
  *
- * Units / frames (all world space, relative to Earth's centre):
- *   offset     THREE.Vector3  camera position minus Earth centre, in EARTH RADII (multiply by the Earth's world radius,
- *                             or rescale to any distance: the direction is what matters; default length opts.distance)
+ * Signatures:
+ *   earth.getCinematicStart()                      → new object (unchanged behaviour)
+ *   earth.getCinematicStart(out, opts?)            → fills `out` in place and returns it (no allocations once
+ *                                                     out.offset/target/driftAxis exist; they are created on `out`
+ *                                                     the first time). Options are only read from `opts`, never from `out`.
+ *   earth.getCinematicStart(opts)                  → a plain options object first (has an option key, no output vectors)
+ *                                                     is treated as opts; returns a new object (backward compatible)
+ *   getCinematicStart(earth, sunLight, out?, opts?) → module function, same rules for the last two arguments
+ *
+ * Result fields (all world space, relative to Earth's centre):
+ *   offset     THREE.Vector3  camera position minus Earth centre, in EARTH RADII (scale by the live world radius;
+ *                             default length opts.distance)
  *   target     THREE.Vector3  look-at point minus Earth centre, in Earth radii (zero: look at the centre)
- *   driftSpeed number         suggested orbit rate of the camera about driftAxis, in RADIANS PER SECOND OF REAL TIME;
+ *   driftSpeed number         orbit rate of the camera about driftAxis, in RADIANS PER SECOND OF REAL TIME;
  *                             positive = the view moves from the day side towards the night side
  *   driftAxis  THREE.Vector3  unit world-space axis through Earth's centre to rotate the camera offset about
  *                             (perpendicular to the Sun direction and the view direction, so the Sun angle sweeps)
- * Usage (ScaleBot): const c = body.earth.getCinematicStart();
- *   cam.position.copy(earthCentre).addScaledVector(c.offset, earthWorldRadius); controls.target.copy(earthCentre)…;
- *   per frame: offset.applyAxisAngle(c.driftAxis, c.driftSpeed * dtReal).
- * The result depends on the Sun's current position, so call it at the moment the fly-to ends.
+ * Usage: const c = body.earth.getCinematicStart(reusedOut);
+ *   cam.position.copy(earthCentre).addScaledVector(c.offset, earthWorldRadius); per frame
+ *   c.offset.applyAxisAngle(c.driftAxis, c.driftSpeed * dtReal). Depends on the Sun's current position.
  *
  * @param {object} earth        object returned by createEarth (uses earth.surface)
  * @param {THREE.Object3D} sunLight
+ * @param {object} [out]        reusable result object (or an options object, see above)
  * @param {object} [opts]       { distance = 2.8 (Earth radii), sunAngleDeg = 75, elevationDeg = 15, driftSpeed = 0.02 }
  * @returns {{offset: THREE.Vector3, target: THREE.Vector3, driftSpeed: number, driftAxis: THREE.Vector3}}
  */
-export function getCinematicStart(earth, sunLight, opts = {}) {
-  const { distance = 2.8, sunAngleDeg = 75, elevationDeg = 15, driftSpeed = 0.02 } = opts;
-  const c = earth.surface.getWorldPosition(new THREE.Vector3());
-  const S = sunLight.getWorldPosition(new THREE.Vector3()).sub(c);
+export function getCinematicStart(earth, sunLight, out, opts) {
+  if (isOptsObject(out)) { opts = out; out = undefined; }
+  if (!out || typeof out !== 'object') out = {};
+  const { distance = 2.8, sunAngleDeg = 75, elevationDeg = 15, driftSpeed = 0.02 } = opts || {};
+  const offset = out.offset || (out.offset = new THREE.Vector3());
+  const target = out.target || (out.target = new THREE.Vector3());
+  const driftAxis = out.driftAxis || (out.driftAxis = new THREE.Vector3());
+  const c = earth.surface.getWorldPosition(_cC);
+  const S = sunLight.getWorldPosition(_cS).sub(c);
   if (S.lengthSq() < 1e-12) S.set(1, 0, 0);
   S.normalize();
   // Earth's spin axis in world space (ground mesh +Y)
-  const A = new THREE.Vector3(0, 1, 0).applyQuaternion(earth.surface.getWorldQuaternion(new THREE.Quaternion())).normalize();
-  // a horizontal direction perpendicular to the Sun (along the terminator's "equator crossing")
-  let E = new THREE.Vector3().crossVectors(A, S);
-  if (E.lengthSq() < 1e-8) E = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 0, 1), S);
+  const A = _cA.set(0, 1, 0).applyQuaternion(earth.surface.getWorldQuaternion(_cQ)).normalize();
+  // a direction perpendicular to the Sun (where the terminator crosses the "equator" seen from the Sun)
+  const E = _cE.crossVectors(A, S);
+  if (E.lengthSq() < 1e-8) E.set(0, 0, 1).cross(S);
   E.normalize();
   const a = THREE.MathUtils.degToRad(sunAngleDeg);
-  const dir = S.clone().multiplyScalar(Math.cos(a)).addScaledVector(E, Math.sin(a)).normalize();
+  const dir = offset.copy(S).multiplyScalar(Math.cos(a)).addScaledVector(E, Math.sin(a)).normalize();
   // raise towards the north pole
-  const up = A.clone().addScaledVector(dir, -A.dot(dir));
+  const up = _cUp.copy(A).addScaledVector(dir, -A.dot(dir));
   if (up.lengthSq() > 1e-8) {
     const e = THREE.MathUtils.degToRad(elevationDeg);
     dir.multiplyScalar(Math.cos(e)).addScaledVector(up.normalize(), Math.sin(e)).normalize();
   }
   // rotating dir about S × dir by a positive angle moves it away from the Sun, i.e. towards the night side
-  const driftAxis = new THREE.Vector3().crossVectors(S, dir).normalize();
-  return { offset: dir.multiplyScalar(distance), target: new THREE.Vector3(), driftSpeed, driftAxis };
+  driftAxis.crossVectors(S, dir).normalize();
+  dir.multiplyScalar(distance);
+  target.set(0, 0, 0);
+  out.driftSpeed = driftSpeed;
+  return out;
+}
+
+// ---- geographic positions ---------------------------------------------------------------------------------------
+export const EARTH_RADIUS_KM = 6371;
+/**
+ * World-space point at geographic latitude/longitude (degrees; north and east positive, lon −180…180 like the day
+ * map) and altitude (km above the surface; the drawn radius = 6371 km, so altitude scales with it). Follows Earth's
+ * current axial tilt, daily spin, orbit position and any parent scale. Fills and returns `out` (allocates only when
+ * `out` is omitted).
+ */
+export function latLonToWorld(earth, latDeg, lonDeg, altitudeKm = 0, out = new THREE.Vector3()) {
+  const lat = THREE.MathUtils.degToRad(latDeg);
+  const phi = THREE.MathUtils.degToRad(lonDeg + 180);    // SphereGeometry azimuth: u = phi / 2π, lon −180° at u = 0
+  const r = earth.radius * (1 + altitudeKm / EARTH_RADIUS_KM);
+  const cl = Math.cos(lat);
+  out.set(-Math.cos(phi) * cl * r, Math.sin(lat) * r, Math.sin(phi) * cl * r);   // ground mesh object space
+  earth.surface.updateWorldMatrix(true, false);          // current tilt/spin even if called mid-frame
+  return out.applyMatrix4(earth.surface.matrixWorld);
 }
