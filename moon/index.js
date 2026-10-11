@@ -59,7 +59,7 @@ export function createMoonMesh({ radius, isTouch = false }) {
 export function updateMoon(moonBody, camera, sunLight, days) {
   const u = moonBody.mesh.userData.moonUniforms;
   if (!u) return;
-  if (!moonBody.moon) moonBody.moon = { getCinematicStart: (opts) => getCinematicStart(moonBody, sunLight, opts) };
+  if (!moonBody.moon) moonBody.moon = { getCinematicStart: (out, opts) => getCinematicStart(moonBody, sunLight, opts, out) };
 
   // Libration: the Moon spins at a constant rate but moves faster near perigee, so seen from Earth it rocks
   // ~±7.9° east-west (anomalistic month, 27.55 d); its 6.7° tilt to the orbit nods it ~±6.7° north-south
@@ -114,27 +114,37 @@ export function updateMoon(moonBody, camera, sunLight, days) {
  *   target     THREE.Vector3  look-at point minus the Moon's centre, in Moon radii (zero = centre)
  *   driftSpeed number         radians per REAL second about driftAxis (positive = toward the night side)
  *   driftAxis  THREE.Vector3  unit world-space axis through the Moon's centre
- * Usage: const c = body.moon.getCinematicStart(); cam = moonCentre + c.offset * body.radius; each frame
+ * Usage: const c = body.moon.getCinematicStart(); (or getCinematicStart(out, opts) to reuse an object) cam = moonCentre + c.offset * body.radius; each frame
  *   c.offset.applyAxisAngle(c.driftAxis, c.driftSpeed * dtReal). Call it when the fly-to ends (depends on the Sun).
  * @param {object} [opts] { distance = 2.6, sunAngleDeg = 80, elevationDeg = 10, driftSpeed = 0.015 }
  */
-export function getCinematicStart(moonBody, sunLight, opts = {}) {
-  const { distance = 2.6, sunAngleDeg = 80, elevationDeg = 10, driftSpeed = 0.015 } = opts;
-  const c = moonBody.group.getWorldPosition(new THREE.Vector3());
-  const S = sunLight.getWorldPosition(new THREE.Vector3()).sub(c);
+const _c = new THREE.Vector3(), _S = new THREE.Vector3(), _A = new THREE.Vector3(), _E = new THREE.Vector3(),
+  _up = new THREE.Vector3(), _q = new THREE.Quaternion();
+/** body.moon.getCinematicStart(out?, opts?): pass an `out` object to reuse it every frame (no allocations); its
+ *  offset/target/driftAxis vectors are filled in place and `out` is returned. Options are never read off `out`. */
+export function getCinematicStart(moonBody, sunLight, opts = {}, out = {}) {
+  const { distance = 2.6, sunAngleDeg = 80, elevationDeg = 10, driftSpeed = 0.015 } = opts || {};
+  const offset = out.offset || (out.offset = new THREE.Vector3());
+  const target = out.target || (out.target = new THREE.Vector3());
+  const driftAxis = out.driftAxis || (out.driftAxis = new THREE.Vector3());
+  moonBody.group.getWorldPosition(_c);
+  const S = sunLight.getWorldPosition(_S).sub(_c);
   if (S.lengthSq() < 1e-12) S.set(1, 0, 0);
   S.normalize();
-  const A = new THREE.Vector3(0, 1, 0).applyQuaternion(moonBody.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize();
-  let E = new THREE.Vector3().crossVectors(A, S);
-  if (E.lengthSq() < 1e-8) E = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 0, 1), S);
+  const A = _A.set(0, 1, 0).applyQuaternion(moonBody.mesh.getWorldQuaternion(_q)).normalize();
+  const E = _E.crossVectors(A, S);
+  if (E.lengthSq() < 1e-8) E.set(0, 0, 1).cross(S);
   E.normalize();
   const a = THREE.MathUtils.degToRad(sunAngleDeg);
-  const dir = S.clone().multiplyScalar(Math.cos(a)).addScaledVector(E, Math.sin(a)).normalize();
-  const up = A.clone().addScaledVector(dir, -A.dot(dir));
+  const dir = offset.copy(S).multiplyScalar(Math.cos(a)).addScaledVector(E, Math.sin(a)).normalize();
+  const up = _up.copy(A).addScaledVector(dir, -A.dot(dir));
   if (up.lengthSq() > 1e-8) {
     const e = THREE.MathUtils.degToRad(elevationDeg);
     dir.multiplyScalar(Math.cos(e)).addScaledVector(up.normalize(), Math.sin(e)).normalize();
   }
-  const driftAxis = new THREE.Vector3().crossVectors(S, dir).normalize();
-  return { offset: dir.multiplyScalar(distance), target: new THREE.Vector3(), driftSpeed, driftAxis };
+  driftAxis.crossVectors(S, dir).normalize();
+  dir.multiplyScalar(distance);
+  target.set(0, 0, 0);
+  out.driftSpeed = driftSpeed;
+  return out;
 }
