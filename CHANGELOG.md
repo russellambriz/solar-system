@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-11: Galaxy animations and label cleanup
+
+### Added
+- **The Milky Way turns.** The disk now rotates about the galactic center once every ~10 minutes (it was ~4 minutes). The rotation is clockwise as seen from the north galactic pole, so the arms trail. It is rigid, like the real spiral pattern (a density wave that turns as a whole). Differential star motion at this speed-up would wind the arms up within minutes. The Sun marker, nebulae, star clusters and their labels all ride along, so "You are here" stays in the Orion Spur. The rotation eases to a stop when the camera gets within ~450 units of the center, so the **Sgr A\* close-up stays perfectly steady**. All fly-tos read live positions: the Sun comes from `galaxy.sunWorldPos()`, Sgr A\* sits on the axis, and Andromeda, Sombrero and TON 618 are in the non-rotating scene.
+- **Andromeda and the Sombrero spin slowly** about their own disk axes (~15 minutes per turn, trailing arms). The Sombrero rotates its `disk` group, and the depth-slab direction is recomputed from `disk.matrixWorld` every frame, so the dust-lane layering stays correct. Both pause with the Milky Way (time paused, or mid-flight). TON 618's jets are unchanged.
+- **Nebulae breathe.** Every emission-nebula sprite gently pulses in size (±7%) and brightness (±~19%). Each sprite has its own phase and rate, so a cloud's puffs drift in and out of step. Round core glows pulse at 40%, and dust clouds stay still.
+- Everything is time-based (seconds, frame-rate independent) and uses uniforms only: a group rotation, a quaternion and one shared `uTime` uniform. There are no per-particle CPU loops, so it stays cheap on iPad.
+
+### Fixed
+- **Overlapping galaxy labels.** A screen-space declutter pass runs inside the galaxy render, after every module's update and right before the CSS2D labels are drawn. It needed no `main.js` change. Labels are placed in priority order: Sun, Milky Way, Andromeda, Sombrero, Sgr A\*, then dwarf companions, named nebulae/clusters, and distance captions. A lower-priority label that overlaps one already placed, or the pulsing "You are here" ring, is nudged just above, below or beside it. If no slot is free nearby, it is hidden. Nudged labels stay clickable.
+  - Default galaxy view: the **M4** label no longer sits on the "You are here" ring.
+  - Near the Sun: the **Sun** label no longer covers the **Orion Nebula** label.
+  - Far zoom-out: the **Milky Way** and **Andromeda** labels are stacked instead of on top of each other, and the "≈ 31 million light-years" caption moves clear of them.
+
 ## 2026-10-11: Moving clouds on Venus, Jupiter, Saturn and Neptune
 
 ### Added

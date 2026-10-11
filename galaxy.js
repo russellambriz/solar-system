@@ -482,26 +482,45 @@ export function createGalaxy({ isTouch = false } = {}) {
   // Nebulae, dust clouds, young-star knots, halo globulars and named objects (Orion, Eagle, Carina, Pleiades, ω Cen, M13…)
   const deep = addDeepSpace({ group, SUN_POS, R }, { isTouch, labels: true });
 
+  // Screen-space label declutter for the galaxy scene. Runs from bg.onBeforeRender, i.e. inside renderer.render() after
+  // every module's update() and the matrix update, right before main.js draws the CSS2D labels (no main.js hook needed).
+  const declutter = createLabelDeclutter(scene, marker, () => markerRingWorld);
+  let markerRingWorld = 0;
+  bg.onBeforeRender = (_r, _s, camera) => declutter(camera);
+
   const tmp = new THREE.Vector3();
-  let t = 0;
+  let t = 0, spinning = false;
+  // cosmetic rotation rates (hugely sped up): Milky Way pattern one turn per ~10 min, Andromeda/Sombrero ~15 min
+  const MW_OMEGA = (2 * Math.PI) / 600, M31_OMEGA = (2 * Math.PI) / 900;
   return {
     scene, group, R, SUN_POS, marker, M31_POS, M31_R, m31Dir, m31Minor, m31Normal, andromeda, deep,
     labelEls: [sunLabel.el, centerLabel.el, mwLabel.el],
     m31LabelEls: [m31Label.el, m32Label.el, m110Label.el],
     m31Counts: { stars: NA, dust: NAD },
     sunWorldPos(out = new THREE.Vector3()) { return marker.getWorldPosition(out); },
+    get spinning() { return spinning; },                // read by sombrero.js so every galaxy pauses together
+    get time() { return t; },
     setScale(pxPerUnitAtDist1) {
       for (const p of [stars, dust, bg, m31Stars, m31Dust, m32.pts, m110.pts]) p.material.uniforms.uScale.value = pxPerUnitAtDist1;
     },
     update(dt, camera, spin) {
       t += dt;
-      if (spin) { group.rotation.y -= dt * 0.025; m31Spin.rotation.y -= dt * 0.018; } // cosmetic rotation (hugely sped up)
+      spinning = !!spin;
+      if (spin) {
+        // rigid rotation of the whole disk group (stars, dust, Sun marker, nebulae/clusters, labels, Sgr A*) about the
+        // galactic center: like the real spiral *pattern* (density wave), which turns rigidly — differential star
+        // motion would wind the arms up within minutes at this speed-up. Clockwise seen from the north galactic pole,
+        // so the arms trail. Eased to a stop near the center so the Sgr A* close-up stays perfectly steady.
+        const steady = THREE.MathUtils.smoothstep(camera.position.length(), 120, 450);
+        group.rotation.y -= dt * MW_OMEGA * steady;
+        m31Spin.rotation.y -= dt * M31_OMEGA;              // Andromeda about its own disk axis (trailing arms)
+      }
       bg.position.copy(camera.position);                  // distant background stars stay "at infinity"
       // what to label depends on how far out we are
       const dMW = camera.position.length(), dM31 = camera.position.distanceTo(M31_POS);
       const far = dMW > 4500;
       sunLabel.el.classList.toggle('off', far);
-      deep.update(camera);                                // deep-space labels appear only when the camera is near
+      deep.update(camera, dt);                            // deep-space labels appear only when the camera is near; nebula breathing
       if (far) for (const o of deep.objects) o.labelEl?.classList.add('off'); // keep the Local Group view uncluttered
       centerLabel.el.classList.toggle('off', far);
       mwLabel.el.classList.toggle('off', !far);
@@ -516,10 +535,111 @@ export function createGalaxy({ isTouch = false } = {}) {
       // marker keeps a constant on-screen size
       const dist = camera.position.distanceTo(marker.getWorldPosition(tmp));
       const s = dist * (dist > 4500 ? 0.018 : 0.04);   // smaller when far out, so it doesn't hide the tiny Milky Way
+      markerRingWorld = s * 0.62;                         // ~visible ring radius (world units) → label keep-out zone
       dot.scale.setScalar(s * 0.45);
       const ph = (t * 0.6) % 1, ph2 = (t * 0.6 + 0.5) % 1;
       ring.scale.setScalar(s * (0.4 + 1.4 * ph)); ring.material.opacity = 1 - ph;
       ring2.scale.setScalar(s * (0.4 + 1.4 * ph2)); ring2.material.opacity = 1 - ph2;
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Label declutter (galaxy scene). Every visible CSS2D galaxy label is projected to the screen; labels are placed in
+// priority order and a lower-priority label that overlaps an already placed one (or the pulsing 'You are here' ring)
+// is nudged just above/below/beside it via the CSS `translate` property (composes with the labels' own CSS transform),
+// or hidden with the shared `.overlap` class when no nearby free slot exists. Only labels of the user's galaxy modules
+// are moved; any other visible label is treated as a fixed obstacle.
+// ---------------------------------------------------------------------------
+const LABEL_PRIO = [
+  ['sun-here', 100, false], ['mw-far', 95, true], ['m31-label', 90, true], ['sombrero-label', 85, true], ['sgra-label', 80, true],
+  ['deep-label', 30, true], ['sgra-note', 60, false], ['sombrero-dist', 12, true], ['dist-label', 12, true], ['small', 40, true],
+];
+function labelPrio(el) {
+  if (/\bton-/.test(el.className)) return { p: 60, movable: false, mayHide: false };   // TON 618 places its own labels
+  for (const [cls, p, movable] of LABEL_PRIO) if (el.classList.contains(cls)) return { p, movable, mayHide: p < 50 };
+  return { p: 60, movable: false, mayHide: false };   // other modules' labels (TON 618 …): fixed obstacles
+}
+function createLabelDeclutter(scene, marker, ringWorld) {
+  let items = [], frame = 0;
+  const v = new THREE.Vector3(), mv = new THREE.Vector3();
+  const collect = () => {
+    const prev = new Map(items.map((it) => [it.el, it]));
+    items = [];
+    scene.traverse((o) => {
+      if (!o.isCSS2DObject) return;
+      const el = o.element.firstElementChild;
+      if (!el || !el.classList.contains('galaxy-label')) return;
+      items.push(prev.get(el) || { obj: o, el, ...labelPrio(el), w: 0, h: 0, ox: 0, oy: 0, dx: 0, dy: 0, hidden: false });
+    });
+    items.sort((a, b) => b.p - a.p);
+  };
+  const shown = (it, body) => {
+    const { el, obj } = it, wrap = obj.element;
+    if (el.classList.contains('off') || el.style.display === 'none' || wrap.style.display === 'none') return false;
+    if (body.contains('lg-view') && el.classList.contains('deep-label')) return false;
+    if (body.contains('sgra-close') && !el.classList.contains('sgra-label') && !el.classList.contains('sgra-note')) return false;
+    for (let p = obj; p; p = p.parent) if (!p.visible) return false;
+    return true;
+  };
+  const setOffset = (it, dx, dy, hide) => {
+    dx = Math.round(dx); dy = Math.round(dy);
+    if (dx !== it.dx || dy !== it.dy) { it.dx = dx; it.dy = dy; it.el.style.translate = dx || dy ? `${dx}px ${dy}px` : ''; }
+    if (hide !== it.hidden) { it.hidden = hide; it.el.classList.toggle('overlap', hide); }
+  };
+  const hit = (r, placed, pad = 0) => placed.some((q) => r[0] < q[2] + pad && r[2] > q[0] - pad && r[1] < q[3] + pad && r[3] > q[1] - pad);
+  return function declutter(camera) {
+    const layer = items[0]?.obj.element.parentElement;
+    if (frame++ % 30 === 0) collect();
+    const body = document.body.classList;
+    if (!body.contains('galaxy-mode') || (layer && layer.style.display === 'none')) return;
+    const W = window.innerWidth, H = window.innerHeight, G = 3;
+    const placed = [];
+    // keep-out zone: the 'You are here' ring around the Sun marker
+    marker.getWorldPosition(v);
+    mv.copy(v).applyMatrix4(camera.matrixWorldInverse);
+    if (mv.z < 0) {
+      v.project(camera);
+      const rpx = ringWorld() / -mv.z * H / 2 * camera.projectionMatrix.elements[5];
+      const cx = (v.x + 1) / 2 * W, cy = (1 - v.y) / 2 * H;
+      if (rpx > 2) placed.push([cx - rpx, cy - rpx, cx + rpx, cy + rpx]);
+    }
+    for (const it of items) {
+      if (!shown(it, body)) { if (it.dx || it.dy || it.hidden) setOffset(it, 0, 0, false); continue; }
+      it.obj.getWorldPosition(v);
+      mv.copy(v).applyMatrix4(camera.matrixWorldInverse);
+      if (mv.z >= 0) continue;
+      v.project(camera);
+      if (!it.w) {                                      // measure once: size + the label's own CSS offset (e.g. translateY(-30px))
+        it.w = it.el.offsetWidth; it.h = it.el.offsetHeight;
+        const m = getComputedStyle(it.el).transform.match(/matrix\(([^)]+)\)/);
+        if (m) { const a = m[1].split(',').map(Number); it.ox = a[4] || 0; it.oy = a[5] || 0; }
+        if (!it.w) continue;
+      }
+      const cx = (v.x + 1) / 2 * W + it.ox, cy = (1 - v.y) / 2 * H + it.oy, hw = it.w / 2, hh = it.h / 2;
+      const rect = (dx, dy) => [cx + dx - hw, cy + dy - hh, cx + dx + hw, cy + dy + hh];
+      if (!it.movable) { placed.push(rect(0, 0)); continue; }
+      const natural = rect(0, 0);
+      // stay put if free (with a small margin when returning from a nudge, so it doesn't flicker back and forth)
+      if (!hit(natural, placed, it.dx || it.dy ? 4 : 0)) { setOffset(it, 0, 0, false); placed.push(natural); continue; }
+      const cands = [];
+      if (it.dx || it.dy) cands.push([it.dx, it.dy]);    // keep the previous slot while it stays free
+      for (const q of placed) {
+        if (!(natural[0] < q[2] && natural[2] > q[0] && natural[1] < q[3] && natural[3] > q[1])) continue;
+        const up = q[1] - G - hh - cy, down = q[3] + G + hh - cy;
+        const left = q[0] - G - hw - cx, right = q[2] + G + hw - cx;
+        const above = cy < (q[1] + q[3]) / 2;           // move away from the obstacle first
+        cands.push(...(above ? [[0, up], [0, down]] : [[0, down], [0, up]]), cx < (q[0] + q[2]) / 2 ? [left, 0] : [right, 0]);
+      }
+      const maxShift = Math.max(70, it.h * 3.5);
+      let best = null;
+      for (const [dx, dy] of cands) {
+        if (Math.hypot(dx, dy) > maxShift) continue;
+        if (!hit(rect(dx, dy), placed)) { best = [dx, dy]; break; }
+      }
+      if (best) { setOffset(it, best[0], best[1], false); placed.push(rect(best[0], best[1])); }
+      else if (it.mayHide) setOffset(it, 0, 0, true);
+      else { setOffset(it, 0, 0, false); placed.push(natural); }
+    }
   };
 }

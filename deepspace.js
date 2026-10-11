@@ -6,7 +6,7 @@
 // galactic plane = the group's local XZ plane, galactic center at the origin, north galactic pole = +Y.
 //
 // Usage:  const deep = addDeepSpace(galaxy, { isTouch });   // galaxy = object returned by createGalaxy()
-//         deep.update(camera)   // only needed when opts.labels is true (shows/hides labels by distance)
+//         deep.update(camera, dt)   // per frame: labels by distance + nebula breathing (dt optional, seconds)
 // Point/billboard sizes self-calibrate every frame from the renderer + camera (no setScale call needed).
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
@@ -158,10 +158,15 @@ function makeScaleHook(uScale) {
 // Camera-facing textured quads (instanced). No gl_PointSize limits, so big clouds stay correct up close on iPad too.
 const BB_VERT = /* glsl */`
   attribute vec3 iPos; attribute vec4 iColor; attribute vec3 iMisc; // iMisc = (size, rotation, atlas tile)
-  uniform float uScale;
+  uniform float uScale, uTime, uFlicker;
   varying vec2 vUv; varying vec4 vCol;
   void main() {
-    float size = iMisc.x, c = cos(iMisc.y), s = sin(iMisc.y);
+    // gentle breathing (emission nebulae only, uFlicker = 0 for dust): each sprite gets its own phase and rate from its
+    // random rotation, so a cloud's puffs drift in and out of step; round core glows (tile 3) breathe less
+    float seed = iMisc.y, amp = uFlicker * (iMisc.z > 2.5 ? 0.4 : 1.0);
+    float w = 0.35 + 0.55 * fract(seed * 7.31), ph = seed * 3.7;
+    float breathe = sin(uTime * w + ph);
+    float size = iMisc.x * (1.0 + 0.07 * amp * breathe), c = cos(iMisc.y), s = sin(iMisc.y);
     vec4 mv = modelViewMatrix * vec4(iPos, 1.0);
     float dz = max(-mv.z, 1e-3);
     mv.xy += mat2(c, s, -s, c) * position.xy * size;
@@ -169,7 +174,8 @@ const BB_VERT = /* glsl */`
     float fade = smoothstep(1.5, 8.0, px)                         // sub-pixel when far → fade out instead of sparkling
                * smoothstep(size * 0.5, size * 2.0, dz)           // camera inside the cloud → fade out (no blow-out)
                * (1.0 - 0.6 * smoothstep(0.15, 0.6, size / dz));  // dim clouds that fill a big part of the screen
-    vCol = vec4(iColor.rgb, iColor.a * fade);
+    float flick = 1.0 + amp * (0.14 * sin(uTime * w * 1.37 + ph * 2.1) + 0.05 * sin(uTime * 2.9 + seed * 11.0));
+    vCol = vec4(iColor.rgb, iColor.a * fade * flick);
     vUv = (position.xy + 0.5 + vec2(mod(iMisc.z, 2.0), floor(iMisc.z / 2.0))) * 0.5;
     gl_Position = projectionMatrix * mv;
   }`;
@@ -180,7 +186,7 @@ const BB_FRAG_DARK = /* glsl */`
   uniform sampler2D map; uniform float uIntensity; varying vec2 vUv; varying vec4 vCol;
   void main() { float a = texture2D(map, vUv).a * vCol.a * uIntensity; if (a < 0.004) discard; gl_FragColor = vec4(vCol.rgb, a); }`;
 
-function billboards(list, map, { dark = false, intensity = 1, uScale, renderOrder = 2 }) {
+function billboards(list, map, { dark = false, intensity = 1, uScale, uTime = { value: 0 }, flicker = 0, renderOrder = 2 }) {
   const n = list.length;
   const base = new THREE.PlaneGeometry(1, 1);
   const geo = new THREE.InstancedBufferGeometry();
@@ -192,7 +198,7 @@ function billboards(list, map, { dark = false, intensity = 1, uScale, renderOrde
   geo.setAttribute('iMisc', new THREE.InstancedBufferAttribute(m, 3));
   geo.instanceCount = n;
   const mat = new THREE.ShaderMaterial({
-    uniforms: { map: { value: map }, uScale, uIntensity: { value: intensity } },
+    uniforms: { map: { value: map }, uScale, uTime, uFlicker: { value: flicker }, uIntensity: { value: intensity } },
     vertexShader: BB_VERT, fragmentShader: dark ? BB_FRAG_DARK : BB_FRAG_ADD,
     transparent: true, depthWrite: false, blending: dark ? THREE.NormalBlending : THREE.AdditiveBlending,
   });
@@ -253,7 +259,7 @@ export function addDeepSpace(galaxy, opts = {}) {
   const group = new THREE.Group();
   group.name = 'DeepSpace';
   parent.add(group);
-  const uScale = { value: 800 };
+  const uScale = { value: 800 }, uTime = { value: 0 };   // uTime: shared clock for the nebula breathing (uniform only)
   const nebTex = nebulaAtlas(isTouch ? 128 : 256, rnd);
   const dustTex = dustAtlas(isTouch ? 128 : 256, rnd);
   const glows = [], darks = [], stars = [];
@@ -362,7 +368,7 @@ export function addDeepSpace(galaxy, opts = {}) {
 
   const parts = [];
   if (darks.length) { const m = billboards(darks, dustTex, { dark: true, intensity: 1, uScale, renderOrder: 2.5 }); m.name = 'DeepSpaceDust'; parts.push(m); }
-  if (glows.length) { const m = billboards(glows, nebTex, { intensity: (isTouch ? 1.1 : 1) * intensity, uScale, renderOrder: 2.7 }); m.name = 'DeepSpaceNebulae'; parts.push(m); }
+  if (glows.length) { const m = billboards(glows, nebTex, { intensity: (isTouch ? 1.1 : 1) * intensity, uScale, uTime, flicker: opts.flicker ?? 1, renderOrder: 2.7 }); m.name = 'DeepSpaceNebulae'; parts.push(m); }
   if (stars.length) { const m = starPoints(stars, { bright: isTouch ? 0.75 : 0.6, uScale, renderOrder: 1.5 }); m.name = 'DeepSpaceStars'; parts.push(m); }
   if (haloPts.length) { const m = starPoints(haloPts, { bright: isTouch ? 0.65 : 0.55, uScale, renderOrder: 1.5 }); m.name = 'DeepSpaceHalo'; parts.push(m); }
   group.add(...parts);
@@ -383,11 +389,15 @@ export function addDeepSpace(galaxy, opts = {}) {
   }
 
   const tmp = new THREE.Vector3();
+  let lastT = performance.now();
   return {
     group,
     objects: named,           // [{ id, name, kind, desc, l, b, distLy, position (group-local), size, labelEl? }]
     counts: { nebulaSprites: glows.length, dustSprites: darks.length, stars: stars.length, halo: haloPts.length },
-    update(camera) {
+    update(camera, dt) {
+      // time-based (frame-rate independent); without a dt from the caller, measure it here
+      const now = performance.now(); if (dt === undefined) dt = Math.min((now - lastT) / 1000, 0.1); lastT = now;
+      uTime.value = (uTime.value + dt) % 1e4;
       for (const L of labelObjs) L.el.classList.toggle('off', camera.position.distanceTo(L.obj.getWorldPosition(tmp)) > L.range);
     },
     setVisible(v) { group.visible = v; for (const L of labelObjs) L.obj.visible = v; },

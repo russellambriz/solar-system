@@ -129,6 +129,9 @@ export function addSombrero(galaxy, opts = {}) {
   const normal = los.clone().multiplyScalar(Math.cos(84 * D2R)).addScaledVector(skyUp, Math.sin(84 * D2R)).normalize();
   const disk = new THREE.Group();
   disk.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+  const diskQ0 = disk.quaternion.clone(), _spinQ = new THREE.Quaternion(), Y = new THREE.Vector3(0, 1, 0);
+  let spinAngle = 0, lastT = performance.now();
+  const SPIN_OMEGA = (2 * Math.PI) / 900;                 // cosmetic slow spin about the disk axis (~15 min per turn)
   group.add(disk);
   const major = new THREE.Vector3().crossVectors(normal, los).normalize();   // on-sky major axis
   const minor = new THREE.Vector3().crossVectors(los, major).normalize();    // on-sky minor axis (≈ "up")
@@ -303,7 +306,14 @@ export function addSombrero(galaxy, opts = {}) {
   let visible = true;
   const _p = new THREE.Vector3();
   function update(camera) {
+    const now = performance.now(), dt = Math.min((now - lastT) / 1000, 0.1); lastT = now;
     if (!visible) return;
+    // spin with the other galaxies (galaxy.spinning: galaxy view, not paused, not mid-flight). Rotating the disk group
+    // about its own axis keeps the depth slabs correct: uToCam is recomputed from disk.matrixWorld every frame.
+    if (galaxy.spinning ?? true) {
+      spinAngle = (spinAngle - dt * SPIN_OMEGA) % (2 * Math.PI);
+      disk.quaternion.copy(diskQ0).multiply(_spinQ.setFromAxisAngle(Y, spinAngle));
+    }
     const pxPerUnit = shared.uScale.value / (window.devicePixelRatio || 1) * 1;   // CSS px per unit at distance 1 (approx.)
     const camPos = camera.getWorldPosition(_p);
     const dS = camPos.distanceTo(POS), dMW = camPos.length();
