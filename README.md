@@ -19,6 +19,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 - **Spacecraft**: Voyager 1 and 2, New Horizons (with their paths past the planets they visited), Parker Solar Probe on its 88-day orbit and JWST at Sun–Earth L2, at approximate real positions for the shown date; the ISS circling Earth (shown at ~1,500 km instead of ~420 km so it clears the surface); and markers for the six Apollo landing sites and the planned Artemis south-pole landing area, which appear when you zoom in on the Moon. Tap any label for facts; the Layers group has a checkbox for each
 - **Comets**: Halley's Comet and Hale-Bopp on their real elliptical orbits, with a blue ion tail pointing straight away from the Sun and a curved dust tail, both growing as the comet nears the Sun (Halley's next visit is 2061). Tap a comet's label for facts; Layers has a Comets checkbox
 - **Andromeda & the Local Group**: zoom even farther out (or press 🔭 Andromeda / `A`) to see the Andromeda Galaxy (M31) with its companions M32 and M110, shown at its true distance of ~2.5 million light-years
+- **Magellanic Clouds & Triangulum (M33)**: the Large and Small Magellanic Clouds (~160,000 and ~200,000 light-years, joined by the Magellanic Bridge) and the Triangulum Galaxy (~2.7 million light-years, near Andromeda) at their true distances and sizes in the galaxy view. Tap one or its label to fly there; Layers has an LMC · SMC · M33 checkbox
 - Distances and sizes are scaled so everything is visible (in the galaxy view, *wildly* so); see the note in the bottom-left corner of the page
 
 ## Controls
@@ -35,6 +36,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 | Galaxy info | Click the galaxy or "You are here" | Tap the galaxy or "You are here" |
 | Andromeda | `A`, 🔭 Andromeda, zoom far out from the galaxy, or click it | 🔭 Andromeda, pinch far out, or tap it |
 | Back from Andromeda | `Esc` or 🌌 Back to Milky Way | 🌌 Back to Milky Way |
+| Magellanic Clouds / M33 (galaxy view) | Click the galaxy or its label | Tap the galaxy or its label |
 | Milky Way sky band on/off | Controls checkbox | Controls checkbox |
 | Asteroid / Kuiper belt on/off | Controls checkboxes | Controls checkboxes |
 | Spacecraft or landing-site facts | Click its label (✕ closes the card and keeps the view) | Tap its label |
@@ -55,6 +57,7 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 - `index.html`: page layout, plus an import map that loads `three` and its addons from the CDN
 - `main.js`: scene, procedural textures, picking, camera focus/follow, view switching and UI code (commented)
 - `galaxy.js`: Milky Way sky band shader, the particle-based Milky Way, and Andromeda (M31) with M32/M110
+- `localgroup/`: Large and Small Magellanic Clouds (riding on the Milky Way's disk), the Magellanic Bridge and the Triangulum Galaxy (M33), with labels, fly-to framing and info cards
 - `sun.js`: animated close-up Sun (granulation, sunspots, limb darkening), prominences, solar flares and CMEs
 - `moons.js`: GPU-baked surfaces of the Galilean moons and the potato-shaped Phobos, Deimos and Vesta
 - `outermoons.js`: moons of Saturn, Uranus and Neptune: GPU-baked surfaces, Titan's haze, tilted/retrograde/eccentric orbits and their facts

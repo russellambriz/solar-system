@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-10-11: Magellanic Clouds and the Triangulum Galaxy (Claude Code)
+
+### Added
+- **New module `localgroup/`** (`addLocalGroup(galaxy, { isTouch, labels })`, written in the same style as `sombrero.js`). It adds the Large and Small Magellanic Clouds and the Triangulum Galaxy (M33) to the galaxy view at their true distances, directions and sizes (1 unit = 100 ly). Directions use the same galactic frame `galaxy.js` uses for Andromeda.
+  - **LMC:** ~160,000 ly → 1,600 units at l = 280.5°, b = −32.9°, ~14,000 ly across. It has an off-centre bar, one main arm, the pink Tarantula Nebula and a few smaller star-forming knots, and turns slowly about its own axis.
+  - **SMC:** ~200,000 ly → 2,000 units at l = 302.8°, b = −44.3°, ~7,000 ly across. It has an elongated body, the "Wing" reaching toward the LMC, and NGC 346. It sits ~76,000 ly from the LMC, joined by a faint **Magellanic Bridge** of gas and young stars.
+  - **M33:** ~2.7 million ly → 27,000 units at l = 133.6°, b = −31.3°, ~60,000 ly across, ~700,000 ly from Andromeda. It is a patchy two-arm spiral with a tiny nucleus and the giant pink nebula NGC 604. Like M31 it turns slowly, and a constant-size beacon marks it when it shrinks below a few pixels.
+- **Attachment.** The Clouds hang off `galaxy.group`, so they ride along as the disk turns and their direction from the Sun stays right, like the nebulae. M33 sits in `galaxy.scene` next to Andromeda. 27,000 units out, the disk's sped-up spin would sweep it hundreds of units per second and break its true distance from M31. Nothing in `galaxy.js` or the other galaxy files was edited.
+- **Labels** carry the `galaxy-label` and `small` classes, so the overlap pass in `galaxy.js` nudges or hides them before Andromeda's label or the Sun marker; the M33 and M31 labels were checked not to overlap in the Local Group view. Their styles are slightly larger and tappable, with ≥ 44 px touch targets.
+  - The Clouds' labels show out to ~9,000 units from the Milky Way.
+  - M33's label shows in the Local Group views. It is hidden while you explore the Milky Way up close, and beyond the Sombrero scale.
+- **Tap to fly**, following `flyToSombrero()`: `flyToLocalGroup(key)` in `main.js` runs two `flyTo()` stages through `galaxyFly`, with no new camera code and no `updateCamera` change.
+  - The Clouds go through a view of the Milky Way beside the Cloud. M33 goes through the Local Group view.
+  - Each flight ends on a view from our side and opens the galaxy's info card (distance, size, stars, where it is in the sky, and a fact).
+  - Tapping the galaxy itself or its label works; a second tap reopens the card.
+- **Info cards** with real facts: the Tarantula Nebula and R136a1, SN 1987A, al-Sufi (964 AD), Henrietta Leavitt's Cepheids in the SMC, NGC 604.
+- New **LMC · SMC · M33** Layers checkbox. The galaxy-view scale note mentions the three galaxies.
+
+### Changed (`main.js` hook lines)
+- The Milky Way's cosmetic spin pauses while a Magellanic Cloud is focused, so the Cloud (which rides on the turning disk) stays in view. Zooming far out (> 2,500 units) releases the focus, as for Sgr A*.
+- Going home from a Cloud (Esc, 🌌 Milky Way, ☀ Solar System, Sgr A*) passes through the Milky Way + Cloud view instead of the far Local Group view. Every other path is unchanged.
+- The `lg-view` note stays on the Milky Way text while a Cloud is focused.
+- `window.solar` gains `localGroup` and `flyToLocalGroup` for tests.
 ## 2026-10-11: Halley's Comet and Comet Hale-Bopp (Claude Code)
 
 ### Added
