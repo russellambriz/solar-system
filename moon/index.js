@@ -24,6 +24,13 @@ function loadTex(file, srgb) {
   return t;
 }
 
+function loadHiRes(file, srgb) {
+  const tex = new THREE.TextureLoader().load(new URL(file, BASE).href, () => tex.onReady && tex.onReady());
+  tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
 /** Builds the Moon as a THREE.LOD (three sphere resolutions sharing one material). */
 export function createMoonMesh({ radius, isTouch = false }) {
   const size = isTouch ? '1k' : '2k';   // iPad/phones get the small set (~0.3 MB vs ~1.3 MB)
@@ -44,6 +51,7 @@ export function createMoonMesh({ radius, isTouch = false }) {
   const levels = isTouch ? [[96, 64, 0], [48, 32, 8], [24, 16, 40]] : [[160, 112, 0], [72, 48, 8], [24, 16, 40]];
   for (const [w, h, d] of levels) lod.addLevel(new THREE.Mesh(new THREE.SphereGeometry(radius, w, h), material), d * radius);
   lod.userData.moonUniforms = uniforms;
+  lod.userData.hiRes = isTouch ? 'never' : 'pending';   // desktop streams 4K maps in once you fly close
   return lod;
 }
 
@@ -73,6 +81,15 @@ export function updateMoon(moonBody, camera, sunLight) {
   const far = base * 40, near = base * 8;                  // overview look beyond `far`, real ratio inside `near`
   const t = 1 - THREE.MathUtils.smoothstep(d, near, far);
   const s = THREE.MathUtils.lerp(1, REAL_RATIO / OVERVIEW_RATIO, t);
+  // Close-up detail: on desktop, swap in the 4K color + relief maps the first time the camera gets close.
+  // They load in the background; the 2K set stays on screen until both are ready, so there's no pop to grey.
+  if (t > 0.35 && moonBody.mesh.userData.hiRes === 'pending') {
+    moonBody.mesh.userData.hiRes = 'loading';
+    let ready = 0;
+    const map = loadHiRes('moon_color_4k.jpg', true), nrm = loadHiRes('moon_normal_4k.jpg', false);
+    function done() { if (++ready < 2) return; u.uMap.value = map; u.uNormalMap.value = nrm; moonBody.mesh.userData.hiRes = 'loaded'; }
+    map.onReady = nrm.onReady = done;
+  }
   moonBody.group.scale.setScalar(s);                       // mesh, pick sphere and label offset all live in this group
   moonBody.radius = base * s;
 }
