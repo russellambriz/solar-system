@@ -1,7 +1,8 @@
-// earth/clouds.js — the cloud deck: a slightly larger sphere using the real cloud map as alpha, lit by the Sun
+// earth/clouds.js — the cloud deck: a slightly larger sphere using the real cloud map as alpha (with latitude-dependent
+// drift, CLOUD_FLOW in glsl.js), lit by the Sun
 // with the same soft terminator as the ground (so clouds go dark — not glowing white — on the night side).
 import * as THREE from 'three';
-import { CLOUD_CURVE } from './glsl.js';
+import { CLOUD_CURVE, CLOUD_FLOW } from './glsl.js';
 
 const vertexShader = /* glsl */ `
 varying vec2 vUv;
@@ -28,8 +29,9 @@ varying vec2 vUv;
 varying vec3 vNormalW;
 varying vec3 vWorldPos;
 ${CLOUD_CURVE}
+${CLOUD_FLOW}
 void main() {
-  float a = cloudCurve(texture2D(uCloudMap, vUv).r) * uCloudsReady * uCloudOpacity;
+  float a = cloudFlow(vUv, dFdx(vUv), dFdy(vUv)) * uCloudsReady * uCloudOpacity;   // latitude drift, see glsl.js
   if (a < 0.003) discard;
   vec3 N = normalize(vNormalW);
   vec3 L = normalize(uSunDir);

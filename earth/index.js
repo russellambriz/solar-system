@@ -10,6 +10,9 @@
 // Uniforms are refreshed automatically right before the ground is drawn (mesh.onBeforeRender), so no extra call
 // is needed in the render loop; earth.update(camera) can still be called manually.
 //
+// Cinematic framing helper for camera code: earth.getCinematicStart() (or getCinematicStart(earth, sunLight)), see
+// the JSDoc at the bottom of this file.
+//
 // Earthshine hook for the Moon: `earth.uEarthTint` (also earth.uniforms.uEarthTint) is a THREE uniform
 // { value: THREE.Vector3 } holding Earth's mean linear reflectance colour (land/ocean + cloud cover).
 // The Moon shader can share the same uniform object: `moonMat.uniforms.uEarthTint = earth.uEarthTint`.
@@ -41,6 +44,17 @@ const DEFAULTS = {
   aerial: 0.25,            // strength of the haze over the ground relative to the limb
   atmoSamples: 6,          // view-ray samples (mobile: atmoSamplesMobile)
   atmoSamplesMobile: 4,
+  // cloud drift (CLOUD_FLOW in glsl.js). Clock unit = radians of Earth spin (so it follows the sim time speed).
+  cloudTrades: -0.035,     // tropics: westward, radians of longitude per radian of spin
+  cloudWesterlies: 0.08,   // ~45° N/S: eastward
+  cloudSolid: 0.03,        // slow solid-body eastward creep of the whole deck (unbounded, no shear)
+  cloudFlowPeriod: 6,      // crossfade period (clock units): max band-to-band shear ≈ 0.08·6 rad ≈ 27°
+  cloudMaxRate: 1.5,       // speed limit for the cloud clock, radians of spin per real second (≈ 12 sim-days/s)
+  // close-approach "cinematic" limb: thicker + brighter as Earth's on-screen radius grows (CSS px)
+  closeFrom: 300,          // no change below this on-screen radius (far view unchanged)
+  closeTo: 700,            // full effect from here
+  closeThicken: 0.35,      // +35 % shell thickness (and scale heights) at full effect
+  closeBrighten: 0.3,      // +30 % atmosphere intensity at full effect
   detailNear: 140,         // Earth's on-screen radius (px) above which glint + cloud shadows are at full detail
   detailFar: 45,           //   … and below which they are fully faded (overview distances: avoids shimmer)
   cloudOpacity: 0.95,
@@ -100,6 +114,10 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uScaleM:        { value: P.scaleM },
     uAerial:        { value: P.aerial },
     uDetail:        { value: 1 },
+    uCloudPhase:    { value: 0 },
+    uCloudBase:     { value: 0 },
+    uCloudFlowPeriod:{ value: P.cloudFlowPeriod },
+    uCloudWinds:    { value: new THREE.Vector3(P.cloudTrades, P.cloudWesterlies, P.cloudSolid) },
     uCenter:        { value: new THREE.Vector3() },
     uR:             { value: radius },
     uRa:            { value: radius * (1 + P.atmoThickness) },
@@ -150,14 +168,22 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     // Sun direction in the ground's object frame (removes axial tilt + daily spin)
     surface.getWorldQuaternion(_q);
     U.uSunDirObj.value.copy(dir).applyQuaternion(_q.invert());
-    // ground object space → cloud object space (both are pure rotations of the same tilt frame)
+    // Cloud deck: locked to the ground frame. main.js still writes clouds.rotation.y = spin × 1.15 every frame
+    // (updateBodies); that solid-body spin-up is overridden here, right before drawing, and replaced by the
+    // latitude-dependent drift in the shaders (CLOUD_FLOW). No main.js change needed.
+    lockClouds();
+    advanceCloudClock();
+    // ground object space → cloud object space (identity now that both share a frame; kept for generality)
     _m.copy(clouds.matrixWorld).invert().multiply(surface.matrixWorld);
     U.uGroundToCloud.value.setFromMatrix4(_m);
     // world-space size/centre for the halo (handles any parent scale)
     U.uCenter.value.copy(_earth);
     surface.getWorldScale(_s);
     U.uR.value = radius * _s.x;
-    U.uRa.value = radius * (1 + P.atmoThickness) * _s.x;
+    const thick = P.atmoThickness * (1 + P.closeThicken * close.k);
+    U.uRa.value = radius * (1 + thick) * _s.x;
+    atmosphere.scale.setScalar((1 + thick) / (1 + P.atmoThickness));   // mesh must still enclose the shell
+    U.uAtmoIntensity.value = P.atmoIntensity * (1 + P.closeBrighten * close.k);
     // match MeshStandardMaterial's response to the same light: colour × intensity / π
     U.uSunColor.value.copy(sunLight.color).multiplyScalar(sunLight.intensity / Math.PI);
     // Level of detail for the high-frequency terms (ocean glint, cloud shadows): from Earth's projected radius
@@ -169,8 +195,48 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
       const x = THREE.MathUtils.clamp((px - P.detailFar) / (P.detailNear - P.detailFar), 0, 1);
       U.uDetail.value = x * x * (3 - 2 * x);
       lod.px = px;
+      // close-approach boost, from the on-screen radius in CSS px (independent of devicePixelRatio); eased and
+      // smoothed over frames so it never pops. Takes effect from the next frame's uRa / intensity.
+      const css = px / (renderer ? renderer.getPixelRatio() : 1);
+      const c = THREE.MathUtils.clamp((css - P.closeFrom) / (P.closeTo - P.closeFrom), 0, 1);
+      const target = c * c * (3 - 2 * c);
+      const now = performance.now(), dt = Math.min((now - close.t) / 1000, 0.25);
+      close.t = now;
+      close.k += (target - close.k) * (1 - Math.exp(-dt / 0.35));          // ~0.35 s ease, frame-rate independent
+      if (Math.abs(target - close.k) < 1e-3) close.k = target;
     }
   }
+
+  // ---- cloud drift clock ----------------------------------------------------------------------------------------
+  // Clock unit = radians of ground spin, so drift follows the simulation (pauses when paused, runs with the time
+  // slider). It is rate-limited to P.cloudMaxRate per real second, so at huge time speeds the clouds keep moving
+  // smoothly instead of strobing; big jumps (tab switch, date change) are absorbed the same way.
+  const close = { k: 0, t: performance.now() };
+  const cloudClock = { t: 0, lastSpin: null, lastNow: 0 };
+  function lockClouds() {
+    if (clouds.rotation.y !== surface.rotation.y || clouds.rotation.x !== surface.rotation.x || clouds.rotation.z !== surface.rotation.z) {
+      clouds.rotation.copy(surface.rotation);
+      clouds.updateMatrixWorld(true);
+    }
+  }
+  function advanceCloudClock() {
+    const now = performance.now();
+    const spin = surface.rotation.y;
+    if (cloudClock.lastSpin !== null) {
+      const dReal = Math.min((now - cloudClock.lastNow) / 1000, 0.1);
+      const dSpin = spin - cloudClock.lastSpin;
+      const lim = P.cloudMaxRate * dReal;
+      cloudClock.t += THREE.MathUtils.clamp(dSpin, -lim, lim);
+    }
+    cloudClock.lastSpin = spin; cloudClock.lastNow = now;
+    const T = P.cloudFlowPeriod;
+    U.uCloudFlowPeriod.value = T;
+    U.uCloudPhase.value = ((cloudClock.t / T) % 1 + 1) % 1;
+    U.uCloudBase.value = (P.cloudSolid * cloudClock.t) % (Math.PI * 2);
+    U.uCloudWinds.value.set(P.cloudTrades, P.cloudWesterlies, P.cloudSolid);
+  }
+  // If the ground is culled but the deck is not, still keep the deck in the ground frame.
+  clouds.onBeforeRender = () => lockClouds();
   // Refresh uniforms just before the ground is drawn (matrices are already up to date at that point).
   const prevBefore = surface.onBeforeRender;
   surface.onBeforeRender = function (...args) { update(args[2]); prevBefore.apply(this, args); };
@@ -185,5 +251,56 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     surfaceMat.dispose();
   }
 
-  return { group, surface, clouds, atmosphere, uniforms: U, uEarthTint: U.uEarthTint, params: P, textureInfo, lod, update, dispose };
+  const api = { group, surface, clouds, atmosphere, uniforms: U, uEarthTint: U.uEarthTint, params: P, textureInfo, lod,
+    cloudClock, update, dispose };
+  api.getCinematicStart = (opts) => getCinematicStart(api, sunLight, opts);
+  return api;
+}
+
+/**
+ * Suggested "cinematic" framing for the end of a fly-to: the terminator runs across the disc with the Sun off to
+ * one side (~75° from the view axis, so a bit more day than night is visible), the camera raised ~15° towards
+ * Earth's north pole, plus a slow drift that carries the view across the terminator towards the night side.
+ *
+ * Units / frames (all world space, relative to Earth's centre):
+ *   offset     THREE.Vector3  camera position minus Earth centre, in EARTH RADII (multiply by the Earth's world radius,
+ *                             or rescale to any distance: the direction is what matters; default length opts.distance)
+ *   target     THREE.Vector3  look-at point minus Earth centre, in Earth radii (zero: look at the centre)
+ *   driftSpeed number         suggested orbit rate of the camera about driftAxis, in RADIANS PER SECOND OF REAL TIME;
+ *                             positive = the view moves from the day side towards the night side
+ *   driftAxis  THREE.Vector3  unit world-space axis through Earth's centre to rotate the camera offset about
+ *                             (perpendicular to the Sun direction and the view direction, so the Sun angle sweeps)
+ * Usage (ScaleBot): const c = body.earth.getCinematicStart();
+ *   cam.position.copy(earthCentre).addScaledVector(c.offset, earthWorldRadius); controls.target.copy(earthCentre)…;
+ *   per frame: offset.applyAxisAngle(c.driftAxis, c.driftSpeed * dtReal).
+ * The result depends on the Sun's current position, so call it at the moment the fly-to ends.
+ *
+ * @param {object} earth        object returned by createEarth (uses earth.surface)
+ * @param {THREE.Object3D} sunLight
+ * @param {object} [opts]       { distance = 2.8 (Earth radii), sunAngleDeg = 75, elevationDeg = 15, driftSpeed = 0.02 }
+ * @returns {{offset: THREE.Vector3, target: THREE.Vector3, driftSpeed: number, driftAxis: THREE.Vector3}}
+ */
+export function getCinematicStart(earth, sunLight, opts = {}) {
+  const { distance = 2.8, sunAngleDeg = 75, elevationDeg = 15, driftSpeed = 0.02 } = opts;
+  const c = earth.surface.getWorldPosition(new THREE.Vector3());
+  const S = sunLight.getWorldPosition(new THREE.Vector3()).sub(c);
+  if (S.lengthSq() < 1e-12) S.set(1, 0, 0);
+  S.normalize();
+  // Earth's spin axis in world space (ground mesh +Y)
+  const A = new THREE.Vector3(0, 1, 0).applyQuaternion(earth.surface.getWorldQuaternion(new THREE.Quaternion())).normalize();
+  // a horizontal direction perpendicular to the Sun (along the terminator's "equator crossing")
+  let E = new THREE.Vector3().crossVectors(A, S);
+  if (E.lengthSq() < 1e-8) E = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 0, 1), S);
+  E.normalize();
+  const a = THREE.MathUtils.degToRad(sunAngleDeg);
+  const dir = S.clone().multiplyScalar(Math.cos(a)).addScaledVector(E, Math.sin(a)).normalize();
+  // raise towards the north pole
+  const up = A.clone().addScaledVector(dir, -A.dot(dir));
+  if (up.lengthSq() > 1e-8) {
+    const e = THREE.MathUtils.degToRad(elevationDeg);
+    dir.multiplyScalar(Math.cos(e)).addScaledVector(up.normalize(), Math.sin(e)).normalize();
+  }
+  // rotating dir about S × dir by a positive angle moves it away from the Sun, i.e. towards the night side
+  const driftAxis = new THREE.Vector3().crossVectors(S, dir).normalize();
+  return { offset: dir.multiplyScalar(distance), target: new THREE.Vector3(), driftSpeed, driftAxis };
 }

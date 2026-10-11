@@ -5,7 +5,10 @@
 //   • night city lights that fade in across the terminator (and are dimmed under thick cloud)
 //   • ocean sun glint (normalised Blinn-Phong + Fresnel, noise-varied roughness) masked by the water map
 //   • soft cloud shadows: the cloud texture is sampled a little "towards the Sun" from each point, in the cloud
-//     layer's own (separately rotating) frame, so the shadows slide with the clouds and fall on the anti-sun side
+//     layer's frame with the same latitude drift (CLOUD_FLOW), so the shadows move with the clouds and fall on the
+//     anti-sun side
+//   • city lights switch on at dusk in clusters: each spot has its own noise threshold on "how far past the
+//     terminator" it must be before it lights up
 //   • level of detail: uDetail (from Earth's on-screen size, see index.js) fades the cloud shadows and widens /
 //     dims the glint at overview distances, where the tight lobe and the offset shadow lookup would shimmer
 // The blue limb haze over the disc is no longer faked here: earth/atmosphere.js adds physically-based aerial
@@ -14,7 +17,7 @@
 // Lighting units follow MeshStandardMaterial under three r155+ physical lights: radiance = albedo · (I/π) · N·L,
 // so Earth matches the brightness of the other planets lit by the same PointLight.
 import * as THREE from 'three';
-import { DIR_TO_UV, CLOUD_CURVE, VALUE_NOISE } from './glsl.js';
+import { DIR_TO_UV, CLOUD_CURVE, CLOUD_FLOW, VALUE_NOISE } from './glsl.js';
 
 const vertexShader = /* glsl */ `
 varying vec2 vUv;
@@ -67,13 +70,14 @@ varying vec3 vWorldPos;
 
 ${DIR_TO_UV}
 ${CLOUD_CURVE}
+${CLOUD_FLOW}
 ${VALUE_NOISE}
 
 // Cloud coverage above a ground direction (object space). textureGrad with the ground UV derivatives avoids
 // the mip-level glitch an atan()-generated UV would otherwise show along the date-line seam.
 float cloudCover(vec3 groundDir) {
   vec2 uv = dirToUv(normalize(uGroundToCloud * groundDir));
-  return cloudCurve(textureGrad(uCloudMap, uv, dFdx(vUv), dFdy(vUv)).r) * uCloudsReady;
+  return cloudFlow(uv, dFdx(vUv), dFdy(vUv)) * uCloudsReady;      // same drift as the cloud deck → shadows follow
 }
 
 void main() {
@@ -138,8 +142,15 @@ void main() {
   // The source map has a faint blue base layer; keep only the bright city cores and warm them up a little.
   vec3 night = texture2D(uNightMap, vUv).rgb;
   float lights = smoothstep(0.06, 0.55, max(night.r, night.g));
-  float nightSide = 1.0 - smoothstep(-0.16, 0.0, NdLgeo);
-  col += vec3(1.0, 0.74, 0.42) * lights * nightSide * (1.0 - 0.6 * overhead) * uNightGain;
+  // Dusk switch-on: "darkness" goes 0 → 1 from just past the terminator to ~12° into the night. Each place gets
+  // its own threshold from two octaves of value noise (town-sized clusters + finer grain), so as the terminator
+  // sweeps over, cities come on in patches instead of one uniform fade. At overview distances the threshold
+  // flattens to 0.5 (no sub-pixel noise).
+  float dark = 1.0 - smoothstep(-0.21, -0.015, NdLgeo);
+  float thr  = vnoise(vObjDir * 38.0) * 0.65 + vnoise(vObjDir * 140.0) * 0.35;
+  thr = mix(0.5, clamp((thr - 0.22) / 0.56, 0.0, 1.0), uDetail) * 0.86 + 0.07;
+  float on = smoothstep(thr - 0.05, thr + 0.05, dark);
+  col += vec3(1.0, 0.74, 0.42) * lights * on * mix(0.55, 1.0, dark) * (1.0 - 0.6 * overhead) * uNightGain;
 
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>

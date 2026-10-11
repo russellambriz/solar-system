@@ -18,6 +18,40 @@ export const CLOUD_CURVE = /* glsl */ `
 float cloudCurve(float c) { return smoothstep(0.08, 0.80, c); }
 `;
 
+/**
+ * Latitude-dependent cloud drift, flow-map style (needs CLOUD_CURVE and uCloudMap declared first).
+ * The cloud deck is locked to the ground frame (index.js); on top of that each latitude band drifts in longitude:
+ * westward trade winds in the tropics, eastward westerlies around ±45°, almost nothing near the poles, plus a slow
+ * solid-body eastward creep. A per-latitude offset that grew forever would shear the map into streaks, so two copies
+ * are sampled with offsets that ramp over one period (half a period apart) and crossfade: the displacement is
+ * bounded by rate × period and each copy resets while it is invisible.
+ * Uniforms (set in index.js from a speed-limited clock): uCloudPhase = fract(clock / period), uCloudBase = solid-body
+ * offset (radians, wrapped), uCloudFlowPeriod = period in clock units, uCloudWinds = (trades, westerlies, –) in
+ * radians of longitude per clock unit (+ = east).
+ */
+export const CLOUD_FLOW = /* glsl */ `
+uniform float uCloudPhase;
+uniform float uCloudBase;
+uniform float uCloudFlowPeriod;
+uniform vec3  uCloudWinds;
+float windRate(float phi) {                         // phi = latitude (radians)
+  float a = abs(phi);
+  return uCloudWinds.x * exp(-(phi * phi) / 0.12)                     // trades, |lat| ≲ 20°
+       + uCloudWinds.y * exp(-((a - 0.8) * (a - 0.8)) / 0.09);        // westerlies, ~45°
+}
+float cloudFlow(vec2 uv, vec2 gx, vec2 gy) {
+  float phi = (uv.y - 0.5) * 3.14159265;
+  float rate = windRate(phi) * uCloudFlowPeriod;
+  float p0 = uCloudPhase, p1 = fract(uCloudPhase + 0.5);
+  // a pattern moving east by d radians is sampled at u − d / 2π
+  vec2 uvA = vec2(uv.x - (uCloudBase + rate * p0) * 0.15915494, uv.y);
+  vec2 uvB = vec2(uv.x - (uCloudBase + rate * p1) * 0.15915494, uv.y);
+  float cA = cloudCurve(textureGrad(uCloudMap, uvA, gx, gy).r);
+  float cB = cloudCurve(textureGrad(uCloudMap, uvB, gx, gy).r);
+  return mix(cA, cB, abs(2.0 * p0 - 1.0));          // A is invisible when it resets (p0 = 0), B when p1 = 0
+}
+`;
+
 /** Cheap 3-D value noise (0..1), used for ocean roughness variation. */
 export const VALUE_NOISE = /* glsl */ `
 float hash13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
