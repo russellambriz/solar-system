@@ -10,7 +10,8 @@
 //     tiltGroup.add(createPlanetRing({ name: p.name, mesh, radius, sunLight, isTouch: IS_TOUCH, fallback: ... }));
 //
 // Everything is lit from sunLight's *world position*, read right before each mesh is drawn (onBeforeRender), so no
-// per-frame call is needed in animate().
+// per-frame call is needed in animate(). Cloud motion (Venus, Jupiter, Saturn, Neptune; see FLOW) is clocked the same
+// way, from the mesh's sim-time-driven spin.
 //
 // Scale note: main.js draws planet radii as 0.95·sqrt(diameter / Earth's) and squeezes distances, so all sizes here are
 // expressed as multiples of the drawn planet radius. That keeps rings and atmospheres in the right proportion to their
@@ -44,6 +45,48 @@ const RINGS = {
 const NIGHT_RIM = 0.35;
 const NIGHT_FILL = 0.12;
 
+// ------------------------------------------------------------------------------------------------------------------
+// Cloud motion. The clock is the planet's own spin: main.js sets mesh.rotation.y = f(simTime) every frame (and leaves
+// it alone while paused), so the drift is read from how far the mesh turned since the last frame. No main.js hook is
+// needed, motion stops when the sim is paused, scales with the time-warp, and every drift is measured relative to the
+// displayed (50x slowed) rotation, so the wind/rotation ratio is the real one times `exag` (Jupiter 5x, Saturn 1.5x:
+// real jets move only ~1-4% of a turn per rotation, invisible next to the spin; Neptune 0.15x: kept subtle on purpose).
+//
+// mode 'rigid' (Venus): one texture sample, the whole cloud deck slides around the planet (Venus' clouds superrotate
+//   at a near-constant angular rate, lapping the planet in ~4 days against the solid body's 243-day retrograde spin).
+// mode 'zonal' (Jupiter, Saturn, Neptune): latitude-dependent zonal wind w(lat) in m/s, a sum of Gaussian jets
+//   [lat°, m/s, width°] in the map's own latitudes. The band at `baseLat` (Jupiter: the Great Red Spot's) moves as a
+//   rigid offset that never resets, so that band and the GRS travel around the planet indefinitely without smearing.
+//   Everything else is the difference w(lat) - w(baseLat), shown flow-map style: two samples displaced by
+//   rel·(phase-0.5)·P with phases half a cycle apart, crossfaded with a triangle weight, so no feature is displaced by
+//   more than `maxDisp` of the map width (no endless shear) and there is no seam. A soft mask around the GRS keeps the
+//   vortex coherent: it rides its band instead of being sheared by its neighbouring jets.
+// `veq`: equatorial rotation speed (m/s) to turn winds into "map widths per rotation" (w / (veq·cos lat)).
+// `maxSpeed`: cap on the fastest visible drift in map widths per wall-clock second, so high time-warp never strobes
+// (the flow cycle then never runs faster than 2·maxDisp/maxSpeed ≈ 1.25 s). At the default 10 d/s nothing is capped.
+// Cost: Venus 1 texture sample, the zonal planets 2 (instead of 1); ~12 exp() per fragment for the wind profile.
+const FLOW = {
+  Venus: { mode: 'rigid', perTurn: 243.02 / 4.0 - 1.0, maxSpeed: 0.03 },          // clouds ~4 d vs the body's 243 d
+  Jupiter: {
+    mode: 'zonal', veq: 12570, exag: 5, maxSpeed: 0.04, maxDisp: 0.025, baseLat: -19,
+    jets: [[0, 100, 8], [19, 140, 2.5], [25, -30, 2.5], [31, 40, 2.5], [36, -20, 3], [43, 30, 3],
+           [-7, 30, 3], [-15, -50, 2.5], [-19, -40, 5], [-24, 45, 3], [-31, -20, 3], [-37, 35, 3]],
+    spot: { u: 0.363, lat: -19, du: 0.042, dlat: 7.5 },     // Great Red Spot in the texture (u, planetographic lat)
+  },
+  Saturn: {
+    mode: 'zonal', veq: 9960, exag: 1.5, maxSpeed: 0.04, maxDisp: 0.025, baseLat: null,
+    jets: [[0, 400, 18], [40, -25, 3], [-40, -25, 3], [47, 90, 3.5], [-47, 90, 3.5], [55, -15, 3], [-55, -15, 3],
+           [62, 75, 3], [-62, 75, 3], [76, 110, 2.5], [-72, 60, 3]],
+  },
+  Neptune: {                                                // -400 m/s retrograde equator, +250 m/s at ±70°; kept faint
+    mode: 'zonal', veq: 2680, exag: 0.15, maxSpeed: 0.01, maxDisp: 0.01, baseLat: null,
+    jets: [[0, -400, 30], [70, 250, 14], [-70, 250, 14]],
+  },
+};
+const zonalWind = (jets, lat) => jets.reduce((w, [l, a, s]) => w + a * Math.exp(-(((lat - l) / s) ** 2)), 0);
+const relPerTurn = (w, lat, veq) => w / (veq * Math.max(Math.cos(THREE.MathUtils.degToRad(lat)), 0.3));
+const fract1 = (x) => x - Math.floor(x);
+
 const loader = new THREE.TextureLoader();
 const _q = new THREE.Quaternion(), _s = new THREE.Vector3();
 
@@ -63,7 +106,46 @@ function loadTexture(file, isTouch, srgb, onLoad, onError) {
 // Planet surface: MeshStandardMaterial (so it matches the rest of the scene's lighting) with a real map and, for
 // ringed planets, an analytic ring shadow injected with onBeforeCompile.
 // ------------------------------------------------------------------------------------------------------------------
-function patchPlanetMaterial(material, U) {
+const FLOW_GLSL = /* glsl */`
+#ifdef FLOW_MODE
+uniform float uFlowBase;          // rigid offset (map widths, wrapped to [0,1))
+#if FLOW_MODE == 2
+uniform float uFlowPhase, uFlowP, uFlowW0, uFlowK, uSpotOn;
+uniform vec3 uJets[JET_COUNT];    // lat (deg), wind (m/s), width (deg)
+uniform vec4 uSpot;               // u, lat, half-size u, half-size lat
+float zonalWind(float lat) {
+  float w = 0.0;
+  for (int i = 0; i < JET_COUNT; i++) { float d = (lat - uJets[i].x) / uJets[i].z; w += uJets[i].y * exp(-d * d); }
+  return w;
+}
+#endif
+#endif`;
+const FLOW_MAP_FRAGMENT = /* glsl */`
+#ifdef USE_MAP
+  #if defined(FLOW_MODE) && FLOW_MODE == 1
+  vec4 sampledDiffuseColor = texture2D(map, vec2(vMapUv.x - uFlowBase, vMapUv.y));
+  #elif defined(FLOW_MODE) && FLOW_MODE == 2
+  float fLat = (vMapUv.y - 0.5) * 180.0;
+  float fx0 = vMapUv.x - uFlowBase;                        // map u after the rigid band offset
+  // wind relative to the rigid band, in map widths per unit of the flow clock
+  float rel = (zonalWind(fLat) / max(cos(radians(fLat)), 0.3) - uFlowW0) * uFlowK;
+  if (uSpotOn > 0.5) {                                     // keep the Great Red Spot coherent (super-Gaussian mask)
+    vec2 sd = vec2(fract(fx0 - uSpot.x + 0.5) - 0.5, fLat - uSpot.y) / uSpot.zw;
+    float r2 = dot(sd, sd);
+    rel *= 1.0 - exp(-r2 * r2);
+  }
+  float ph1 = fract(uFlowPhase + 0.5);
+  vec4 s0 = texture2D(map, vec2(fx0 - rel * (uFlowPhase - 0.5) * uFlowP, vMapUv.y));
+  vec4 s1 = texture2D(map, vec2(fx0 - rel * (ph1 - 0.5) * uFlowP, vMapUv.y));
+  // triangle crossfade: each sample is fully hidden at the instant its displacement wraps
+  vec4 sampledDiffuseColor = mix(s0, s1, abs(2.0 * uFlowPhase - 1.0));
+  #else
+  vec4 sampledDiffuseColor = texture2D(map, vMapUv);
+  #endif
+  diffuseColor *= sampledDiffuseColor;
+#endif`;
+
+function patchPlanetMaterial(material, U, flowKey = 'none') {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, U);
     shader.vertexShader = shader.vertexShader
@@ -75,6 +157,7 @@ varying vec3 vPWorld;
 uniform vec3 uSunPos, uRingCenter, uRingNormal;
 uniform float uRingInner, uRingOuter, uRingOpacity, uHasRing, uNightRim;
 uniform sampler2D uRingMap;
+${FLOW_GLSL}
 // Fraction of sunlight that gets through the ring plane on the way from this point to the Sun (1 = no ring in the way).
 float ringShadow(vec3 p) {
   if (uHasRing < 0.5) return 1.0;
@@ -88,6 +171,7 @@ float ringShadow(vec3 p) {
   if (u < 0.0 || u > 1.0) return 1.0;
   return 1.0 - 0.92 * texture2D(uRingMap, vec2(u, 0.5)).a * uRingOpacity;
 }`)
+      .replace('#include <map_fragment>', FLOW_MAP_FRAGMENT)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
 { float rs = ringShadow(vPWorld); reflectedLight.directDiffuse *= rs; reflectedLight.directSpecular *= rs; }
 // Night-side rim: a faint, surface-tinted fresnel edge only where the Sun isn't shining, so the silhouette stays readable
@@ -97,7 +181,7 @@ float ringShadow(vec3 p) {
   float rimF = pow(1.0 - clamp(dot(normal, geometryViewDir), 0.0, 1.0), 3.0);
   reflectedLight.indirectDiffuse += diffuseColor.rgb * uNightRim * rimF * night; }`);
   };
-  material.customProgramCacheKey = () => 'planets-fx';
+  material.customProgramCacheKey = () => 'planets-fx-' + flowKey;
 }
 
 // ------------------------------------------------------------------------------------------------------------------
@@ -170,9 +254,12 @@ export function addPlanetFX({ name, mesh, tiltGroup, radius, sunLight, isTouch =
     uRingInner: { value: 0 }, uRingOuter: { value: 1 }, uRingOpacity: { value: 0 }, uHasRing: { value: 0 },
     uRingMap: { value: null }, uR: { value: radius }, uNightRim: { value: NIGHT_RIM },
   };
-  patchPlanetMaterial(mat, U);                      // ring shadow (Saturn/Uranus) + night-side rim (all)
+  const flow = setupFlow(name, mat, U);
+  patchPlanetMaterial(mat, U, flow ? flow.key : 'none');   // ring shadow (Saturn/Uranus) + night-side rim (all) + cloud flow
+  if (flow && fallbackMap) { fallbackMap.wrapS = THREE.RepeatWrapping; fallbackMap.needsUpdate = true; }
 
   loadTexture(cfg.file, isTouch, true, (tex) => {
+    if (flow) tex.wrapS = THREE.RepeatWrapping;       // drifting u must wrap around the planet without a seam
     mat.map = tex; mat.needsUpdate = true;
     if (fallbackMap && fallbackMap !== tex) fallbackMap.dispose();
   });
@@ -180,15 +267,70 @@ export function addPlanetFX({ name, mesh, tiltGroup, radius, sunLight, isTouch =
   let atmosphere = null;
   if (cfg.atmo) { atmosphere = createAtmosphere(radius, cfg.atmo, U, isTouch ? 48 : 64); tiltGroup.add(atmosphere); }
 
-  const fx = { name, mesh, radius, uniforms: U, atmosphere, ring: null, sunLight };
+  const fx = { name, mesh, radius, uniforms: U, atmosphere, ring: null, sunLight, flow };
   mesh.userData.planetFX = fx;
   const prev = mesh.onBeforeRender;
-  mesh.onBeforeRender = function (...args) { updateFX(fx); prev.apply(this, args); };
+  mesh.onBeforeRender = function (...args) { updateFX(fx, args[0]); prev.apply(this, args); };
   return fx;
 }
 
-function updateFX(fx) {
+/** Adds the cloud-flow defines/uniforms for planets listed in FLOW; returns the per-planet flow state (or null). */
+function setupFlow(name, mat, U) {
+  const c = FLOW[name];
+  if (!c) return null;
+  const f = { cfg: c, lastRot: null, lastT: 0, lastFrame: -1, clock: 0, base: 0, key: c.mode };
+  U.uFlowBase = { value: 0 };
+  if (c.mode === 'rigid') {
+    mat.defines = { ...mat.defines, FLOW_MODE: 1 };
+    f.basePerClock = c.perTurn;                      // map widths per planet turn
+    f.capClock = c.maxSpeed / Math.abs(c.perTurn);   // planet turns per wall second at the speed cap
+    return f;
+  }
+  const K = 1 / c.veq;                               // clock unit = one exaggerated planet turn (exag applied to the clock)
+  // w0: the rigid band's angular wind (m/s at the equator equivalent), so rel(baseLat) is exactly 0
+  const w0 = c.baseLat == null ? 0 : relPerTurn(zonalWind(c.jets, c.baseLat), c.baseLat, 1);
+  f.basePerClock = w0 * K;                           // map widths per clock unit
+  let relMax = Math.abs(f.basePerClock), shearMax = 0;
+  for (let lat = -70; lat <= 70; lat += 0.5) {
+    const a = relPerTurn(zonalWind(c.jets, lat), lat, 1);
+    relMax = Math.max(relMax, Math.abs(a * K));      // fastest total drift (caps the clock)
+    shearMax = Math.max(shearMax, Math.abs((a - w0) * K));   // fastest drift relative to the rigid band
+  }
+  f.capClock = c.maxSpeed / Math.max(relMax, shearMax);   // no band moves faster than maxSpeed map widths / s
+  f.period = (2 * c.maxDisp) / shearMax;              // flow cycle length in clock units → |displacement| ≤ maxDisp
+  mat.defines = { ...mat.defines, FLOW_MODE: 2, JET_COUNT: c.jets.length };
+  f.key = `zonal${c.jets.length}`;
+  Object.assign(U, {
+    uFlowPhase: { value: 0.5 }, uFlowP: { value: f.period }, uFlowW0: { value: w0 }, uFlowK: { value: K },
+    uJets: { value: c.jets.map(([l, a, s]) => new THREE.Vector3(l, a, s)) },
+    uSpot: { value: c.spot ? new THREE.Vector4(c.spot.u, c.spot.lat, c.spot.du, c.spot.dlat) : new THREE.Vector4(0, 0, 1, 1) },
+    uSpotOn: { value: c.spot ? 1 : 0 },
+  });
+  return f;
+}
+
+/** Advances the flow clock from the mesh's spin (= sim time), once per rendered frame, capped per wall second. */
+function updateFlow(fx, renderer) {
+  const f = fx.flow, U = fx.uniforms;
+  const frame = renderer && renderer.info ? renderer.info.render.frame : -2;
+  if (frame === f.lastFrame && frame !== -2) return;  // already advanced this frame (e.g. a second render pass)
+  f.lastFrame = frame;
+  const now = performance.now(), rot = fx.mesh.rotation.y;
+  if (f.lastRot === null) { f.lastRot = rot; f.lastT = now; return; }
+  const dt = Math.min((now - f.lastT) / 1000, 0.1);
+  let d = ((rot - f.lastRot) / (2 * Math.PI)) * (f.cfg.mode === 'rigid' ? 1 : f.cfg.exag);   // clock units
+  f.lastRot = rot; f.lastT = now;
+  const cap = f.capClock * dt;
+  if (d > cap) d = cap; else if (d < -cap) d = -cap;
+  f.clock += d;
+  f.base = fract1(f.base + d * f.basePerClock);
+  U.uFlowBase.value = f.base;
+  if (U.uFlowPhase) U.uFlowPhase.value = fract1(f.clock / f.period);
+}
+
+function updateFX(fx, renderer) {
   const U = fx.uniforms;
+  if (fx.flow) updateFlow(fx, renderer);
   fx.sunLight.getWorldPosition(U.uSunPos.value);
   fx.mesh.getWorldPosition(U.uCenter.value);
   fx.mesh.getWorldScale(_s);

@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-11: Moving clouds on Venus, Jupiter, Saturn and Neptune
+
+### Added
+- **Jupiter and Saturn: bands that flow at different speeds** (`planets/index.js`). Each latitude drifts at its own zonal wind speed, built from Gaussian jets in m/s: alternating east/west jet streams, with a fast prograde equatorial band (Jupiter about +100 m/s, Saturn about +400 m/s). The drift is shown flow-map style: two phase-offset texture samples crossfaded with a triangle weight. No feature is displaced more than 2.5% of the map width per cycle, so bands never smear endlessly and there is no seam.
+- **The Great Red Spot rolls with its band.** Jupiter's GRS band (about 40 m/s westward) is a rigid offset that never resets, so the spot and its band travel all the way around the planet. A soft mask around the spot keeps the vortex intact instead of letting the neighbouring jets shear it.
+- **Venus: cloud-top superrotation.** The cloud deck slides westward (the same way as Venus's slow retrograde spin) at the real ratio: about 60 laps of the clouds for each turn of the solid planet (4 days vs 243 days). This uses one texture sample.
+- **Neptune: a very faint band drift**: retrograde equator and prograde high latitudes, kept deliberately subtle.
+
+### How it works
+- The clock is driven by sim time with no `main.js` change. `main.js` already sets each planet's `mesh.rotation.y` from `simTime` every frame. The planet's `onBeforeRender` reads how far the mesh turned since the last frame, so clouds stop when the sim is paused, follow the time-speed slider, and move relative to the displayed (50× slowed) rotation.
+- Winds relative to rotation are exaggerated so they show next to the spin: Jupiter 5×, Saturn 1.5×. Neptune is scaled down to 0.15×. Venus uses the real ratio.
+- The drift rate is capped per wall-clock second (fastest band ≤ 0.04 map widths/s for Jupiter and Saturn, 0.03 for Venus, 0.01 for Neptune), so high time-warp doesn't strobe. At the default 10 days/s nothing is capped.
+- iPad cost: at most two texture samples (Jupiter, Saturn, Neptune), one on Venus, and about a dozen `exp()` calls for the wind profile. Mercury and Uranus shaders are unchanged. The procedural fallback maps also drift (set to repeat-wrap).
+
 ## 2026-10-11: Sun glow no longer draws a band at the screen edge
 
 ### Fixed
