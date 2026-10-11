@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-10-11: Help overlay, clean view, mini-map, events timeline and motion trails (Claude Code)
+
+### Added
+- **Help overlay** (new module `ui/`). Open it with the **?** button in the Controls header or the `?` key.
+  - It lists the mouse/keyboard and touch controls (touch first on touch screens) and a few things to try.
+  - ✕, Esc, `?` or a tap outside the card closes it. While it's open, Esc and the single-letter shortcuts don't reach the app.
+- **Clean view.** The 🖼 button next to Pause and Overview, or `H`, hides every panel, note, the HUD and the mini-map, so only the sky is left. A **Show interface** button in the corner (it dims after a moment) or `H` brings them back. Labels stay, and Layers → Labels still turns them off.
+- **"Why is this not to scale?"** The long bottom-left note now starts folded to a one-line button and opens on a tap. The galaxy-view note works the same way ("Galaxy view: what's to scale?"). Open or closed is remembered. Phones and short landscape screens, which used to hide the notes, now show the folded button.
+- **Mini-map** (Layers → Mini-map, or `M`). It's on by default on desktop and landscape tablets and off on compact screens; the setting is remembered.
+  - It's a top-down view of the Solar System on a log distance scale (out to 50 AU). It shows the planets' real eccentric orbits, the asteroid and Kuiper belts, the planets, the dwarf planets, Halley and Hale-Bopp, Parker Solar Probe, New Horizons and the Voyagers. Anything past 50 AU sits on the rim as an arrowhead.
+  - It also shows the camera as a dot with a view cone, and rings the focused object.
+  - Tap or click a dot to fly there (the same search fly-to, cinematic on long trips). Hovering with a mouse shows the name.
+  - It moves left of the Controls or info panel when they cover the corner, hides if nothing fits, and hides in the galaxy view.
+- **Events timeline** (Controls → 📅 Events, under the date).
+  - A 1965–2065 strip has coloured markers and a needle for the current date, plus ◀ ▶ (previous/next event) and a list of 18 events:
+    - the Apollo 11 and 17 landings;
+    - Voyager 1 and 2 at Jupiter and Saturn, and Voyager 2 at Uranus and Neptune;
+    - the Pale Blue Dot photo;
+    - Halley in 1986 and 2061, and Hale-Bopp in 1997;
+    - Pluto's reclassification and New Horizons at Pluto;
+    - both Voyagers reaching interstellar space;
+    - JWST arriving at L2, and Parker's record close pass.
+  - Picking one jumps to that day, pauses, says what happened and flies to the object. For a flyby it flies to the planet and then opens the probe's card, with the probe's path running into the planet. Planets are drawn ~1,000× too big, so at closest approach the probe is inside the drawn planet. Tapping the strip away from a marker jumps to that date.
+  - The group starts open on desktop and closed on compact screens.
+- **Motion trails** (Layers → Trails, off by default).
+  - Each planet and dwarf planet trails the last eighth of its orbit, fading behind it, with dots at equal time steps.
+  - The dots spread out near the Sun, where a body moves fastest (Kepler's second law; easy to see on Mercury, Pluto and Eris).
+  - It follows the scale slider and costs nothing while paused.
+- **Signal delay on the probes' labels.** While Layers → Distances is on, Voyager 1 and 2, New Horizons and Parker show their one-way radio delay from Earth, for example "Voyager 1 · 📡 23 h 56 min". This is `spacecraft.setSignalDelay`, driven by `ui/`.
+
+### Fixed
+- **Typing a year into the date field.** On desktop Chrome the field reports every keystroke as a date, for example year "0002" while you type 2061. The out-of-range check reset the field to the sim date halfway through. It now ignores out-of-range years; the field resyncs when it loses focus.
+- **Controls panel scrolls by touch.** It's marked `scrollable` like the other panels, so on a short screen its lower rows stay reachable when Layers and Events are open.
+
+### `main.js` hook lines
+- One import.
+- `createUI({...})` before the first frame, with `ui.update(...)` once per frame.
+- `ui` on `window.solar`.
+
 ## 2026-10-11: Scale slider, distance HUD and true-size comparisons (Claude Code)
 
 ### Added

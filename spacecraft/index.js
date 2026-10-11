@@ -101,7 +101,7 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
     const wrap = document.createElement('div'); wrap.className = 'sc-wrap';
     const el = document.createElement('div');
     el.className = `label small solar-label sc-label ${cls}`;
-    el.textContent = text;
+    el.textContent = text; el._base = text;
     el.title = item.info.title || item.info.name;
     wrap.appendChild(el);
     el.addEventListener('click', (e) => { e.stopPropagation(); showInfo(item); });
@@ -443,6 +443,7 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
     }
 
     placeLabels(camera, W, H);
+    if (performance.now() - lastDelay > 1000) { lastDelay = performance.now(); labelDelays(days); }
 
     if (open) {
       if (!isOpenHere()) release();
@@ -483,6 +484,23 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
       if (dy !== null && el._dy !== dy) { el.style.transform = `translateY(${Math.round(dy)}px)`; el._dy = dy; }
     }
   }
+  // one-way radio delay from Earth on the probes' labels ("Voyager 1 · 📡 23 h 9 min"); ui/ turns it on with
+  // Layers → Distances. JWST and the ISS ride with Earth (seconds or less), so they keep their plain names.
+  let delayOn = false, lastDelay = 0;
+  function labelDelays(t) {
+    let earth = null;
+    for (const it of crafts) {
+      if (it === jwst || it === iss || !it.posAU) continue;
+      let txt = it.labelEl._base;
+      if (delayOn && it.active) {
+        earth ||= planetAU('Earth', t, _a);
+        const s = _b.copy(it.posAU).sub(earth).length() * LIGHT_SEC_PER_AU;
+        txt += ` · 📡 ${s < 3600 ? `${Math.max(1, Math.round(s / 60))} min` : `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`}`;
+      }
+      if (it.labelEl.textContent !== txt) { it.labelEl.textContent = txt; it.labelEl._w = 0; }      // re-measured below
+    }
+  }
+
   // measure each label once, the first time it is on screen (cheap estimates are used until then)
   const measure = () => {
     for (const it of items) if (!it.labelEl._w && it.labelObj.visible && it.labelEl.offsetWidth) {
@@ -505,6 +523,7 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
 
   return {
     group: root, items, update, rebuild,
+    setSignalDelay: (on) => { delayOn = !!on; lastDelay = 0; },
     showInfo: (name) => { const it = items.find((i) => i.name === name || i.info.short === name); return it ? showInfo(it) : false; },
     get: (name) => items.find((i) => i.name === name || i.info.short === name),
     stats: () => ({ craftOn, sitesOn, active: items.filter((i) => i.active).map((i) => i.name),
