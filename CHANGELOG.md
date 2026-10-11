@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-11: Arrival drift stays on the day/night line at any time speed (ScaleBot)
+
+### Fixed
+- **The Earth and Moon arrival drift no longer slides to full phase.** At the default 10 days/s, Earth swings about 10° around the Sun every second. The old drift rotated a camera offset captured at arrival, so within a few seconds the view had moved off the terminator and the Moon looked nearly full. Now the drift re-reads `getCinematicStart()` every frame. The camera sits at the fresh offset times the live radius, swung about the fresh `driftAxis` by an accumulated drift angle (`driftSpeed` times real seconds). The camera targets the live body. The view therefore keeps the helper's Sun angle plus the intended slow sweep toward night, whatever the time speed.
+- Any drag, pinch, wheel or tap still stops the drift for that focus, and plain follow takes over from there.
+- No per-frame allocations in `main.js`. If a helper fills an `out` object (`getCinematicStart(out, opts)`), it gets a reused one. Support is checked once per helper. Today's `(opts)` helpers are called without arguments as before.
+
 ## 2026-10-11: Cinematic Earth & Moon arrivals; fly-tos track the turning galaxy (ScaleBot)
 
 ### Added

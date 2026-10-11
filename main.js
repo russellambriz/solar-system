@@ -1006,7 +1006,7 @@ function focusOn(b) {
 // (earth/ & moon/ getCinematicStart(): offset in body radii, world frame). The live rendered radius is used, so the Moon's
 // 0.5x -> 0.273x size easing is followed as the camera closes in. On arrival a slow drift carries the view across the
 // terminator until the user touches, drags or zooms (then it stays off for this focus).
-let drift = null;            // { body, axis, speed } while the post-arrival drift is running
+let drift = null;            // { body, helper, useOut, angle } while the post-arrival drift is running
 let userTouched = false;     // set by any controls start / wheel / pointerdown; cancels a pending or running drift
 const CINEMATIC_MIN_SEC = 1.6;
 function cinematicHelper(b) {
@@ -1034,7 +1034,7 @@ function cinematicArrival(b) {
   userTouched = false;
   flyTo(goalCam, goalTarget, CINEMATIC_MIN_SEC, () => {
     controls.minDistance = cinematicMinDist(b);           // radius is final now (Moon size easing has settled)
-    if (focused === b && !userTouched && last.driftAxis && last.driftSpeed) drift = { body: b, axis: last.driftAxis.clone().normalize(), speed: last.driftSpeed };
+    if (focused === b && !userTouched && last.driftAxis && last.driftSpeed) drift = { body: b, helper, useOut: helperTakesOut(helper), angle: 0 };
   });
   transition.cinematic = b;
   // fly in around the body itself (not the moving orbit target), so the distance to the body shrinks steadily in log space
@@ -1042,6 +1042,39 @@ function cinematicArrival(b) {
   transition.fromOffset = camera.position.clone().sub(transition.goalTarget);
   controls.minDistance = 0;                               // the live Moon radius shrinks mid-flight; clamp again on arrival
   return true;
+}
+// The drift re-reads the helper every frame, so the framing stays on the day/night line however fast the sim runs
+// (at 10 days/s Earth swings ~10° around the Sun per second; a fixed offset would slide to full phase in seconds).
+// If a helper fills an `out` object (getCinematicStart(out, opts)), we hand it a reused one to avoid per-frame garbage.
+// Support is probed once per helper: today's helpers take (opts) and simply see an object without opts keys (defaults).
+const _cineOut = { offset: new THREE.Vector3(), target: new THREE.Vector3(), driftSpeed: 0, driftAxis: new THREE.Vector3() };
+const _outSupport = new WeakMap();
+function helperTakesOut(helper) {
+  if (_outSupport.has(helper)) return _outSupport.get(helper);
+  let ok = false;
+  try {
+    const probe = { offset: new THREE.Vector3(), target: new THREE.Vector3(), driftAxis: new THREE.Vector3() };  // no opts keys
+    const r = helper.getCinematicStart(probe);
+    ok = r === probe && probe.offset.lengthSq() > 0;
+  } catch (e) { ok = false; }
+  _outSupport.set(helper, ok);
+  return ok;
+}
+const _driftAxis = new THREE.Vector3(), _driftOff = new THREE.Vector3(), _driftP = new THREE.Vector3();
+function applyDrift(dt) {
+  const b = drift.body;
+  let c;
+  try { c = drift.useOut ? drift.helper.getCinematicStart(_cineOut) : drift.helper.getCinematicStart(); } catch (e) { c = null; }
+  if (!c || !c.offset || !c.driftAxis || !(c.offset.lengthSq() > 0)) { drift = null; return; }   // fall back to plain follow
+  drift.angle += (c.driftSpeed || 0) * dt;
+  const r = b.radius;
+  bodyWorldPos(b, _driftP);
+  if (c.target) _driftP.addScaledVector(c.target, r);
+  const d = Math.max(c.offset.length() * r, cinematicMinDist(b) * 1.05);
+  _driftOff.copy(c.offset).normalize().multiplyScalar(d);
+  if (c.driftAxis.lengthSq() > 1e-12) _driftOff.applyAxisAngle(_driftAxis.copy(c.driftAxis).normalize(), drift.angle);
+  controls.target.copy(_driftP);
+  camera.position.copy(_driftP).add(_driftOff);
 }
 function stopDrift() { userTouched = true; drift = null; }
 controls.addEventListener('start', stopDrift);
@@ -1373,11 +1406,9 @@ function updateCamera(dt) {
     camera.position.add(delta);
     controls.target.add(delta);
     lastFocusPos.copy(p);
-    // cinematic drift after an Earth/Moon arrival: swing the view slowly about the helper's axis (real-time rate)
-    if (drift && drift.body === focused && dt > 0) {
-      const off = tmp2.subVectors(camera.position, controls.target).applyAxisAngle(drift.axis, drift.speed * dt);
-      camera.position.copy(controls.target).add(off);
-    }
+    // cinematic drift after an Earth/Moon arrival: helper framing re-read each frame, swung by the accumulated
+    // real-time drift angle (stops for good on any user interaction; plain follow from then on)
+    if (drift && drift.body === focused) applyDrift(dt);
   }
 }
 
@@ -1484,4 +1515,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
+window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
