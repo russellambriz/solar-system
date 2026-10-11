@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-11: Sun glow no longer draws a band at the screen edge
+
+### Fixed
+- The Sun's two glow sprites (`main.js`) fade out when the Sun is far off to the side of the view. Before, a sprite near the screen edge projected to a giant straight-edged warm band when the Sun was about 85° off-axis. Their opacity is now multiplied by smoothstep(cos 75°, cos 55°, camera forward · direction to the Sun), so the glow is full within 55° of the view axis and gone beyond 75° or behind. The base opacities (including the close-up dimming) are unchanged.
+- The glow sprites now set `depthTest: true` explicitly, so a planet in front of the Sun hides the glow instead of it washing over the planet's night side.
+
 ## 2026-10-10: Moons of Saturn, Uranus & Neptune
 
 ### Added

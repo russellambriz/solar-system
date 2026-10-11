@@ -369,11 +369,13 @@ const sunGroup = new THREE.Group();
 scene.add(sunGroup);
 const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(SUN_RADIUS, 64, 48), new THREE.MeshBasicMaterial({ map: sunTexture() }));
 sunGroup.add(sunMesh);
-const glow1 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+const glow1 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), blending: THREE.AdditiveBlending, depthTest: true, depthWrite: false, transparent: true }));
 glow1.scale.set(SUN_RADIUS * 5, SUN_RADIUS * 5, 1);
-const glow2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture('rgba(255,200,120,0.5)', 'rgba(255,140,40,0.12)'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+const glow2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture('rgba(255,200,120,0.5)', 'rgba(255,140,40,0.12)'), blending: THREE.AdditiveBlending, depthTest: true, depthWrite: false, transparent: true }));
 glow2.scale.set(SUN_RADIUS * 11, SUN_RADIUS * 11, 1);
 sunGroup.add(glow1, glow2);
+const GLOW_COS_FAR = Math.cos(THREE.MathUtils.degToRad(75)), GLOW_COS_NEAR = Math.cos(THREE.MathUtils.degToRad(55));
+const _camFwd = new THREE.Vector3(), _toSun = new THREE.Vector3();
 // close-up effects: animated granulation, sunspots, limb darkening, prominences, flares/CMEs (LOD: only when near)
 const sunFX = createSunFX({ radius: SUN_RADIUS, isTouch: IS_TOUCH, mesh: sunMesh });
 sunGroup.add(sunFX.group);
@@ -1342,7 +1344,12 @@ function animate() {
     skyBand.update(camera);
     sunFX.update(dt, camera, sunGroup.position, true);
     const nearSun = sunFX.stats().near;
-    glow1.material.opacity = 1 - 0.55 * nearSun; glow2.material.opacity = 1 - 0.4 * nearSun; // let surface detail show up close
+    // fade the glow sprites out when the Sun is far off-axis or behind: a sprite near the screen edge projects to a huge straight-edged band
+    camera.getWorldDirection(_camFwd);
+    const sunDot = _camFwd.dot(sunGroup.getWorldPosition(_toSun).sub(camera.position).normalize());
+    const sunAxisFade = THREE.MathUtils.smoothstep(sunDot, GLOW_COS_FAR, GLOW_COS_NEAR);
+    glow1.material.opacity = (1 - 0.55 * nearSun) * sunAxisFade; glow2.material.opacity = (1 - 0.4 * nearSun) * sunAxisFade; // let surface detail show up close
+    glow1.visible = glow2.visible = sunAxisFade > 0;
   }
   else { galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0); sombrero.update(camera); sgra.update(camera, renderer); ton618.update(camera, renderer); }
   dateEl.textContent = 'Date: ' + new Date(simTime).toISOString().slice(0, 10) + (paused || daysPerSecond === 0 ? '  ⏸' : '');
