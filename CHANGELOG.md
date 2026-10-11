@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-10-11: Real planet positions and a date picker (Claude Code)
+
+### Added
+- **New module `ephemeris/`.** `planets.js` holds JPL's Keplerian elements for the eight planets (E. M. Standish, "Approximate Positions of the Major Planets"), and `index.js` holds the hook and the date picker.
+  - The elements include eccentricity, inclination, node, perihelion and their drift per century.
+  - Table 1 is used for 1800–2050 and Table 2a+2b (with the extra Jupiter–Neptune terms) outside that span.
+  - Positions come from solving Kepler's equation and then applying `main.js`'s radial distance compression, as the dwarf planets already do.
+  - **Checked against real events:** the 2020 Mars, 2023 Jupiter and 2024 Saturn/Uranus/Neptune oppositions and the 2025 Venus and 2024 Mercury inferior conjunctions all land within 0.2° of Earth's longitude. Earth's 2026 perihelion lands on 3 Jan at 0.98330 AU.
+- **Orbit lines are now the real tilted ellipses**, e.g. Mercury's 7° tilt and e = 0.21, and Mars' e = 0.09. Each planet rides exactly on its line. The lines are redrawn when the date moves on by more than 20 years.
+- **Date picker** in the Controls panel, under Pause/Overview: a native date field and a **Today** button. Picking a day jumps the sim clock to noon UTC on that day, from 1000 to 3000 AD. Out-of-range input is ignored. The sim keeps running, or stays paused, from there, and the field follows the sim date while you aren't typing in it.
+
+### Changed
+- `main.js` hook lines:
+  - The import.
+  - `createRealPositions({ bodies, scaleDistance, getTime, setTime })` after the time controls.
+  - Each planet's orbit line is kept on its body (`body.orbit`).
+  - `updateBodies()` calls `realPositions.place(b, days)`, keeping the old mean-longitude circle as a fallback.
+  - `realPositions` on `window.solar`.
+- `spacecraft/` uses the same real planet positions for its flyby waypoints and for Earth's position (signal time), instead of the old circular model. On their flyby dates Voyager 2 sits on Jupiter (1979-07-09), Saturn (1981-08-26), Uranus (1986-01-24) and Neptune (1989-08-25), within 0.012 scene units.
+- `index.html` scale note: planets now follow their real tilted, eccentric orbits for the shown date.
+
 ## 2026-10-11: Magellanic Clouds and the Triangulum Galaxy (Claude Code)
 
 ### Added

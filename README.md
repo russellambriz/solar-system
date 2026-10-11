@@ -5,10 +5,11 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 **Live demo:** https://russellambriz.github.io/solar-system/
 
 ## Features
-- The Sun (glowing, and it's the light source) plus all 8 planets and 5 dwarf planets in the right order, with correctly proportional orbital periods
+- The Sun (glowing, and it's the light source) plus all 8 planets and 5 dwarf planets in the right order, each planet on its real tilted, eccentric orbit (JPL orbital elements) at its true position for the shown date
 - Real axial tilts and day lengths (spin is slowed 50× so you can see it), Saturn's and Uranus's rings, Earth's clouds, the Moon clearly orbiting Earth with its own orbit ring, and Mars' (Phobos, Deimos) and Jupiter's (Io, Europa, Ganymede, Callisto) moons with detailed procedural surfaces
 - **Saturn's, Uranus's and Neptune's major moons**: Mimas, Enceladus, Tethys, Dione, Rhea, hazy orange Titan and two-tone Iapetus; Miranda, Ariel, Umbriel, Titania and Oberon orbiting in Uranus's sideways equatorial plane; and Neptune's backwards-orbiting Triton (pink polar cap), Proteus and Nereid (on its stretched-out orbit). Each has a detailed procedural surface, orbit ring, label and info panel
 - Click or tap any planet to fly to it and follow it, with an info panel: diameter, distance from the Sun (AU), orbital period, day length and a fun fact
+- **Date picker**: jump to any day from 1000 to 3000 AD (Today returns to now); planets, spacecraft and the Moon follow
 - Time speed slider (paused up to about 2.7 years per second), a compact Layers group (orbits, labels, belts, Milky Way), and collapsible panels; on portrait/small screens both panels start collapsed and the planet list folds away after you pick something
 - Planet list with moons folded under their planet (tap ▸ to show them; focusing a planet unfolds its moons)
 - **Asteroid belt & Kuiper belt**: thousands of GPU-animated asteroids (with the Kirkwood gaps and Jupiter's Trojans) and an icy Kuiper belt beyond Neptune, each with its own on/off checkbox
@@ -31,6 +32,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 | Follow a planet | Click planet, label or list item | Tap planet, label or list item |
 | Back to overview | `Esc` or ⟲ Overview | ⟲ Overview or ✕ |
 | Pause / play | `Space` or button | Pause button |
+| Jump to a date | Controls → Date field, or Today | Controls → Date field, or Today |
 | Galaxy view | `G`, 🌌 Galaxy, or zoom far out | 🌌 Galaxy, or pinch far out |
 | Back from galaxy | `Esc`, ☀ Solar System, or zoom all the way in | ☀ Solar System, or pinch all the way in |
 | Galaxy info | Click the galaxy or "You are here" | Tap the galaxy or "You are here" |
@@ -63,6 +65,7 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 - `outermoons.js`: moons of Saturn, Uranus and Neptune: GPU-baked surfaces, Titan's haze, tilted/retrograde/eccentric orbits and their facts
 - `smallbodies.js`: asteroid belt, Trojans and Kuiper belt particles (Kepler orbits on the GPU), plus dwarf-planet orbits, facts and surfaces
 - `planets/index.js`: real texture maps for Mercury, Venus, Jupiter, Saturn, Uranus and Neptune (`textures/planets/`, 2K on desktop, 1K on touch devices; the procedural map stays if a file fails to load), sun-facing atmosphere rims, and sun-lit rings with planet/ring shadows
+- `ephemeris/`: JPL Keplerian elements for the planets (real positions and tilted, eccentric orbits for any date from 3000 BC to 3000 AD) and the Controls date picker
 - `spacecraft/`: spacecraft positions (flyby trajectories, Parker's Kepler orbit, JWST's L2 halo loop, the ISS via `earth.latLonToWorld`), small procedural models, the Moon landing sites (via `moon.latLonToWorld`), their labels and info cards
 - `comets/`: Halley's and Hale-Bopp's orbits (robust Kepler solver), coma, ion and dust tails, labels and info cards
 - `style.css`: dark space-themed UI that adapts to touch screens

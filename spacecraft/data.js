@@ -7,8 +7,8 @@ export const day = (y, m, d, h = 0, min = 0) => (Date.UTC(y, m - 1, d, h, min) -
 export const KMS_TO_AU_YR = 31557600 / 149597870.7;
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Escaping probes: launch, planetary flybys (the probe sits on that planet at that date, using main.js's own planet
-// model, so the trail passes through each planet), then a straight coast to a measured position:
+// Escaping probes: launch, planetary flybys (the probe sits on that planet at that date, using the same real planet
+// positions main.js draws (ephemeris/), so the trail passes through each planet), then a straight coast to a measured position:
 // distance from the Sun on EPOCH and the direction in the sky (RA/Dec, heavens-above.com "Spacecraft escaping the Solar
 // System", mid-2026). After EPOCH they keep coasting along the same line at today's speed.
 // ---------------------------------------------------------------------------------------------------------------------
