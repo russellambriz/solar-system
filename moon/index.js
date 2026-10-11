@@ -59,7 +59,10 @@ export function createMoonMesh({ radius, isTouch = false }) {
 export function updateMoon(moonBody, camera, sunLight, days) {
   const u = moonBody.mesh.userData.moonUniforms;
   if (!u) return;
-  if (!moonBody.moon) moonBody.moon = { getCinematicStart: (out, opts) => getCinematicStart(moonBody, sunLight, opts, out) };
+  if (!moonBody.moon) moonBody.moon = {
+    getCinematicStart: (out, opts) => getCinematicStart(moonBody, sunLight, opts, out),
+    latLonToWorld: (lat, lon, altitudeKm, out) => latLonToWorld(moonBody, lat, lon, altitudeKm, out),
+  };
 
   // Libration: the Moon spins at a constant rate but moves faster near perigee, so seen from Earth it rocks
   // ~±7.9° east-west (anomalistic month, 27.55 d); its 6.7° tilt to the orbit nods it ~±6.7° north-south
@@ -147,4 +150,21 @@ export function getCinematicStart(moonBody, sunLight, opts = {}, out = {}) {
   target.set(0, 0, 0);
   out.driftSpeed = driftSpeed;
   return out;
+}
+
+const MOON_RADIUS_KM = 1737.4;
+/**
+ * body.moon.latLonToWorld(latDeg, lonDeg, altitudeKm = 0, out?) -> THREE.Vector3 in world space.
+ * Selenographic coordinates: latitude north-positive, longitude east-positive, 0/0 = centre of the near side
+ * (the point facing Earth). Follows tidal lock, libration and the 0.5x -> 0.273x size easing, so a marker placed
+ * with it every frame stays glued to the surface. Altitude is real km, scaled with the Moon (e.g. Apollo 11:
+ * latLonToWorld(0.674, 23.473)). Pass `out` to avoid allocations.
+ */
+export function latLonToWorld(moonBody, latDeg, lonDeg, altitudeKm = 0, out = new THREE.Vector3()) {
+  const lat = THREE.MathUtils.degToRad(latDeg), lon = THREE.MathUtils.degToRad(lonDeg);
+  const r = (moonBody.baseRadius || moonBody.radius) * (1 + altitudeKm / MOON_RADIUS_KM);
+  // mesh-local frame of three.js SphereGeometry: +x = lon 0 (faces Earth), +y = north, east = -z
+  out.set(Math.cos(lat) * Math.cos(lon), Math.sin(lat), -Math.cos(lat) * Math.sin(lon)).multiplyScalar(r);
+  moonBody.mesh.updateWorldMatrix(true, false);
+  return moonBody.mesh.localToWorld(out);
 }
