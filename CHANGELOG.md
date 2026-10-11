@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-10: Mars module (mars/): real NASA/USGS maps, seasonal polar caps, dusty atmosphere
+
+Built by **MarsBot**, following EarthBot's `earth/` pattern.
+
+### Added
+- **Real Mars surface** (new module `mars/`): USGS Viking MDIM 2.1 colour mosaic (warm-graded) with a normal map from MGS MOLA laser-altimeter topography, so Olympus Mons, the Tharsis volcanoes, Valles Marineris and Hellas show real relief that moves with the light. Both are public domain; see `textures/mars/SOURCES.md` (and `build_mars_textures.py` to rebuild them).
+- **Polar ice caps** drawn by the shader, with a ragged edge and a faint frost fringe. They follow Mars' seasons: the winter cap reaches ~60° latitude and the summer one shrinks to its small residual cap. The south residual cap sits slightly off the pole, as it does on the real Mars.
+- **Thin dusty atmosphere:** a butterscotch rim glow on the day side, a hint of Mars' blue sunset at the terminator, a bright forward-scattering ring when Mars is backlit, and a soft dust haze toward the day-side limb.
+- **Lighting from the Sun's real position:** the shader reads `sunLight`'s world position every frame (no render-loop hook needed) and has a slightly softened, dusty terminator.
+- **iPad and phones get the small texture set:** 1024×512 maps (≈ 0.19 MB) instead of 2048×1024 (≈ 1 MB), using the same `IS_TOUCH` detection as Earth.
+
+### Changed
+- `main.js`: one import and one line in the planet loop. Mars keeps its orbit, size, axial tilt and spin, and Phobos and Deimos still orbit in its tilt group. The old procedural Mars texture is only shown until the real map loads.
+
 ## 2026-10-09: Deep space: Sombrero Galaxy, Sagittarius A* and TON 618
 
 Built by **Galaxy Builder/Coder** (deep-space batch), integrated onto the compact iPad UI and EarthBot's Earth module.

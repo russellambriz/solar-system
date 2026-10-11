@@ -10,6 +10,7 @@ import { createGalileanMesh, createPotatoMesh } from './moons.js';
 import { createSunFX } from './sun.js';
 import { createEarth } from './earth/index.js';
 import { createMoonMesh, updateMoon } from './moon/index.js';
+import { createMars } from './mars/index.js';
 import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitPoints, createAsteroidBelt, createKuiperBelt,
   surfaceTexture } from './smallbodies.js';
 
@@ -397,6 +398,8 @@ for (const p of PLANETS) {
   addPickSphere(group, radius, body);
   bodies.push(body);
 
+  // real-texture Mars (USGS Viking colour + MOLA relief, seasonal polar caps, dusty rim): see mars/index.js
+  if (p.name === 'Mars') tiltGroup.add((body.mars = createMars({ radius, sunLight, isMobile: IS_TOUCH, renderer, mesh })).group);
   if (p.name === 'Earth') {
     // real-texture Earth (day/night, ocean glint, clouds + shadows, atmosphere): see earth/index.js
     const earth = createEarth({ radius, sunLight, isMobile: IS_TOUCH, renderer, mesh });
