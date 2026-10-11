@@ -15,6 +15,7 @@ import { createMars } from './mars/index.js';
 import { addPlanetFX, createPlanetRing, addNightFill } from './planets/index.js';
 import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitPoints, createAsteroidBelt, createKuiperBelt,
   surfaceTexture } from './smallbodies.js';
+import { createSpacecraft } from './spacecraft/index.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -568,6 +569,9 @@ for (const sb of SMALL_BODIES) {
 // Milky Way sky band (galactic plane tilted ~60° to the ecliptic, center toward Sagittarius)
 const skyBand = createSkyBand({ isTouch: IS_TOUCH, renderer });
 scene.add(skyBand.group);
+
+// spacecraft/: Voyager 1 & 2, New Horizons, Parker Solar Probe, JWST, ISS, and the Apollo/Artemis sites on the Moon
+const spacecraft = createSpacecraft({ scene, bodies, renderer, isTouch: IS_TOUCH, scaleDistance, orbitLines });
 
 // Galaxy view lives in its own scene with its own units (1 unit = 100 ly) → no float/depth precision issues
 const galaxy = createGalaxy({ isTouch: IS_TOUCH });
@@ -1475,6 +1479,7 @@ function animate() {
     for (const bt of belts) bt.material.uniforms.uDays.value = days;
     skyBand.update(camera);
     sunFX.update(dt, camera, sunGroup.position, true);
+    spacecraft.update(days, camera, dt);
     const nearSun = sunFX.stats().near;
     // fade the glow sprites out when the Sun is far off-axis or behind: a sprite near the screen edge projects to a huge straight-edged band
     camera.getWorldDirection(_camFwd);
@@ -1515,4 +1520,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
+window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft };
