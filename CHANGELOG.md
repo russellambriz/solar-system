@@ -29,7 +29,7 @@
 
 ### `main.js` hook lines
 - Two imports.
-- `createSearch({...})` and `createPerfGuard({...})` just before the first frame.
+- `createSearch({...})` and `createPerfGuard({...})` just before the first frame. `createSearch` also gets a small `releaseFocus` callback: the same three lines `goOverview` starts with (stop following, stop the Earth/Moon arrival drift, un-highlight). Search calls it before flying to a spacecraft or comet, so the camera isn't pulled back to the planet or moon you were looking at.
 - `&& !search.holdsSpin()` on the galaxy spin flag.
 - `search` and `perfGuard` on `window.solar`.
 

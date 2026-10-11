@@ -1551,7 +1551,8 @@ window.addEventListener('orientationchange', () => setTimeout(onResize, 250)); /
 // search/: find any object by name and fly there (cinematic past the orbits/belts on long trips); grouped, filterable list
 const search = createSearch({ bodies, spacecraft, comets, localGroup, galaxy, camera, controls, focusOn, flyTo, flyToFixed, galaxyFly,
   enterGalaxy, exitGalaxy, getMode: () => mode, getGalaxyFocus: () => galaxyFocus, isTransitioning: () => !!transition, flyToAndromeda,
-  flyToMilkyWay, flyToSombrero, flyToSgrA, flyToTon618, flyToLocalGroup, showGalaxyInfo, scaleDistance, scene, isCompact, setPanelCollapsed });
+  flyToMilkyWay, flyToSombrero, flyToSgrA, flyToTon618, flyToLocalGroup, showGalaxyInfo, scaleDistance, scene, isCompact, setPanelCollapsed,
+  releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
 // perf/: if the frame rate stays low, thin out the big particle clouds (stars, belts, galaxies); "Restore" in Controls
 const perfGuard = createPerfGuard({ scenes: [scene, galaxy.scene], exclude: [sunFX.group, sgra.group, ton618.group], isTouch: IS_TOUCH });
 

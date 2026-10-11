@@ -3,7 +3,8 @@
 // Usage (main.js, once everything exists, before the first frame):
 //   const search = createSearch({ bodies, spacecraft, comets, localGroup, galaxy, camera, controls, focusOn, flyTo, flyToFixed,
 //     galaxyFly, enterGalaxy, exitGalaxy, getMode, getGalaxyFocus, isTransitioning, flyToAndromeda, flyToMilkyWay, flyToSombrero,
-//     flyToSgrA, flyToTon618, flyToLocalGroup, showGalaxyInfo, scaleDistance, scene, isCompact, setPanelCollapsed });
+//     flyToSgrA, flyToTon618, flyToLocalGroup, showGalaxyInfo, scaleDistance, scene, isCompact, setPanelCollapsed,
+//     releaseFocus });   releaseFocus: stop following the focused body (as goOverview does) without flying anywhere
 //   galaxy spin flag: ... && !search.holdsSpin()   (keeps a searched nebula/cluster in view while you look at it)
 //
 // Camera moves only use main.js's own functions (no new camera code):
@@ -132,6 +133,9 @@ export function createSearch(api) {
     if (getMode() === 'galaxy') { endTrip(); exitGalaxy(final); return; }
     if (getMode() !== 'solar') return;
     if (!it.active && it.active !== undefined) { onArrive(); return; }      // not launched yet / hidden: just show the card
+    // stop following the focused planet/moon first: main.js's follow (and the Earth/Moon arrival drift) would pull the
+    // camera back to it once this flight ends
+    api.releaseFocus?.();
     trip(it.pos.clone(), final);
   }
   // nebulae and clusters ride on the turning disk: function goals in group space, and the disk holds still while you look
