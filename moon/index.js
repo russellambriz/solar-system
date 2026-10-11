@@ -60,7 +60,8 @@ export function updateMoon(moonBody, camera, sunLight, days) {
   const u = moonBody.mesh.userData.moonUniforms;
   if (!u) return;
   if (!moonBody.moon) moonBody.moon = {
-    getCinematicStart: (out, opts) => getCinematicStart(moonBody, sunLight, opts, out),
+    // Same as EarthBot's helper: a first argument with option keys but no offset/target/driftAxis is treated as options.
+    getCinematicStart: (out, opts) => (isOptions(out) ? getCinematicStart(moonBody, sunLight, out) : getCinematicStart(moonBody, sunLight, opts, out)),
     latLonToWorld: (lat, lon, altitudeKm, out) => latLonToWorld(moonBody, lat, lon, altitudeKm, out),
   };
 
@@ -150,6 +151,11 @@ export function getCinematicStart(moonBody, sunLight, opts = {}, out = {}) {
   target.set(0, 0, 0);
   out.driftSpeed = driftSpeed;
   return out;
+}
+
+const OPTION_KEYS = ['distance', 'sunAngleDeg', 'elevationDeg', 'driftSpeed'];
+function isOptions(o) {
+  return !!o && !o.offset && !o.target && !o.driftAxis && OPTION_KEYS.some((k) => k in o);
 }
 
 const MOON_RADIUS_KM = 1737.4;
