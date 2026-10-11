@@ -11,7 +11,7 @@ import { createSunFX } from './sun.js';
 import { createEarth } from './earth/index.js';
 import { createMoonMesh, updateMoon } from './moon/index.js';
 import { createMars } from './mars/index.js';
-import { addPlanetFX, createPlanetRing } from './planets/index.js';
+import { addPlanetFX, createPlanetRing, addNightFill } from './planets/index.js';
 import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitPoints, createAsteroidBelt, createKuiperBelt,
   surfaceTexture } from './smallbodies.js';
 
@@ -134,9 +134,10 @@ controls.minDistance = 2;
 const SOLAR_MAX_DIST = 900;          // zooming out to this distance switches to the galaxy view
 controls.maxDistance = SOLAR_MAX_DIST;
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.12));
+scene.add(new THREE.AmbientLight(0xffffff, 0.04));   // low so night sides read as night (was 0.12); planets/ adds a faint night fill so silhouettes stay readable
 const sunLight = new THREE.PointLight(0xfff2dd, 3.2, 0, 0); // decay 0: no falloff, so outer planets stay visible
 scene.add(sunLight);
+addNightFill(scene);   // planets/: very dim camera fill so unlit moons/dwarf planets stay readable with the low ambient
 
 // ---------------------------------------------------------------------------
 // Procedural texture helpers (seamless 3D value noise sampled on the sphere)

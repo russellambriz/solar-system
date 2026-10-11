@@ -39,6 +39,11 @@ const RINGS = {
   Uranus: { inner: 1.6, outer: 2.0, file: null, opacity: 0.5, brightness: 1.0, forward: 0.0 },
 };
 
+// Night-side readability (main.js' ambient light is 0.04): strength of the planets' night rim, and of the dim camera
+// "headlight" fill that keeps unlit moons and dwarf planets from going pure black (≈4% of the Sun's light, so day sides barely change).
+const NIGHT_RIM = 0.35;
+const NIGHT_FILL = 0.12;
+
 const loader = new THREE.TextureLoader();
 const _q = new THREE.Quaternion(), _s = new THREE.Vector3();
 
@@ -58,7 +63,7 @@ function loadTexture(file, isTouch, srgb, onLoad, onError) {
 // Planet surface: MeshStandardMaterial (so it matches the rest of the scene's lighting) with a real map and, for
 // ringed planets, an analytic ring shadow injected with onBeforeCompile.
 // ------------------------------------------------------------------------------------------------------------------
-function patchRingShadow(material, U) {
+function patchPlanetMaterial(material, U) {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, U);
     shader.vertexShader = shader.vertexShader
@@ -68,7 +73,7 @@ function patchRingShadow(material, U) {
       .replace('#include <common>', `#include <common>
 varying vec3 vPWorld;
 uniform vec3 uSunPos, uRingCenter, uRingNormal;
-uniform float uRingInner, uRingOuter, uRingOpacity, uHasRing;
+uniform float uRingInner, uRingOuter, uRingOpacity, uHasRing, uNightRim;
 uniform sampler2D uRingMap;
 // Fraction of sunlight that gets through the ring plane on the way from this point to the Sun (1 = no ring in the way).
 float ringShadow(vec3 p) {
@@ -84,9 +89,15 @@ float ringShadow(vec3 p) {
   return 1.0 - 0.92 * texture2D(uRingMap, vec2(u, 0.5)).a * uRingOpacity;
 }`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
-{ float rs = ringShadow(vPWorld); reflectedLight.directDiffuse *= rs; reflectedLight.directSpecular *= rs; }`);
+{ float rs = ringShadow(vPWorld); reflectedLight.directDiffuse *= rs; reflectedLight.directSpecular *= rs; }
+// Night-side rim: a faint, surface-tinted fresnel edge only where the Sun isn't shining, so the silhouette stays readable
+// against black space now that the global ambient light is low. Not physical (think of it as a hint of skyglow).
+{ vec3 Lv = normalize((viewMatrix * vec4(normalize(uSunPos - vPWorld), 0.0)).xyz);
+  float night = smoothstep(0.05, -0.35, dot(normal, Lv));
+  float rimF = pow(1.0 - clamp(dot(normal, geometryViewDir), 0.0, 1.0), 3.0);
+  reflectedLight.indirectDiffuse += diffuseColor.rgb * uNightRim * rimF * night; }`);
   };
-  material.customProgramCacheKey = () => 'planet-ringshadow';
+  material.customProgramCacheKey = () => 'planets-fx';
 }
 
 // ------------------------------------------------------------------------------------------------------------------
@@ -157,9 +168,9 @@ export function addPlanetFX({ name, mesh, tiltGroup, radius, sunLight, isTouch =
     uSunPos: { value: new THREE.Vector3() }, uCenter: { value: new THREE.Vector3() },
     uRingCenter: { value: new THREE.Vector3() }, uRingNormal: { value: new THREE.Vector3(0, 1, 0) },
     uRingInner: { value: 0 }, uRingOuter: { value: 1 }, uRingOpacity: { value: 0 }, uHasRing: { value: 0 },
-    uRingMap: { value: null }, uR: { value: radius },
+    uRingMap: { value: null }, uR: { value: radius }, uNightRim: { value: NIGHT_RIM },
   };
-  if (RINGS[name]) patchRingShadow(mat, U);
+  patchPlanetMaterial(mat, U);                      // ring shadow (Saturn/Uranus) + night-side rim (all)
 
   loadTexture(cfg.file, isTouch, true, (tex) => {
     mat.map = tex; mat.needsUpdate = true;
@@ -294,6 +305,24 @@ export function createPlanetRing({ name, mesh, radius, sunLight, isTouch = false
     U.uSunColor.value.copy(sunLight.color).multiplyScalar(sunLight.intensity / Math.PI);
   };
   return ring;
+}
+
+/**
+ * A very dim light that sits at the camera (a "headlight"): night sides of every MeshStandard body (moons, dwarf
+ * planets, Mars) facing the viewer get a faint fill, brightest at the disc centre, so they don't vanish against black
+ * space. Custom-shaded bodies (Earth, Moon, rings, atmospheres) ignore it. Position is refreshed by scene.onBeforeRender.
+ */
+export function addNightFill(scene, intensity = NIGHT_FILL) {
+  const light = new THREE.PointLight(0xc8d4ff, intensity, 0, 0);   // decay 0, slightly cool like starlight
+  light.name = 'night fill (camera headlight)';
+  scene.add(light);
+  const prev = scene.onBeforeRender;
+  scene.onBeforeRender = function (renderer, sc, camera, ...rest) {
+    camera.getWorldPosition(light.position);
+    light.updateMatrixWorld();                       // the scene graph was already updated for this frame
+    prev.call(this, renderer, sc, camera, ...rest);
+  };
+  return light;
 }
 
 export const PLANET_FX_NAMES = Object.keys(PLANETS);

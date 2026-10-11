@@ -16,7 +16,8 @@ New module `planets/` (Mars, Earth and the Moon are untouched; they have their o
 ### Changed
 - Uranus' rings use the same lit ring shader (sunlight and the planet's shadow; its procedural strip is unchanged).
 - Saturn's rings now run from 1.17 to 2.35 Saturn radii (was 1.25–2.35), matching the real ring strip. All ring and atmosphere sizes are multiples of the planet's drawn radius, so they stay in proportion with the √diameter planet sizing.
-- `main.js` hook: one import, one `addPlanetFX(...)` line after each planet mesh is created (it does nothing for Earth and Mars), and the two Saturn/Uranus `makeRing` calls are replaced by `createPlanetRing(...)`.
+- **Darker night sides:** the global ambient light is lowered from 0.12 to 0.04, so night sides now look like night. To keep silhouettes readable, `planets/` adds a faint surface-tinted rim on the planets' night sides and a very dim camera "headlight" fill (`addNightFill`, about 4% of the Sun's light), so unlit moons, dwarf planets and Charon don't go pure black.
+- `main.js` hook: one import, one `addNightFill(scene)` line after the lights, one `addPlanetFX(...)` line after each planet mesh is created (it does nothing for Earth and Mars), and the two Saturn/Uranus `makeRing` calls are replaced by `createPlanetRing(...)`.
 
 ## 2026-10-10: Mars module (mars/): real NASA/USGS maps, seasonal polar caps, dusty atmosphere
 
