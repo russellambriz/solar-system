@@ -197,6 +197,10 @@ body.galaxy-mode .solar-label, body:not(.galaxy-mode) .galaxy-label-wrap { displ
 body.lg-view #galaxy-note .note-mw, body:not(.lg-view) #galaxy-note .note-lg { display: none; }
 .galaxy-label.off { display: none; }
 .galaxy-label.m31-label { color: #ffe2b0; border-color: rgba(255, 210, 150, 0.6); background: rgba(40, 26, 10, 0.6); pointer-events: auto; cursor: pointer; }
+/* Local Group dwarfs (localgroup/): keep the `small` class for the overlap pass priority, but readable and tappable */
+.galaxy-label.lg-dwarf { font-size: 11px; color: #d6e4ff; border-color: rgba(170, 195, 255, 0.5); background: rgba(10, 16, 40, 0.6); pointer-events: auto; cursor: pointer; }
+body.touch .galaxy-label.lg-dwarf { font-size: 12px; }
+body.touch .galaxy-label.lg-dwarf::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
 .galaxy-label.deep-label { color: #ffc6dc; border-color: rgba(255, 150, 190, 0.45); }
 body.lg-view .galaxy-label.deep-label { display: none; }
 .galaxy-label.mw-far { color: #cdd6ff; border-color: rgba(185, 198, 255, 0.6); }
