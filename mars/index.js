@@ -30,7 +30,7 @@ const DEFAULTS = {
   capColor: new THREE.Color(0.86, 0.85, 0.83),    // slightly dusty white
   capStrength: 1.0,
   normalStrength: 1.0,
-  ambient: 0.03,           // ≈ what the scene's AmbientLight(0.12) gives a MeshStandardMaterial (0.12/π · albedo)
+  ambient: 0.013,          // ≈ what the scene's AmbientLight(0.04) gives a MeshStandardMaterial (0.04/π · albedo)
 };
 
 /**

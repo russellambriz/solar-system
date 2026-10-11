@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-10: Mars night side matches the new scene ambient
+
+### Changed
+- `mars/`: lowered Mars's built-in ambient from 0.03 to 0.013 to match the scene's AmbientLight dropping from 0.12 to 0.04 (in 45c0fb6). Mars's night side is now as dark as the other planets'.
+
 ## 2026-10-10: Planets pass 1: real maps, atmosphere rims, sun-lit Saturn rings
 
 New module `planets/` (Mars, Earth and the Moon are untouched; they have their own modules).
