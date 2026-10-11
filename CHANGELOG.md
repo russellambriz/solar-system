@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-10: Planets pass 1: real maps, atmosphere rims, sun-lit Saturn rings
+
+New module `planets/` (Mars, Earth and the Moon are untouched; they have their own modules).
+
+### Added
+- **Real texture maps** for Mercury (NASA MESSENGER mosaic), Venus cloud tops, Jupiter (NASA Cassini PIA07782), Saturn, Uranus and Neptune (Solar System Scope, CC BY 4.0), in `textures/planets/`: 2048×1024 on desktop (≈1.1 MB in total) and 1024×512 on touch devices such as iPad (≈0.3 MB). The procedural map shows until a file loads, and stays if it fails. Sources and processing: `textures/planets/SOURCES.md`.
+- **Saturn's rings are lit by the Sun:** a real ring color/opacity strip (C, B and A rings, Cassini Division, Encke Gap) with these effects:
+  - The lit face reflects sunlight. The unlit face lets light through, so thin rings glow and the dense B ring goes dark.
+  - The **planet's shadow falls on the rings**.
+  - The rings brighten slightly (**forward scattering**) when the Sun is behind them.
+- **The rings' shadow falls on Saturn:** the striped band of shade across the hemisphere facing away from the Sun.
+- **Atmosphere rims** that glow only on the sunlit limb and fade across the terminator: thick yellow-white on Venus, faint and warm on Jupiter and Saturn, soft cyan on Uranus and blue on Neptune. Mercury has none (it has no air).
+
+### Changed
+- Uranus' rings use the same lit ring shader (sunlight and the planet's shadow; its procedural strip is unchanged).
+- Saturn's rings now run from 1.17 to 2.35 Saturn radii (was 1.25–2.35), matching the real ring strip. All ring and atmosphere sizes are multiples of the planet's drawn radius, so they stay in proportion with the √diameter planet sizing.
+- `main.js` hook: one import, one `addPlanetFX(...)` line after each planet mesh is created (it does nothing for Earth and Mars), and the two Saturn/Uranus `makeRing` calls are replaced by `createPlanetRing(...)`.
+
 ## 2026-10-10: Mars module (mars/): real NASA/USGS maps, seasonal polar caps, dusty atmosphere
 
 Built by **MarsBot**, following EarthBot's `earth/` pattern.

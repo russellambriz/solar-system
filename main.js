@@ -11,6 +11,7 @@ import { createSunFX } from './sun.js';
 import { createEarth } from './earth/index.js';
 import { createMoonMesh, updateMoon } from './moon/index.js';
 import { createMars } from './mars/index.js';
+import { addPlanetFX, createPlanetRing } from './planets/index.js';
 import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitPoints, createAsteroidBelt, createKuiperBelt,
   surfaceTexture } from './smallbodies.js';
 
@@ -390,6 +391,7 @@ for (const p of PLANETS) {
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 64, 48),
     new THREE.MeshStandardMaterial({ map: TEXTURES[p.name](), roughness: 0.95, metalness: 0 }));
   tiltGroup.add(mesh);
+  addPlanetFX({ name: p.name, mesh, tiltGroup, radius, sunLight, isTouch: IS_TOUCH }); // planets/: real maps + atmosphere rim (no-op for Earth/Mars)
   scene.add(group);
   scene.add(orbitLine(dist));
 
@@ -446,8 +448,9 @@ for (const p of PLANETS) {
     }
     body.systemRadius = sys.moons[sys.moons.length - 1].orbit;
   }
-  if (p.name === 'Saturn') tiltGroup.add(makeRing(radius * 1.25, radius * 2.35, ringTexture(), 0.95));
-  if (p.name === 'Uranus') tiltGroup.add(makeRing(radius * 1.6, radius * 2.0, uranusRingTexture(), 0.5));
+  // planets/: sun-lit rings with planet shadow + ring shadow on the planet; radii are real multiples of the drawn radius
+  if (p.name === 'Saturn') tiltGroup.add(createPlanetRing({ name: p.name, mesh, radius, sunLight, isTouch: IS_TOUCH, fallback: ringTexture }));
+  if (p.name === 'Uranus') tiltGroup.add(createPlanetRing({ name: p.name, mesh, radius, sunLight, isTouch: IS_TOUCH, fallback: uranusRingTexture }));
 }
 
 // ---------------------------------------------------------------------------

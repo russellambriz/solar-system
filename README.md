@@ -53,7 +53,14 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 - `sun.js`: animated close-up Sun (granulation, sunspots, limb darkening), prominences, solar flares and CMEs
 - `moons.js`: GPU-baked surfaces of the Galilean moons and the potato-shaped Phobos, Deimos and Vesta
 - `smallbodies.js`: asteroid belt, Trojans and Kuiper belt particles (Kepler orbits on the GPU), plus dwarf-planet orbits, facts and surfaces
+- `planets/index.js`: real texture maps for Mercury, Venus, Jupiter, Saturn, Uranus and Neptune (`textures/planets/`, 2K on desktop, 1K on touch devices; the procedural map stays if a file fails to load), sun-facing atmosphere rims, and sun-lit rings with planet/ring shadows
 - `style.css`: dark space-themed UI that adapts to touch screens
 - `.nojekyll`: tells GitHub Pages to serve the files as they are
 
 All paths are relative, so it also works from a subpath such as `https://<user>.github.io/solar-system/`.
+
+## Texture credits
+- Mercury: NASA/Johns Hopkins University APL/Carnegie Institution of Washington, MESSENGER MDIS global mosaic (public domain).
+- Jupiter: NASA/JPL/Space Science Institute, Cassini cylindrical map PIA07782 (public domain).
+- Venus (cloud tops, toned down), Saturn, Uranus, Neptune and Saturn's ring strip: [Solar System Scope](https://www.solarsystemscope.com/textures/), CC BY 4.0.
+- Details and processing: `textures/planets/SOURCES.md`.
