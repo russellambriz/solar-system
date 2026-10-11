@@ -11,7 +11,7 @@
 // also pushed into main.js's orbitLines, so the Orbits checkbox hides them too.
 //
 // Positions (AU, heliocentric ecliptic, then main.js's radial distance compression via scaleAU):
-//   • Voyager 1 & 2, New Horizons: launch → each flyby (on main.js's own planet at that date) → a straight coast to the
+//   • Voyager 1 & 2, New Horizons: launch → each flyby (on the planet's real position that day, ephemeris/) → a straight coast to the
 //     measured mid-2026 position (data.js), then onward at today's speed. Their past path is drawn as a trail.
 //   • Parker Solar Probe: Kepler orbit (its final 88-day orbit), same keplerAU() as the dwarf planets.
 //   • JWST: Sun–Earth L2 (beyond Earth on the Sun–Earth line) plus a 6-month halo loop; drawn just outside the Moon's orbit.
@@ -24,6 +24,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { keplerAU, scaleAU, orbitPoints, SMALL_BODIES } from '../smallbodies.js';
 import { PROBES, PARKER, JWST, ISS, SITES, EPOCH, KMS_TO_AU_YR, day } from './data.js';
 import { MODELS } from './models.js';
+import { planetAU as ephemerisAU } from '../ephemeris/planets.js';
 
 const D2R = Math.PI / 180, TAU = Math.PI * 2;
 const OBLIQUITY = 23.4393 * D2R;
@@ -72,12 +73,9 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
   const occluderBodies = [byName('Sun'), ...planets, moonB].filter(Boolean);
   const pluto = SMALL_BODIES.find((b) => b.name === 'Pluto');
 
-  // heliocentric AU position of a planet with main.js's own model (circular orbit at the mean longitude), Pluto via Kepler
+  // heliocentric AU position of a planet on its real orbit (ephemeris/, the same positions main.js draws), Pluto via Kepler
   function planetAU(name, t, out) {
-    if (name === 'Pluto') return keplerAU(pluto, t, out);
-    const p = planets.find((b) => b.name === name).info;
-    const L = p.L0 * D2R + (t / p.period) * TAU;
-    return out.set(Math.cos(L) * p.au, 0, -Math.sin(L) * p.au);
+    return name === 'Pluto' ? keplerAU(pluto, t, out) : ephemerisAU(name, t, out);
   }
 
   const root = new THREE.Group(); root.name = 'Spacecraft';

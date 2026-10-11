@@ -18,6 +18,7 @@ import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitP
   surfaceTexture } from './smallbodies.js';
 import { createSpacecraft } from './spacecraft/index.js';
 import { createComets } from './comets/index.js';
+import { createRealPositions } from './ephemeris/index.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -400,9 +401,10 @@ for (const p of PLANETS) {
   tiltGroup.add(mesh);
   addPlanetFX({ name: p.name, mesh, tiltGroup, radius, sunLight, isTouch: IS_TOUCH }); // planets/: real maps + atmosphere rim (no-op for Earth/Mars)
   scene.add(group);
-  scene.add(orbitLine(dist));
+  const orbit = orbitLine(dist);         // ephemeris/ reshapes it into the real tilted ellipse
+  scene.add(orbit);
 
-  const body = { name: p.name, info: p, group, mesh, radius, dist, tiltGroup };
+  const body = { name: p.name, info: p, group, mesh, radius, dist, tiltGroup, orbit };
   body.labelEl = addLabel(group, p.name, radius + 0.9);
   addPickSphere(group, radius, body);
   bodies.push(body);
@@ -657,6 +659,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') { e.preventDefault(); togglePause(); }
 });
 updateSpeed();
+// ephemeris/: planets on their real Keplerian orbits (eccentricity, inclination) for the sim date + the Controls date picker
+const realPositions = createRealPositions({ bodies, scaleDistance, getTime: () => simTime, setTime: (ms) => { simTime = ms; } });
 
 // Body list buttons
 const list = $('body-list');
@@ -1461,8 +1465,10 @@ function updateBodies() {
       continue;
     }
     const p = b.info;
-    const L = THREE.MathUtils.degToRad(p.L0) + (days / p.period) * Math.PI * 2; // mean longitude
-    b.group.position.set(Math.cos(L) * b.dist, 0, -Math.sin(L) * b.dist);
+    if (!realPositions.place(b, days)) {      // ephemeris/: real orbit for the date; mean-longitude circle as a fallback
+      const L = THREE.MathUtils.degToRad(p.L0) + (days / p.period) * Math.PI * 2; // mean longitude
+      b.group.position.set(Math.cos(L) * b.dist, 0, -Math.sin(L) * b.dist);
+    }
     b.mesh.rotation.y = (days / p.rotation / SPIN_SLOWDOWN) * Math.PI * 2;
     if (b.clouds) b.clouds.rotation.y = b.mesh.rotation.y * 1.15;
   }
@@ -1548,4 +1554,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup };
+window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions };

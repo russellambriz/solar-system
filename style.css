@@ -114,6 +114,12 @@ body.touch .row.toggle { min-height: 44px; margin: 0; }
 .slider-row { justify-content: space-between; }
 #speed-value { color: #ffd27a; font-variant-numeric: tabular-nums; }
 .buttons button { flex: 1; }
+/* date picker (ephemeris/) */
+.date-row label { color: #dfe6f5; }
+.date-row input[type="date"] { flex: 1; min-width: 0; min-height: var(--btn-h); background: rgba(60, 80, 160, 0.25); color: #dfe6f5;
+  border: 1px solid rgba(120, 150, 255, 0.25); border-radius: 8px; padding: 3px 6px; font: inherit; font-size: 14px; color-scheme: dark;
+  font-variant-numeric: tabular-nums; -webkit-appearance: none; appearance: none; }
+.date-row button { flex: none; }
 .toggle { cursor: pointer; }
 input[type="range"] { width: 100%; accent-color: #7f9cff; touch-action: none; }
 body.touch input[type="range"] { height: 36px; }

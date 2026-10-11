@@ -56,6 +56,12 @@
         <button id="pause-btn" title="Space">⏸ Pause</button>
         <button id="overview-btn" title="Esc">⟲ Overview</button>
       </div>
+      <!-- Date picker (ephemeris/): jump the sim to any day from 1000 to 3000 AD; planets sit on their real orbits -->
+      <div class="row date-row">
+        <label for="date-input">Date</label>
+        <input type="date" id="date-input" min="1000-01-01" max="3000-12-31" aria-label="Simulation date" />
+        <button id="today-btn" title="Back to today">Today</button>
+      </div>
       <!-- Views: one compact row of icon + short label buttons (wraps to 2 lines) -->
       <div class="view-row deep-row">
         <button id="galaxy-btn" title="Galaxy view (G)"><span class="ico">🌌</span><span class="lbl">Galaxy</span></button>
@@ -109,8 +115,8 @@
   <!-- Bottom-left: scaling note -->
   <div id="scale-note">
     Not to scale: distances are compressed (∝ AU<sup>0.55</sup>) and planet sizes exaggerated (∝ √diameter) so everything is visible.
-    Orbital periods are correctly proportional; self-rotation is slowed 50× for visibility. The Moon is shown ~2× too big and its orbit hugely enlarged (really ~30 Earth-diameters away) so it's visible. Moons of Mars and Jupiter are likewise enlarged, and their orbits are slowed (Jupiter's 20×, Mars' 60×) so they don't blur; their order and relative periods are real. Moons of Saturn, Uranus and Neptune are enlarged the same way, slowed 30×, and their distances compressed (logarithmically) so each system fits; their order, relative periods and tilts are real (Triton orbits backwards). Planet orbits are drawn as circles in one plane;
-    planet positions are approximate mean longitudes for the shown date. Dwarf planets follow their real tilted, eccentric orbits (same distance compression), but
+    Orbital periods are correctly proportional; self-rotation is slowed 50× for visibility. The Moon is shown ~2× too big and its orbit hugely enlarged (really ~30 Earth-diameters away) so it's visible. Moons of Mars and Jupiter are likewise enlarged, and their orbits are slowed (Jupiter's 20×, Mars' 60×) so they don't blur; their order and relative periods are real. Moons of Saturn, Uranus and Neptune are enlarged the same way, slowed 30×, and their distances compressed (logarithmically) so each system fits; their order, relative periods and tilts are real (Triton orbits backwards). Planets follow their real tilted, eccentric orbits
+    (JPL orbital elements) to their true positions for the shown date. Dwarf planets follow their real tilted, eccentric orbits too (same distance compression), but
     asteroids and Kuiper-belt objects are drawn as huge glowing dots: the real belts are mostly empty space. Charon's orbit is shrunk and slowed 20×.
     Spacecraft are drawn thousands of times too big; the ISS flies ~3.5× too high (1,500 km) and its orbit is slowed ~300×, and JWST is drawn just past the Moon's orbit (really ~4× farther).
   </div>
