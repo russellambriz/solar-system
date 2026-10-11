@@ -131,9 +131,10 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
     const it = { name: c.name, info: c, prio: 2 - k, posAU: new THREE.Vector3(), velDir: new THREE.Vector3(), pos: new THREE.Vector3(),
       activity: 0, r: 0, inbound: false, markerPx: isTouch ? 10 : 8 };
     // orbit: sampled densely near perihelion (E = π·s³), where the curve turns sharply for e ≈ 1
-    const pts = [];
-    for (let i = 0; i < 720; i++) { const s = -1 + (2 * i) / 720; pts.push(scaleAU(posFromE(c, Math.PI * s * s * s, new THREE.Vector3()), scaleDistance)); }
-    const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),
+    it.orbitAU = [];
+    for (let i = 0; i < 720; i++) { const s = -1 + (2 * i) / 720; it.orbitAU.push(posFromE(c, Math.PI * s * s * s, new THREE.Vector3())); }
+    const pts = it.orbitAU.map((p) => scaleAU(p.clone(), scaleDistance));
+    const line = it.orbitLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),
       new THREE.LineBasicMaterial({ color: c.color, transparent: true, opacity: 0.3, depthWrite: false }));
     orbitLines.push(line);
     it.orbitWrap = new THREE.Group(); it.orbitWrap.add(line);
@@ -334,8 +335,17 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
     }
   }
 
+  // redraw the orbit lines after main.js's distance scale changes (positions and tails follow by themselves)
+  function rebuild() {
+    for (const it of items) {
+      const pos = it.orbitLine.geometry.attributes.position;
+      it.orbitAU.forEach((p, i) => { _a.copy(p); scaleAU(_a, scaleDistance); pos.setXYZ(i, _a.x, _a.y, _a.z); });
+      pos.needsUpdate = true; it.orbitLine.geometry.computeBoundingSphere();
+    }
+  }
+
   return {
-    group: root, items, update,
+    group: root, items, update, rebuild,
     showInfo: (name) => { const it = items.find((i) => i.name === name || i.info.short === name); return it ? showInfo(it) : false; },
     get: (name) => items.find((i) => i.name === name || i.info.short === name),
     stats: () => ({ on, comets: items.map((i) => ({ name: i.info.short, r: +i.r.toFixed(3), activity: +i.activity.toFixed(3),

@@ -170,7 +170,8 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
     const ts = [];
     for (let t = pr.launch; t < item.track.lastFlyby + 400; t += 8) ts.push(t);
     for (let t = item.track.lastFlyby + 400; t < TRAIL_END; t += 60) ts.push(t);
-    const pts = ts.map((t) => auToScene(trackAU(item.track, t, new THREE.Vector3())));
+    item.trailAU = ts.map((t) => trackAU(item.track, t, new THREE.Vector3()));    // kept in AU so the scale slider can redraw it
+    const pts = item.trailAU.map((p) => auToScene(p.clone()));
     item.trailTimes = ts;
     item.trailWrap = new THREE.Group();
     item.trail = makeLine(pts, pr.color, 0.32);
@@ -189,7 +190,8 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
   const parker = addCraft(PARKER, 'parker', 0.24, { prio: 6 });
   parker.posAU = new THREE.Vector3();
   parker.trailWrap = new THREE.Group();
-  parker.trailWrap.add(makeLine(orbitPoints(PARKER.el, scaleDistance, 256), PARKER.color, 0.35, true));
+  parker.orbitLine = makeLine(orbitPoints(PARKER.el, scaleDistance, 256), PARKER.color, 0.35, true);
+  parker.trailWrap.add(parker.orbitLine);
   craftGroup.add(parker.trailWrap);
   parker.place = (t) => {
     if (t < PARKER.launch) return false;
@@ -490,8 +492,19 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
   };
   setTimeout(measure, 500);
 
+  // redraw what was drawn once in scene units (probe trails, Parker's orbit) after main.js's distance scale changes
+  function rebuild() {
+    const setAll = (line, pts) => {
+      const pos = line.geometry.attributes.position;
+      pts.forEach((p, i) => pos.setXYZ(i, p.x, p.y, p.z));
+      pos.needsUpdate = true; line.geometry.computeBoundingSphere();
+    };
+    for (const it of crafts) if (it.trailAU) setAll(it.trail, it.trailAU.map((p) => auToScene(p.clone())));
+    setAll(parker.orbitLine, orbitPoints(PARKER.el, scaleDistance, 256));
+  }
+
   return {
-    group: root, items, update,
+    group: root, items, update, rebuild,
     showInfo: (name) => { const it = items.find((i) => i.name === name || i.info.short === name); return it ? showInfo(it) : false; },
     get: (name) => items.find((i) => i.name === name || i.info.short === name),
     stats: () => ({ craftOn, sitesOn, active: items.filter((i) => i.active).map((i) => i.name),

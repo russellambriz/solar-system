@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-10-11: Scale slider, distance HUD and true-size comparisons (Claude Code)
+
+### Added
+- **Scale slider** (new module `scale/`), in Controls under the date. It runs from "Comfortable" (compressed) to "True distances" in five steps, and the planets glide between them.
+  - Distances are drawn as `a + b·AU^p`. The slider moves `p` from 0.55 to 1 (and `a` to 0) while keeping Earth's orbit where it is, so at the right end every distance has its true ratio (20 units per AU).
+  - A live readout says how compressed the view is, for example "Neptune is drawn 6.2× too close to the Sun (compared with Earth)" or "Distances: true ratios". The note in the bottom-left corner follows it.
+  - Everything placed through `scaleDistance` moves at once: planets, dwarf planets, spacecraft and comets. What was drawn once is rebuilt: orbit lines, the probes' paths, Halley's and Hale-Bopp's orbits, Parker's orbit and the belts' shader.
+  - The zoom-out limit and ⟲ Overview pull back as the system spreads out. The background stars follow the camera so they stay "at infinity", and the far clip plane grows with the system.
+  - Planet sizes are not changed (Earth's and the Moon's arrival framing and the Moon's size easing depend on them). The comparisons below show true sizes instead.
+  - The setting is remembered (when the browser allows storage).
+- **Distance HUD** (Layers → Distances), at the top of the screen.
+  - It shows the camera's distance from the Sun with the light time, and the selected object's distance from the Sun and from Earth. For spacecraft that second figure is the one-way radio delay (Voyager 1: about 23 hours).
+  - In the galaxy view it switches to light-years from the Sun. It hides during cinematic trips and is remembered.
+- **Scale section in each body's info card.** It gives the size in Earth diameters, plus two toggle buttons:
+  - **👻 Earth for scale:** a wireframe Earth beside the body at its true size relative to the body as drawn (Jupiter is 11 Earths across; on Earth it shows the Moon).
+  - **📏 True-scale moon orbits:** ghost rings and moons at their true distances and sizes in units of the drawn planet. For example, the Moon is 60 Earth radii out and Callisto is 26 Jupiter radii out. The rest of the view stays compressed.
+
+### Changed
+- `spacecraft/` and `comets/` each gained a `rebuild()` that redraws their paths and orbits for the current distance scale (in place, no new geometry).
+
+### `main.js` hook lines
+- `scaleDistance` reads its three numbers from a `DIST_SCALE` object, and `SOLAR_MAX_DIST` became a `let`.
+- Small bodies keep a reference to their orbit line, and the starfield gets a name.
+- `createScaleTools({...})` before the first frame, with `scaleTools.update(...)` once per frame.
+- `scaleTools` on `window.solar`.
+
 ## 2026-10-11: Search with cinematic fly-to, grouped object list, frame-rate guard (Claude Code)
 
 ### Added
