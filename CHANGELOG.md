@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-11: Cinematic Earth & Moon arrivals; fly-tos track the turning galaxy (ScaleBot)
+
+### Added
+- **Cinematic arrival at Earth and the Moon.** Focusing either body (tap, list button or keyboard, anything that calls `focusOn`) now flies in with the same log-space distance move as the galaxy fly-tos, instead of the old straight-line focus move. The trip is longer when you start far away (about 4 s from the overview) and short when you are already close (about 2 s from Earth to the Moon). The goal is recomputed every frame, so the camera follows the body along its orbit.
+- The flight ends on the framing suggested by `earth.getCinematicStart()` / `moon.getCinematicStart()`: about 2.8 Earth radii or 2.6 Moon radii out, with the terminator across the disc. Distances use the body's live rendered radius, so the Moon arrival follows its 0.5x to 0.273x size easing. The camera never ends inside `controls.minDistance`, which is set from the final radius on arrival.
+- **Slow drift after arrival.** The view then drifts across the terminator at the helper's `driftSpeed` (0.02 rad/s for Earth, 0.015 rad/s for the Moon, in real time). Any drag, pinch, wheel or tap stops the drift for the rest of that focus, and so does touching the controls during the flight.
+- Other planets and moons keep the old focus move. Earth and the Moon also fall back to it if their helper is missing.
+
+### Changed
+- `flyTo` / `flyToFixed` accept functions for `goalCam` and `goalTarget`. A function goal is re-evaluated every frame, so a fly-to can track a moving goal. Existing Vector3 callers work unchanged, and the duration is still worked out from the starting goal.
+- The first stage of `exitGalaxy` (the dive to the Sun marker) now tracks `galaxy.sunWorldPos()` live, so the camera lands on the Sun's current position in the turning Milky Way rather than where it was at take-off. The galaxy currently pauses its spin while a fly-to runs (it only turns in `galaxy` mode), so today this guards against future changes; you won't see a difference yet. `enterGalaxy` already starts from the Sun's position at the moment of the scene swap and then flies to the fixed galaxy view, so it needed no change.
+- `window.solar` gains `isDrifting()` and `getTransitionInfo()` for tests.
+
 ## 2026-10-11: Longer, log-scale fly-to animations (ScaleBot)
 
 ### Changed

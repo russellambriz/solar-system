@@ -992,14 +992,65 @@ function focusOffset(b, out) {
 
 function focusOn(b) {
   focused = b;
+  drift = null;
   setMoonsExpanded(b.moons && b.moons.length ? b : b.parent || b, true);
-  transition = { fromCam: camera.position.clone(), fromTarget: controls.target.clone(), t: 0, offset: focusOffset(b, new THREE.Vector3()) };
-  controls.minDistance = Math.max(b.radius * 1.5, 0.3);
+  if (!cinematicArrival(b)) {
+    transition = { fromCam: camera.position.clone(), fromTarget: controls.target.clone(), t: 0, offset: focusOffset(b, new THREE.Vector3()) };
+    controls.minDistance = Math.max(b.radius * 1.5, 0.3);
+  }
   bodies.forEach((o) => { o.labelEl.classList.toggle('active', o === b); o.button.classList.toggle('active', o === b); });
   showInfo(b);
 }
+// ScaleBot: cinematic arrival for Earth and the Moon. Same log-space fly as flyTo (distance-scaled duration), but the goal
+// is re-evaluated every frame so the camera tracks the orbiting body, and ends on the module's suggested framing
+// (earth/ & moon/ getCinematicStart(): offset in body radii, world frame). The live rendered radius is used, so the Moon's
+// 0.5x -> 0.273x size easing is followed as the camera closes in. On arrival a slow drift carries the view across the
+// terminator until the user touches, drags or zooms (then it stays off for this focus).
+let drift = null;            // { body, axis, speed } while the post-arrival drift is running
+let userTouched = false;     // set by any controls start / wheel / pointerdown; cancels a pending or running drift
+const CINEMATIC_MIN_SEC = 1.6;
+function cinematicHelper(b) {
+  const h = b.earth || b.moon;
+  return h && typeof h.getCinematicStart === 'function' ? h : null;
+}
+function cinematicMinDist(b) { return Math.max(b.radius * 1.5, 0.3); }
+function cinematicArrival(b) {
+  const helper = cinematicHelper(b);
+  if (!helper) return false;
+  let c;
+  try { c = helper.getCinematicStart(); } catch (e) { return false; }
+  if (!c || !c.offset || !(c.offset.lengthSq() > 0)) return false;
+  let last = c;
+  const goalTarget = () => {
+    const p = bodyWorldPos(b, new THREE.Vector3());
+    return last.target ? p.addScaledVector(last.target, b.radius) : p;
+  };
+  const goalCam = () => {
+    last = helper.getCinematicStart() || last;           // depends on the Sun direction: keep it current as the body moves
+    const t = goalTarget(), r = b.radius;
+    const d = Math.max(last.offset.length() * r, cinematicMinDist(b) * 1.05);
+    return t.add(_cineDir.copy(last.offset).normalize().multiplyScalar(d));
+  };
+  userTouched = false;
+  flyTo(goalCam, goalTarget, CINEMATIC_MIN_SEC, () => {
+    controls.minDistance = cinematicMinDist(b);           // radius is final now (Moon size easing has settled)
+    if (focused === b && !userTouched && last.driftAxis && last.driftSpeed) drift = { body: b, axis: last.driftAxis.clone().normalize(), speed: last.driftSpeed };
+  });
+  transition.cinematic = b;
+  // fly in around the body itself (not the moving orbit target), so the distance to the body shrinks steadily in log space
+  // even when the start is beside another body (e.g. Earth -> Moon, where a target-relative arc swings out first)
+  transition.fromOffset = camera.position.clone().sub(transition.goalTarget);
+  controls.minDistance = 0;                               // the live Moon radius shrinks mid-flight; clamp again on arrival
+  return true;
+}
+function stopDrift() { userTouched = true; drift = null; }
+controls.addEventListener('start', stopDrift);
+renderer.domElement.addEventListener('wheel', stopDrift, { passive: true });
+renderer.domElement.addEventListener('pointerdown', stopDrift);
+
 function goOverview() {
   focused = null;
+  drift = null;
   transition = { fromCam: camera.position.clone(), fromTarget: controls.target.clone(), t: 0, overview: true };
   controls.minDistance = 2;
   bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); });
@@ -1011,6 +1062,7 @@ function goOverview() {
 // Fly out → fade to black → swap scene + camera range → fade in → fly to the destination.
 // ---------------------------------------------------------------------------
 const fadeEl = $('fade');
+const _cineDir = new THREE.Vector3();
 // ScaleBot: longer fly-tos scale with how far they really travel. `duration` is now a minimum: each factor of ten in
 // camera distance adds FLY_SEC_PER_DECADE seconds, and moving the target far relative to the view adds a little more,
 // capped per stage. Pass fixed = true for a stage that is timed against something else (e.g. the fade-to-black).
@@ -1022,10 +1074,14 @@ function flyDuration(goalCam, goalTarget, duration) {
   return Math.min(FLY_STAGE_MAX, Math.max(duration * 1.3, 1.2 + decades * FLY_SEC_PER_DECADE + travel * FLY_SEC_TRAVEL));
 }
 function flyToFixed(goalCam, goalTarget, duration, onDone) { flyTo(goalCam, goalTarget, duration, onDone, true); }
+// goalCam / goalTarget may be Vector3s (fixed goal) or functions returning a fresh Vector3, re-evaluated every frame so the
+// fly can track a moving goal (an orbiting planet, the Sun marker in the turning Milky Way). Duration uses their start values.
 function flyTo(goalCam, goalTarget, duration, onDone, fixed = false) {
-  if (!fixed) duration = flyDuration(goalCam, goalTarget, duration);
+  const camFn = typeof goalCam === 'function' ? goalCam : null, targetFn = typeof goalTarget === 'function' ? goalTarget : null;
+  const gc = camFn ? camFn() : goalCam.clone(), gt = targetFn ? targetFn() : goalTarget.clone();
+  if (!fixed) duration = flyDuration(gc, gt, duration);
   transition = { fly: true, fromCam: camera.position.clone(), fromTarget: controls.target.clone(), t: 0,
-    goalCam: goalCam.clone(), goalTarget: goalTarget.clone(), duration, onDone };
+    goalCam: gc, goalTarget: gt, camFn, targetFn, duration, onDone };
 }
 function setCameraRange(near, far) { camera.near = near; camera.far = far; camera.updateProjectionMatrix(); }
 function beginTransit() {
@@ -1057,6 +1113,7 @@ function enterGalaxy(after) {
   if (mode !== 'solar') return;
   galaxyFocus = 'mw';
   focused = null;
+  drift = null;
   bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); });
   beginTransit();
   const dir = tmp.subVectors(camera.position, controls.target).normalize();
@@ -1247,9 +1304,10 @@ function exitGalaxy(after) {
   }
   beginTransit();
   const sun = galaxy.sunWorldPos();
-  const dir = tmp.subVectors(camera.position, sun).normalize();
+  const dir = new THREE.Vector3().subVectors(camera.position, sun).normalize();
   setTimeout(() => fadeEl.classList.add('on'), 1100);
-  flyToFixed(sun.clone().addScaledVector(dir, 25), sun, 1.6, () => {
+  // track the Sun marker live (the disk turns), so the dive ends on the Sun rather than where it was when we set off
+  flyToFixed(() => galaxy.sunWorldPos().addScaledVector(dir, 25), () => galaxy.sunWorldPos(), 1.6, () => {
     activeScene = scene;
     setCameraRange(0.05, 6000);
     updateGalaxyButton();
@@ -1265,6 +1323,7 @@ function exitGalaxy(after) {
   });
 }
 const _flyA = new THREE.Vector3(), _flyB = new THREE.Vector3();
+const _flyQ = new THREE.Quaternion(), _flyQI = new THREE.Quaternion();
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 function updateCamera(dt) {
@@ -1272,19 +1331,32 @@ function updateCamera(dt) {
     transition.t = Math.min(1, transition.t + dt / (transition.duration || 1.6));
     const e = ease(transition.t);
     let goalTarget, goalCam;
-    if (transition.fly) { goalTarget = transition.goalTarget; goalCam = transition.goalCam; }
+    if (transition.fly) {
+      if (transition.targetFn) transition.goalTarget = transition.targetFn();
+      if (transition.camFn) transition.goalCam = transition.camFn();
+      goalTarget = transition.goalTarget; goalCam = transition.goalCam;
+    }
     else if (transition.overview) { goalTarget = new THREE.Vector3(); goalCam = OVERVIEW_POS; }
     else { goalTarget = bodyWorldPos(focused, new THREE.Vector3()); goalCam = goalTarget.clone().add(transition.offset); }
     controls.target.lerpVectors(transition.fromTarget, goalTarget, e);
     if (transition.fly) {
       // ScaleBot: log-space fly. The camera's distance to its target changes by the same factor per unit of eased time,
       // so every power of ten gets equal screen time (instead of racing through the near part of a huge jump).
-      const o0 = _flyA.subVectors(transition.fromCam, transition.fromTarget), o1 = _flyB.subVectors(goalCam, goalTarget);
+      // (cinematic arrivals pass fromOffset: interpolate about the live body instead of the lerped orbit target)
+      const anchor = transition.fromOffset ? goalTarget : controls.target;
+      const o0 = transition.fromOffset ? _flyA.copy(transition.fromOffset) : _flyA.subVectors(transition.fromCam, transition.fromTarget);
+      const o1 = _flyB.subVectors(goalCam, goalTarget);
       const d0 = Math.max(o0.length(), 1e-6), d1 = Math.max(o1.length(), 1e-6);
-      const dir = o0.divideScalar(d0).lerp(o1.divideScalar(d1), e);
-      if (dir.lengthSq() < 1e-8) dir.set(0, 0.5, 0.86);
+      let dir;
+      if (transition.fromOffset) {   // great-circle swing (also safe when start and end directions are opposite)
+        o0.divideScalar(d0); _flyQ.setFromUnitVectors(o0, o1.divideScalar(d1));
+        dir = o0.applyQuaternion(_flyQI.identity().slerp(_flyQ, e));
+      } else {
+        dir = o0.divideScalar(d0).lerp(o1.divideScalar(d1), e);
+        if (dir.lengthSq() < 1e-8) dir.set(0, 0.5, 0.86);
+      }
       dir.normalize();
-      camera.position.copy(controls.target).addScaledVector(dir, Math.exp(Math.log(d0) + (Math.log(d1) - Math.log(d0)) * e));
+      camera.position.copy(anchor).addScaledVector(dir, Math.exp(Math.log(d0) + (Math.log(d1) - Math.log(d0)) * e));
     } else {
       camera.position.lerpVectors(transition.fromCam, goalCam, e);
     }
@@ -1301,6 +1373,11 @@ function updateCamera(dt) {
     camera.position.add(delta);
     controls.target.add(delta);
     lastFocusPos.copy(p);
+    // cinematic drift after an Earth/Moon arrival: swing the view slowly about the helper's axis (real-time rate)
+    if (drift && drift.body === focused && dt > 0) {
+      const off = tmp2.subVectors(camera.position, controls.target).applyAxisAngle(drift.axis, drift.speed * dt);
+      camera.position.copy(controls.target).add(off);
+    }
   }
 }
 
@@ -1407,4 +1484,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { isTransitioning: () => !!transition, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
+window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode };
