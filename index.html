@@ -41,7 +41,7 @@
   </div>
 
   <!-- Top-right: controls (collapsible) -->
-  <div class="panel" id="controls">
+  <div class="panel scrollable" id="controls">
     <div class="panel-head">
       <h2>⚙ Controls</h2>
       <button class="collapse-btn" data-target="controls" aria-label="Show or hide controls" aria-expanded="true">▾</button>
@@ -82,6 +82,8 @@
           <label class="toggle"><input type="checkbox" id="toggle-spacecraft" checked /> Spacecraft</label>
           <label class="toggle" title="Apollo landing sites and the planned Artemis landing area"><input type="checkbox" id="toggle-landings" checked /> Moon landings</label>
           <label class="toggle"><input type="checkbox" id="toggle-comets" checked /> Comets</label>
+          <label class="toggle" title="Each planet trails the last eighth of its orbit; dots mark equal time steps"><input type="checkbox" id="toggle-trails" /> Trails</label>
+          <label class="toggle" title="Top-down map of the Solar System; tap a dot to fly there (M)"><input type="checkbox" id="toggle-minimap" /> Mini-map</label>
           <label class="toggle" title="Large and Small Magellanic Clouds and the Triangulum Galaxy (galaxy view)"><input type="checkbox" id="toggle-localgroup" checked /> LMC · SMC · M33</label>
         </div>
       </details>
@@ -113,17 +115,23 @@
     <p id="info-fact"></p>
   </div>
 
-  <!-- Bottom-left: scaling note -->
-  <div id="scale-note">
+  <!-- Bottom-left: scaling note (folded to one line; ui/ opens it) -->
+  <div id="scale-note" class="why-note">
+    <button type="button" class="why-btn" aria-expanded="false" aria-controls="scale-note-body">ⓘ Why is this not to scale?</button>
+    <div class="why-body" id="scale-note-body">
     Not to scale: <span id="scale-note-dist">distances are compressed (∝ AU<sup>0.55</sup>)</span> and planet sizes exaggerated (∝ √diameter) so everything is visible.
     Orbital periods are correctly proportional; self-rotation is slowed 50× for visibility. The Moon is shown ~2× too big and its orbit hugely enlarged (really ~30 Earth-diameters away) so it's visible. Moons of Mars and Jupiter are likewise enlarged, and their orbits are slowed (Jupiter's 20×, Mars' 60×) so they don't blur; their order and relative periods are real. Moons of Saturn, Uranus and Neptune are enlarged the same way, slowed 30×, and their distances compressed (logarithmically) so each system fits; their order, relative periods and tilts are real (Triton orbits backwards). Planets follow their real tilted, eccentric orbits
     (JPL orbital elements) to their true positions for the shown date. Dwarf planets follow their real tilted, eccentric orbits too (same distance compression), but
     asteroids and Kuiper-belt objects are drawn as huge glowing dots: the real belts are mostly empty space. Charon's orbit is shrunk and slowed 20×.
     Spacecraft are drawn thousands of times too big; the ISS flies ~3.5× too high (1,500 km) and its orbit is slowed ~300×, and JWST is drawn just past the Moon's orbit (really ~4× farther).
+    Controls → Scale slides distances to their true ratios; a planet's card can show Earth, or its moons' orbits, at true scale.
+    </div>
   </div>
 
   <!-- Galaxy view: scale note -->
-  <div id="galaxy-note">
+  <div id="galaxy-note" class="why-note">
+    <button type="button" class="why-btn" aria-expanded="false" aria-controls="galaxy-note-body"><span class="note-mw">ⓘ Galaxy view: what's to scale?</span><span class="note-lg">ⓘ Local Group: what's to scale?</span></button>
+    <div class="why-body" id="galaxy-note-body">
     <span class="note-lg"><b>Local Group: true scale.</b> Andromeda is shown at its real distance, ~2.5 million light-years away (about 25 Milky Way
     diameters), and both galaxies are drawn to scale. Andromeda is ~220,000 ly across, about twice the Milky Way. The dwarf companions M32 and M110
     are shown in approximate positions. The Triangulum Galaxy (M33, ~2.7 million ly) and our satellites the Large and Small
@@ -137,6 +145,7 @@
     Particles stand in for billions of stars; the galaxy's rotation is sped up by trillions of times. Zoom in, press Esc or tap ☀ Solar System to go back.
     Nebulae and star clusters are at their real positions relative to the Sun, but drawn far larger than life so they're visible.
     Zoom far out (or tap 🔭 Andromeda) to see our neighbor galaxy.</span>
+    </div>
   </div>
 
   <!-- Black fade used during the solar ⇄ galaxy transition -->

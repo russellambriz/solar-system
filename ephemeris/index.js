@@ -48,7 +48,7 @@ export function createRealPositions({ bodies, scaleDistance, getTime, setTime })
       const m = /^(\d{4,})-(\d{2})-(\d{2})$/.exec(input.value);
       if (!m) return;
       const y = +m[1];
-      if (y < MIN_YEAR || y > MAX_YEAR) { input.value = iso(getTime()); return; }
+      if (y < MIN_YEAR || y > MAX_YEAR) return;   // e.g. "0019" while a year is still being typed; the field resyncs on blur
       setTime(Date.UTC(y, +m[2] - 1, +m[3], 12));
     };
     input.addEventListener('change', jump);

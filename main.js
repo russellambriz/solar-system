@@ -22,6 +22,7 @@ import { createRealPositions } from './ephemeris/index.js';
 import { createSearch } from './search/index.js';
 import { createPerfGuard } from './perf/index.js';
 import { createScaleTools } from './scale/index.js';
+import { createUI } from './ui/index.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -1532,6 +1533,7 @@ function animate() {
   }
   else { galaxy.update(dt, camera, mode === 'galaxy' && !paused && daysPerSecond > 0 && !localGroup.isNear(galaxyFocus) && !search.holdsSpin()); sombrero.update(camera); sgra.update(camera, renderer); ton618.update(camera, renderer); localGroup.update(camera); }
   scaleTools.update((simTime - J2000) / DAY_MS, camera, activeScene === galaxy.scene);
+  ui.update((simTime - J2000) / DAY_MS, camera, activeScene === galaxy.scene);
   dateEl.textContent = 'Date: ' + new Date(simTime).toISOString().slice(0, 10) + (paused || daysPerSecond === 0 ? '  ⏸' : '');
   renderer.render(activeScene, camera);
   declutterLabels();
@@ -1565,6 +1567,8 @@ const search = createSearch({ bodies, spacecraft, comets, localGroup, galaxy, ca
 const scaleTools = createScaleTools({ DIST_SCALE, scaleDistance, bodies, smallBodies, belts, starfield, realPositions, spacecraft, comets, camera,
   controls, OVERVIEW_POS, setSolarMaxDist: (d) => { SOLAR_MAX_DIST = d; if (mode === 'solar') controls.maxDistance = d; }, getMode: () => mode,
   getFocused: () => focused, galaxy, scene });
+const ui = createUI({ bodies, smallBodies, scene, camera, scaleDistance, realPositions, search, spacecraft, comets, getMode: () => mode,
+  getFocused: () => focused, isPaused: () => paused || daysPerSecond === 0, togglePause, isTransitioning: () => !!transition, isTouch: IS_TOUCH, isCompact });
 const perfGuard = createPerfGuard({ scenes: [scene, galaxy.scene], exclude: [sunFX.group, sgra.group, ton618.group], isTouch: IS_TOUCH });
 
 updateBodies();
@@ -1575,4 +1579,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools };
+window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui };

@@ -26,7 +26,11 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 - **Scale slider**: morph from the comfortable compressed view to true distance ratios (with a live "Neptune is drawn N× too close" readout), and watch the planets spread out
 - **Distance HUD** (Layers → Distances): how far the camera and the selected object are from the Sun and Earth, with light and radio-signal travel times (light-years in the galaxy view)
 - **True-size comparisons** in each info card: size in Earth diameters, a ghost Earth at true relative size, and true-scale moon orbits (the Moon really is 60 Earth radii away)
-- Distances and sizes are scaled so everything is visible (in the galaxy view, *wildly* so); see the note in the bottom-left corner of the page
+- **Events timeline** (Controls → Events): jump to Voyager 2 at Neptune, Halley's Comet in 1986, Apollo 11 and more; the sim pauses there and flies you to the object
+- **Mini-map** (Layers, or `M`): a top-down log-scale map of the planets, belts, comets and probes with your camera on it; tap a dot to fly there
+- **Motion trails** (Layers → Trails): dots at equal time steps along each orbit show where planets speed up (Kepler's second law)
+- **Help** (`?` or the ? button) and **clean view** (`H` or 🖼) to hide the interface
+- Distances and sizes are scaled so everything is visible (in the galaxy view, *wildly* so); tap "Why is this not to scale?" in the bottom-left corner
 
 ## Controls
 | Action | Mouse / keyboard | Touch (iPad) |
@@ -42,6 +46,11 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 | Compressed ↔ true distances | Controls → Scale slider | Controls → Scale slider |
 | Distance / light-time readout | Layers → Distances | Layers → Distances |
 | Ghost Earth / true moon orbits | Buttons in a planet's info card | Buttons in a planet's info card |
+| Jump to an event (flybys, comets, landings) | Controls → Events: list, ◀ ▶ or the timeline | Controls → Events |
+| Help | `?` or the ? button in Controls | ? button in Controls |
+| Clean view (hide the interface) | `H` or 🖼 in Controls | 🖼 in Controls, then Show interface |
+| Mini-map on/off | `M` or Layers | Layers |
+| Motion trails | Layers → Trails | Layers → Trails |
 | Galaxy view | `G`, 🌌 Galaxy, or zoom far out | 🌌 Galaxy, or pinch far out |
 | Back from galaxy | `Esc`, ☀ Solar System, or zoom all the way in | ☀ Solar System, or pinch all the way in |
 | Galaxy info | Click the galaxy or "You are here" | Tap the galaxy or "You are here" |
@@ -76,6 +85,7 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 - `planets/index.js`: real texture maps for Mercury, Venus, Jupiter, Saturn, Uranus and Neptune (`textures/planets/`, 2K on desktop, 1K on touch devices; the procedural map stays if a file fails to load), sun-facing atmosphere rims, and sun-lit rings with planet/ring shadows
 - `search/`: object index, search box, fly-to (cinematic past orbits and belts on long trips) and the grouped, filterable list
 - `scale/`: the scale slider (compressed ↔ true distance ratios), the distance / light-time HUD, and the info card's true-size comparisons (ghost Earth, true-scale moon orbits)
+- `ui/`: help overlay, clean view, the foldable scale notes, mini-map, events timeline and motion trails
 - `perf/`: frame-rate guard that thins particle clouds on slow devices
 - `ephemeris/`: JPL Keplerian elements for the planets (real positions and tilted, eccentric orbits for any date from 3000 BC to 3000 AD) and the Controls date picker
 - `spacecraft/`: spacecraft positions (flyby trajectories, Parker's Kepler orbit, JWST's L2 halo loop, the ISS via `earth.latLonToWorld`), small procedural models, the Moon landing sites (via `moon.latLonToWorld`), their labels and info cards
