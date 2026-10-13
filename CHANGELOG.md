@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-13: Bright ray craters on the Moon: Tycho and Copernicus (MoonBot)
+
+### Added
+- **Tycho's and Copernicus's ray systems** stand out at full Moon, the way they do through binoculars. They are drawn analytically in `moon/shaders.js` on top of the LRO colour map, with no new textures and no download cost on iPad.
+  - **Tycho** (43.3° S, 11.4° W): a bright ejecta halo and about 30 rays of mixed length, streaky and clumpy like real chains of secondary craters. The longest run more than 1,500 km. Its famous long ray crosses the near side past Bessel in Mare Serenitatis.
+  - **Copernicus** (9.6° N, 20.1° W): a denser, fainter, feathery fan out to about 800 km.
+  - Ray material is fresh, bright ejecta, so the rays depend on the phase angle. They are strongest near full, a faint trace at quarter and gone at crescent, where the terminator's shadows take over. Crescents and the earthshine side are unchanged.
+  - Cost: a few hash lookups per pixel, skipped entirely outside each crater's reach.
+- `uRayStrength` uniform on the Moon material (`mesh.userData.moonUniforms.uRayStrength`, 1 by default, 0 turns the rays off).
+
+### Testing
+- `moon-shots/shoot.js` pauses the sim and steps to the sim's next full Moon. It then shoots the near side and a Sun-side close-up of Tycho, with the rays on and off. No console errors on desktop or iPad.
+
 ## 2026-10-11: Help overlay, clean view, mini-map, events timeline and motion trails (Claude Code)
 
 ### Added

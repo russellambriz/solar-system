@@ -15,6 +15,12 @@ const BASE = new URL('../textures/moon/', import.meta.url);
 const REAL_RATIO = 0.273;           // real Moon radius / Earth radius
 const OVERVIEW_RATIO = 0.5;         // what main.js draws at overview zoom (moonR = Earth radius * 0.5)
 
+// Selenographic lat/lon (deg, east-positive) -> unit vector in mesh space (+x = lon 0 facing Earth, +y = north, east = -z).
+function seleno(latDeg, lonDeg) {
+  const la = THREE.MathUtils.degToRad(latDeg), lo = THREE.MathUtils.degToRad(lonDeg);
+  return new THREE.Vector3(Math.cos(la) * Math.cos(lo), Math.sin(la), -Math.cos(la) * Math.sin(lo));
+}
+
 const _sun = new THREE.Vector3(), _earth = new THREE.Vector3(), _moon = new THREE.Vector3();
 
 function loadTex(file, srgb) {
@@ -44,6 +50,11 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uEarthLit: { value: 0.5 },                              // how much of Earth's day side faces the Moon (0..1)
     uEarthTint: { value: new THREE.Color(0.55, 0.66, 0.9) }, // replaced by EarthBot's shared uniform when available
     uEarthshine: { value: 0.3 },                             // scaled for EarthBot's uEarthTint (~0.31 grey-blue)
+    // Bright ray craters (analytic, on top of the LRO albedo; strongest near full Moon). 0 turns them off.
+    uRayStrength: { value: 1.0 },
+    uTycho: { value: seleno(-43.31, -11.36) },
+    uCopernicus: { value: seleno(9.62, -20.08) },
+    uTychoRayDir: { value: seleno(21.8, 17.9) },             // Bessel, in Mare Serenitatis: Tycho's famous long ray runs past it
   };
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG });
 
