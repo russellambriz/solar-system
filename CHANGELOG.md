@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-10-13: Hyperion and Phoebe join Saturn's moons (Space Model Coder)
+
+### Added
+- **Hyperion**, the "sponge" moon, between Titan and Iapetus.
+  - Irregular potato shape (360 × 266 × 205 km): very lumpy, crowded with deep, sharp craters, with one big pit. Dark reddish crater floors, like the ones Cassini found.
+  - Real orbit: a = 1,481,009 km, e = 0.124, 21.28 days.
+  - It isn't tidally locked. It turns on its own (~13 days, slowed like the planets' spin) instead of keeping one face to Saturn, a stand-in for its chaotic tumble.
+  - It sits in its real **4:3 resonance with Titan**. Its ellipse slowly precesses at the real rate (−18.6°/year), which keeps the resonance locked at any date, so it only lines up with Titan at its far point, just as in reality.
+- **Phoebe**, Saturn's dark captured moon, beyond Iapetus.
+  - Coal-dark, battered potato (~213 km) with a Jason-like crater.
+  - Real orbit: a = 12.95 million km, e = 0.16, 550.3 days.
+  - It orbits **backwards** (tilted 173°) and spins every 9 h 16 min (slowed for display).
+  - Its card covers its likely Centaur/Kuiper-belt origin, the Phoebe ring, and the dust that darkens Iapetus's leading side.
+- Both have info cards and tap-to-focus, and appear in the Saturn list and in search. Saturn's list now shows 9 moons.
+
+### Changed
+- **Saturn framing.** Phoebe's orbit reaches 15.4–16.1 display units, past Iapetus at 13.2. Saturn's system now uses a fixed `frame: 14` (Iapetus + margin), so focusing Saturn frames the same way as before instead of pulling back to Phoebe's orbit. Phoebe stays in view at the edge of the system.
+- `createPotatoMesh` (moons.js) takes an optional `floor` colour for tinted crater floors (only Hyperion uses it). Eccentric moons in `outermoons.js` take an optional `periRate` (apsidal precession, only Hyperion uses it). Nereid, Proteus, Phobos, Deimos and Vesta are unchanged.
+
+### Notes
+- No `main.js` changes: `createOuterMoons` already wires every moon in `OUTER_MOON_SYSTEMS`.
+- With the compressed distances, Hyperion's tiny marker can just touch the edge of Titan's haze shell at their closest pass (once per ~64 days of orbit, slowed 30×).
+- Tested on desktop (1280×800) and iPad Pro 11 in portrait and landscape (touch). The page loads, both moons can be tapped from the Saturn view and from the list, Phoebe is retrograde, Nereid's ellipse still works, and the console is clean.
+- Screenshots: `screenshot-hyperion-phoebe.png` (new) and `screenshot-saturn.png` (refreshed).
+
 ## 2026-10-11: Help overlay, clean view, mini-map, events timeline and motion trails (Claude Code)
 
 ### Added

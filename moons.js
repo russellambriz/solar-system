@@ -224,6 +224,7 @@ export function createPotatoMesh(name, radius, isTouch) {
     cr *= shade; cg *= shade; cb *= shade;
     const dark = 1 - 0.18 * inCrater - 0.25 * groove;
     cr *= dark; cg *= dark; cb *= dark;
+    if (cfg.floor && inCrater > 0) { const f = Math.min(1, inCrater * 2.2); cr += (cfg.floor[0] - cr) * f; cg += (cfg.floor[1] - cg) * f; cb += (cfg.floor[2] - cb) * f; }   // tinted crater floors (Hyperion)
     if (inStickney > 0) { const s = Math.min(1, inStickney * 1.6) * (0.5 + 0.5 * N.fbm(n.x * 12, n.y * 12, n.z * 12, 3)); cr += (0.46 - cr) * s; cg += (0.46 - cg) * s; cb += (0.5 - cb) * s; }
     c.setRGB(cr, cg, cb, THREE.SRGBColorSpace);
     colors.set([c.r, c.g, c.b], i * 3);

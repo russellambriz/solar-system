@@ -1,15 +1,16 @@
 // Major moons of Saturn, Uranus and Neptune (same approach as moons.js for Mars' & Jupiter's moons):
 //  • Round moons: procedural color + height maps baked ONCE on the GPU (bake() from moons.js), used as map + bumpMap.
 //  • Titan: an extra translucent haze shell (orange, lit by the Sun, bluish detached haze at the limb).
-//  • Proteus & Nereid (Neptune): irregular "potato" meshes (createPotatoMesh from moons.js).
+//  • Hyperion & Phoebe (Saturn), Proteus & Nereid (Neptune): irregular "potato" meshes (createPotatoMesh from moons.js).
 // Orbits: each moon sits in its planet's equatorial plane (Uranus's is tipped 97.8°), with real inclinations where they
-// matter (Iapetus 15.5°, Triton 156.9° = retrograde, Nereid 7°). Distances use the real semi-major axes, compressed
+// matter (Iapetus 15.5°, Phoebe 173° and Triton 156.9° = retrograde, Nereid 7°). Distances use the real semi-major axes, compressed
 // logarithmically so the order and spacing ratios survive while the whole system fits between the planets.
-// Nereid follows its real e = 0.75 Kepler ellipse (radius compressed the same way).
+// Nereid (e = 0.75), Phoebe (0.16) and Hyperion (0.12) follow real Kepler ellipses (radius compressed the same way);
+// Hyperion's ellipse also precesses so it stays in its 4:3 resonance with Titan (they only line up at Hyperion's far point).
 import * as THREE from 'three';
 import { bake, POTATO, createPotatoMesh } from './moons.js';
 
-const SPIN_SLOWDOWN = 50;   // same as main.js (only used for the non-locked Nereid)
+const SPIN_SLOWDOWN = 50;   // same as main.js (only used for the non-locked moons: Hyperion, Phoebe, Nereid)
 
 // ---------------------------------------------------------------------------
 // Surfaces (GLSL bodies: `d` = unit direction in the moon's local frame; must set vec3 col and float h)
@@ -220,8 +221,15 @@ const SURFACES = {
   `,
 };
 
-// Irregular moons of Neptune (shape builder in moons.js)
+// Irregular moons of Saturn & Neptune (shape builder in moons.js)
 Object.assign(POTATO, {
+  // Hyperion: elongated (360 × 266 × 205 km), very lumpy, crowded with deep sharp craters → "sponge"; Cassini saw dark reddish crater floors
+  Hyperion: { axes: [1.0, 0.76, 0.64], lump: 0.18, nCraters: 95, seed: 47, stickney: false, grooves: false,
+              basin: { d: [0.35, 0.55, 0.76], r: 0.62, depth: 0.2 }, base: [0.55, 0.48, 0.40], crater: 0.95, floor: [0.24, 0.15, 0.10] },
+  // Phoebe: roughly round (219 × 217 × 204 km), coal-dark, battered
+  Phoebe:   { axes: [1.0, 0.92, 0.90], lump: 0.08, nCraters: 35, seed: 58, stickney: false, grooves: false,
+              basin: { d: [-0.4, 0.2, 0.89], r: 0.5, depth: 0.12 }, base: [0.18, 0.15, 0.13], crater: 0.6 },   // Jason crater (~100 km)
+
   Proteus: { axes: [1.0, 0.92, 0.93], lump: 0.09, nCraters: 40, seed: 21, stickney: false, grooves: false,
              basin: { d: [0.2, 0.3, 0.93], r: 0.55, depth: 0.12 }, base: [0.24, 0.23, 0.22], crater: 0.6 },   // Pharos crater
   Nereid:  { axes: [1.0, 0.95, 0.92], lump: 0.06, nCraters: 22, seed: 34, stickney: false, grooves: false,
@@ -234,7 +242,8 @@ Object.assign(POTATO, {
 // ---------------------------------------------------------------------------
 const lock = 'Tidally locked (= orbital period)';
 export const OUTER_MOON_SYSTEMS = {
-  Saturn: { slow: 30, inner: 7.3, k: 2.0, moons: [
+  // frame: camera framing radius — Iapetus (13.2) + margin, so focusing Saturn doesn't pull back to far-out Phoebe (15.4 – 16.1)
+  Saturn: { slow: 30, inner: 7.3, k: 2.0, frame: 14, moons: [
     { name: 'Mimas', diameter: 396, a: 185539, period: 0.942, phase: 0.5, color: '#bdbab4',
       type: 'Moon of Saturn', diameterText: '396 km (0.03× Earth)', distanceText: '185,539 km', periodText: '22 h 37 min (0.94 days)', dayText: lock,
       fact: 'Its giant crater Herschel is 130 km wide — a third of Mimas\'s whole diameter — which makes it look like the Death Star. ' +
@@ -260,10 +269,20 @@ export const OUTER_MOON_SYSTEMS = {
       fact: 'The only moon with a thick atmosphere — mostly nitrogen, 1.5× Earth\'s surface pressure — wrapped in orange smog. It rains methane, ' +
             'and Titan has lakes and seas of liquid methane and ethane. ESA\'s Huygens probe landed there in 2005; NASA\'s Dragonfly drone is next.',
       haze: true },
+    { name: 'Hyperion', kind: 'potato', diameter: 270, a: 1481009, e: 0.1236, period: 21.276, phase: 3.5604, peri: 0.5, periRate: -8.894e-4, rotation: 13, color: '#c9b89a',
+      type: 'Moon of Saturn', diameterText: '~270 km (irregular, 360 × 266 × 205 km)', distanceText: '1,481,009 km (1.30 – 1.66 million km)', periodText: '21.28 days',
+      dayText: 'Chaotic: tumbles unpredictably (not tidally locked)',
+      fact: 'Looks like a giant sponge: it is so porous (density ~0.54 g/cm³, ~40% empty space) that impacts punch deep, sharp-edged craters instead of ' +
+            'blasting material away. Titan\'s pull (a 4:3 orbital resonance) makes it tumble chaotically, and Cassini found dark reddish material pooled in its crater floors.' },
     { name: 'Iapetus', diameter: 1469, a: 3560820, period: 79.32, phase: 0.2, incl: 15.47, node: 0.6, color: '#a8957a',
       type: 'Moon of Saturn', diameterText: '1,469 km (0.12× Earth)', distanceText: '3,560,820 km', periodText: '79.3 days', dayText: lock,
       fact: 'Two-faced: its leading side is as dark as coal and its trailing side as bright as snow — Cassini (who discovered it in 1671) noticed it ' +
             'vanished on one side of Saturn. A 20 km-high ridge runs around its equator like the seam of a walnut.' },
+    { name: 'Phoebe', kind: 'potato', diameter: 213, a: 12947780, e: 0.1635, period: 550.31, phase: 2.4, incl: 173.0, node: 3.0, peri: 2.0, rotation: 0.3863, color: '#4a3f38',
+      type: 'Moon of Saturn (irregular)', diameterText: '~213 km (0.02× Earth)', distanceText: '12,947,780 km (10.8 – 15.1 million km)',
+      periodText: '550.3 days, retrograde (backwards, tilted 173°)', dayText: '9 h 16 min (not tidally locked)',
+      fact: 'A captured outsider: it orbits backwards, far beyond the other big moons, and is probably a Centaur or Kuiper-belt object that strayed too close. ' +
+            'Dark as soot (reflects ~6% of light), it sheds dust into the huge, faint Phoebe ring — the dust that drifts inward and paints Iapetus\'s leading side dark.' },
   ] },
   Uranus: { slow: 30, inner: 4.4, k: 2.0, moons: [
     { name: 'Miranda', diameter: 472, a: 129390, period: 1.413, phase: 0.8, incl: 4.3, node: 1.0, color: '#b3b3b1',
@@ -385,9 +404,12 @@ export function createOuterMoons(planetName, { renderer, isTouch, tiltGroup, par
       }
       ring.geometry.setFromPoints(pts);
       update = (days) => {
-        const M = m.phase + (days / (m.period * sys.slow)) * Math.PI * 2;
+        // periRate (rad/day): apsidal precession (Hyperion: keeps the 4:3 Titan resonance, so conjunctions stay at Hyperion's apoapsis)
+        const dw = (m.periRate || 0) * days / sys.slow;
+        if (m.periRate) ring.rotation.y = dw;
+        const M = m.phase + (days / (m.period * sys.slow)) * Math.PI * 2 - dw;
         const [nu, rr] = kepler(((M % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2), m.e);
-        const d = mapDist(m.a * rr), th = nu + m.peri;
+        const d = mapDist(m.a * rr), th = nu + m.peri + dw;
         mg.position.set(Math.cos(th) * d, 0, -Math.sin(th) * d);
         mesh.rotation.y = (days / m.rotation / SPIN_SLOWDOWN) * Math.PI * 2;
       };
