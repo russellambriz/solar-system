@@ -45,7 +45,35 @@ low-memory device) the two 4K maps are fetched and swapped in when decoded (`ear
 forces it off/on). Mean linear day colour of the new 2K day map (cos-latitude weighted): ≈ (0.096, 0.096, 0.111),
 within ~5 % of the old value, so `uEarthTint` was left unchanged (the Moon's earthshine is tuned against it).
 
-## Water mask, clouds, normal map — three.js example textures (unchanged)
+## 4K water mask + 4K clouds (desktop), and the 2K/1K water masks — directly from NASA (public domain)
+
+| File(s) | Source (exact URL) | Original |
+|---|---|---|
+| `desktop/earth_water_4k.jpg`, `desktop/earth_water.jpg`, `mobile/earth_water.jpg` | NASA Visible Earth — *Blue Marble Next Generation: Bathymetry* (GEBCO): <https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73963/gebco_08_rev_bath_21600x10800.png> (record page: <https://visibleearth.nasa.gov/images/73963>) | 21600×10800 PNG, 35 MB (land = 255) |
+| `desktop/earth_clouds_4k.jpg` | NASA Visible Earth — *Blue Marble: Clouds*: <https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57747/cloud_combined_8192.tif> (record page: <https://visibleearth.nasa.gov/images/57747>) | 8192×4096 TIFF, 34 MB |
+
+Processing (Python/Pillow + numpy, ImageMagick 7 encode):
+
+- **Water**: ocean = (bathymetry < 255) at full resolution, area-averaged (box filter) to 4096×2048, so coastlines are
+  exact coverage. Inland lakes (Great Lakes, Victoria, Baikal, …) are not in the bathymetry, so they are taken from the
+  old three.js mask (bicubic-upsampled), only where they are > 6 px (4K) from GEBCO ocean and between 60° S and 68° N
+  (this drops the old mask's false "water" on Antarctic ice shelves and the Siberian Arctic coast). Water area,
+  cos-latitude weighted: 69.6 %. Alignment check against `earth_day_4k.jpg`: correlation peaks at 0 px offset.
+  2K and 1K masks are box downscales of the 4K mask. Greyscale progressive JPEG q90 (4K), q88 (2K), q86 (1K).
+- **Clouds**: greyscale, Lanczos 8192→4096, then a 256-step quantile map onto the old 2K cloud map's levels
+  (the 2K map is the same NASA pattern, correlation 0.991 before / 0.996 after, mean 66.8 vs 67.3), so the
+  shaders' `cloudCurve` and `uEarthTint` stay tuned. Greyscale progressive JPEG q80.
+
+| File | Size | Bytes |
+|---|---|---|
+| `desktop/earth_water_4k.jpg`  | 4096×2048 | 523 KB |
+| `desktop/earth_clouds_4k.jpg` | 4096×2048 | 1.67 MB |
+| `desktop/earth_water.jpg`     | 2048×1024 | 187 KB |
+| `mobile/earth_water.jpg`      | 1024×512  | 64 KB |
+
+The 2K/1K **cloud** maps and the normal map below are unchanged.
+
+## Clouds (2K/1K), normal map, old water mask — three.js example textures
 
 These were downloaded from the three.js repository at tag **r160**:
 `https://github.com/mrdoob/three.js/tree/r160/examples/textures/planets`
@@ -59,7 +87,7 @@ three.js example textures (MIT)."*
 
 | Original file (r160)        | Size        | Used as                                                       |
 |-----------------------------|-------------|---------------------------------------------------------------|
-| `earth_specular_2048.jpg`   | 2048×1024   | `earth_water.jpg` (greyscale water mask; white = ocean)       |
+| `earth_specular_2048.jpg`   | 2048×1024   | former `earth_water.jpg`; now only the inland-lake source for the NASA mask above |
 | `earth_clouds_2048.png`     | 2048×1024   | `earth_clouds.jpg` (its **alpha** channel → greyscale coverage)|
 | `earth_normal_2048.jpg`     | 2048×1024   | `earth_normal.jpg` (tangent-space normal map, desktop only)   |
 

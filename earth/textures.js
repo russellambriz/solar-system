@@ -3,18 +3,26 @@
 // Three tiers live in textures/earth/:
 //   mobile/   1024×512  day, night lights, water mask, clouds (no normal map; iPad/phones)
 //   desktop/  2048×1024 day, night lights, water mask, clouds + a normal map   (first paint / fallback)
-//   desktop/  4096×2048 earth_day_4k.jpg + earth_night_4k.jpg                 (progressive upgrade)
+//   desktop/  4096×2048 earth_{day,night,water,clouds}_4k.jpg                 (progressive upgrade)
 //
 // Desktop loads the 2K set first; once its day + night maps are on screen and the GPU can take 4096² textures
 // (and the device is not touch-first), the 4K day/night maps are fetched, decoded off the main thread where
-// createImageBitmap exists, pre-uploaded with renderer.initTexture(), and only then swapped in.
+// createImageBitmap exists, pre-uploaded with renderer.initTexture(), and only then swapped in. The 4K water mask
+// and cloud map follow right after (same path), so the ocean glint, coastlines and cloud shadows stay as sharp as
+// the 4K surface. The 4K cloud map is level-matched to the 2K one, so the swap does not change cloud density.
 //
 // Paths are resolved relative to this module, so the site keeps working from a subpath
 // (e.g. https://user.github.io/solar-system/).
 import * as THREE from 'three';
 
 const BASE = new URL('../textures/earth/', import.meta.url);
-const HI_RES = { day: 'earth_day_4k.jpg', night: 'earth_night_4k.jpg' };
+// order = fetch priority (colour first; the data masks are sharper but less noticeable)
+const HI_RES = {
+  day:    { file: 'earth_day_4k.jpg',    srgb: true  },
+  night:  { file: 'earth_night_4k.jpg',  srgb: true  },
+  water:  { file: 'earth_water_4k.jpg',  srgb: false },
+  clouds: { file: 'earth_clouds_4k.jpg', srgb: false },
+};
 
 /**
  * Can this renderer/device take the 4096×2048 maps? Desktop (not touch), maxTextureSize ≥ 4096, and not a
@@ -90,10 +98,10 @@ export function loadEarthTextures({ isMobile, renderer = null, onLoad }) {
     const useBitmap = typeof createImageBitmap === 'function';
     const bmLoader = useBitmap ? new THREE.ImageBitmapLoader().setOptions({ imageOrientation: 'flipY' }) : null;
     let remaining = Object.keys(HI_RES).length;
-    for (const [key, file] of Object.entries(HI_RES)) {
+    for (const [key, { file, srgb }] of Object.entries(HI_RES)) {
       const url = new URL(`desktop/${file}`, BASE).href;
       const done = (tex) => {
-        setup(tex, true);
+        setup(tex, srgb);
         if (renderer?.initTexture) renderer.initTexture(tex);   // upload (and build mips) now, not mid-frame later
         info.tier[key] = '4k';
         onLoad(key, tex, '4k');

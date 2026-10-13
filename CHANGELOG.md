@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-13: Earth gets 4K ocean mask and 4K clouds (EarthBot)
+
+### Changed
+- **4K water mask and 4K cloud map** on desktop. They load right after the 4K day and night maps (same off-thread decode and pre-upload), so ocean glint, coastlines and cloud shadows are now as sharp as the 4K surface. Clouds show visibly finer detail up close.
+- **New water mask, straight from NASA**: ocean coastlines come from the NASA Blue Marble GEBCO bathymetry map (21600×10800, area-averaged), which lines up pixel-exact with the Blue Marble day map. Inland lakes are carried over from the old mask. Antarctic ice shelves (Ross, Ronne) and a strip of the Siberian Arctic coast were wrongly marked as water before and no longer glint. The 2K (desktop) and 1K (iPad) masks were regenerated from the same 4K mask, so every tier matches.
+- **4K clouds** come from NASA's 8192×4096 *Blue Marble clouds* image (the same pattern as the 2K map, 0.99 correlation), level-matched to the 2K map so the 4K swap doesn't change cloud density or `uEarthTint`.
+- iPad still loads only the 1K set. Extra desktop download: about 2.2 MB, after first paint.
+
 ## 2026-10-13: Hyperion and Phoebe join Saturn's moons (Space Model Coder)
 
 ### Added
