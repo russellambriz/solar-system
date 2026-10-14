@@ -25,6 +25,12 @@ float cloudCurve(float c) { return smoothstep(0.08, 0.80, c); }
  * solid-body eastward creep. A per-latitude offset that grew forever would shear the map into streaks, so two copies
  * are sampled with offsets that ramp over one period (half a period apart) and crossfade: the displacement is
  * bounded by rate × period and each copy resets while it is invisible.
+ *
+ * A plain linear mix of the two sheared copies doubles cloud edges mid-fade (ghosting) and dips contrast. The blend
+ * below uses an S-curve weight (less time near 50/50) and an RMS mix (keeps mid-fade coverage from washing out).
+ * Wind speeds are independent of period (offset = windRate·period·phase, phase = t/period); a short period caps how
+ * far the two copies diverge so residual mid-fade shear stays within a soft cloud edge.
+ *
  * Uniforms (set in index.js from a speed-limited clock): uCloudPhase = fract(clock / period), uCloudBase = solid-body
  * offset (radians, wrapped), uCloudFlowPeriod = period in clock units, uCloudWinds = (trades, westerlies, –) in
  * radians of longitude per clock unit (+ = east).
@@ -48,7 +54,12 @@ float cloudFlow(vec2 uv, vec2 gx, vec2 gy) {
   vec2 uvB = vec2(uv.x - (uCloudBase + rate * p1) * 0.15915494, uv.y);
   float cA = cloudCurve(textureGrad(uCloudMap, uvA, gx, gy).r);
   float cB = cloudCurve(textureGrad(uCloudMap, uvB, gx, gy).r);
-  return mix(cA, cB, abs(2.0 * p0 - 1.0));          // A is invisible when it resets (p0 = 0), B when p1 = 0
+  // S-curve weight: endpoints stay a pure single copy (resets stay invisible); the equal-blend zone is
+  // narrower in phase, so with a short period the two shears never sit as a long-lived double image.
+  float w0 = abs(2.0 * p0 - 1.0);
+  float w = w0 * w0 * (3.0 - 2.0 * w0);
+  // RMS (not linear) mix: mid-fade coverage stays closer to a single opaque deck instead of washing out.
+  return sqrt(mix(cA * cA, cB * cB, w));
 }
 `;
 

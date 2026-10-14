@@ -50,7 +50,7 @@ const DEFAULTS = {
   cloudTrades: -0.035,     // tropics: westward, radians of longitude per radian of spin
   cloudWesterlies: 0.08,   // ~45° N/S: eastward
   cloudSolid: 0.03,        // slow solid-body eastward creep of the whole deck (unbounded, no shear)
-  cloudFlowPeriod: 6,      // crossfade period (clock units): max band-to-band shear ≈ 0.08·6 rad ≈ 27°
+  cloudFlowPeriod: 2,      // crossfade period (clock units): max band-to-band shear ≈ 0.08·2 rad ≈ 9°; inter-copy gap at mid-fade ≈ 4.6° (was ~14° at period 6)
   cloudMaxRate: 1.5,       // speed limit for the cloud clock, radians of spin per real second (≈ 12 sim-days/s)
   // close-approach "cinematic" limb: thicker + brighter as Earth's on-screen radius grows (CSS px)
   closeFrom: 300,          // no change below this on-screen radius (far view unchanged)
