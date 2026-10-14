@@ -54,6 +54,8 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uRayStrength: { value: 1.0 },
     uTycho: { value: seleno(-43.31, -11.36) },
     uCopernicus: { value: seleno(9.62, -20.08) },
+    uKepler: { value: seleno(8.12, -38.01) },
+    uAristarchus: { value: seleno(23.73, -47.49) },
     uTychoRayDir: { value: seleno(21.8, 17.9) },             // Bessel, in Mare Serenitatis: Tycho's famous long ray runs past it
   };
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG });

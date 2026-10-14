@@ -2,7 +2,7 @@
 // Photometry: Lunar-Lambert (McEwen) blend of Lambert and Lommel-Seeliger, which is why the full Moon looks
 // flat and evenly bright instead of shaded like a ball, plus a small opposition surge near full phase.
 // Relief: LOLA-derived normal map in an analytic east/north tangent frame (exact for a UV sphere).
-// Rays: analytic bright ray systems for Tycho and Copernicus, laid over the LRO albedo. Ray material is fresh,
+// Rays: analytic bright ray systems for Tycho, Copernicus, Kepler and Aristarchus, laid over the LRO albedo. Ray material is fresh,
 // immature ejecta, so it stands out most at full Moon (no shadows, albedo contrast only) and nearly vanishes
 // near the terminator. Cost: ~7 hash lookups per ray system, skipped outright beyond each system's reach.
 
@@ -32,6 +32,8 @@ uniform float uEarthshine;
 uniform float uRayStrength;   // 0 turns the analytic ray systems off
 uniform vec3 uTycho;          // crater centres, unit vectors in mesh space (see moon/index.js)
 uniform vec3 uCopernicus;
+uniform vec3 uKepler;
+uniform vec3 uAristarchus;
 uniform vec3 uTychoRayDir;    // far point of Tycho's long ray across Mare Serenitatis (past Bessel)
 varying vec2 vUv;
 varying vec3 vObjN;
@@ -89,21 +91,28 @@ void main() {
 
   mat3 m = mat3(modelMatrix);
   vec3 Ng = normalize(m * n);          // smooth sphere normal (for the terminator)
-  vec3 N = normalize(m * pn);          // relief normal (for crater shading)
   vec3 L = normalize(uSunPos - vWorldPos);
   vec3 V = normalize(cameraPosition - vWorldPos);
+  // Relief fades out toward the disc's edge. There the normal map is squashed to a few pixels and a facet can tilt
+  // away from both the Sun and the eye, which made black and white speckles along the limb at full Moon. The
+  // smooth-sphere photometry (no limb darkening) takes over there, as on the real full Moon.
+  float relief = smoothstep(0.04, 0.3, dot(Ng, V));
+  vec3 N = normalize(mix(Ng, normalize(m * pn), relief));   // relief normal (for crater shading)
 
   vec3 albedo = texture2D(uMap, vUv).rgb;   // sRGB texture -> linear on fetch
 
   float cosI = max(dot(N, L), 0.0);
-  float cosE = max(dot(N, V), 0.0);
+  float cosE = max(dot(N, V), 0.02);   // floor: a facet turned edge-on to the eye must not blow Lommel-Seeliger up to 2x
   float g = acos(clamp(dot(L, V), -1.0, 1.0));         // phase angle
 
-  // Ray craters: Tycho (86 km, rays to ~1,800 km) and Copernicus (93 km, rays to ~800 km). Strong near full,
-  // a faint trace at quarter, gone at crescent (where the LRO albedo already carries what little shows).
+  // Ray craters: Tycho (86 km, rays to ~1,800 km), Copernicus (93 km, rays to ~800 km), Kepler (31 km, rays to
+  // ~400 km, crossing Copernicus's) and Aristarchus (40 km, the brightest spot on the Moon, short rays). Strong near
+  // full, a faint trace at quarter, gone at crescent (where the LRO albedo already carries what little shows).
   if (uRayStrength > 0.0) {
     float rays = raySystem(n, uTycho, 0.0248, 1.05, 30.0, 11.0) + 1.2 * longRay(n, uTycho, uTychoRayDir, 0.0248, 1.45)
-               + 0.55 * raySystem(n, uCopernicus, 0.0268, 0.45, 44.0, 57.0);
+               + 0.55 * raySystem(n, uCopernicus, 0.0268, 0.45, 44.0, 57.0)
+               + 0.42 * raySystem(n, uKepler, 0.0089, 0.23, 22.0, 83.0)
+               + 0.38 * raySystem(n, uAristarchus, 0.0115, 0.16, 20.0, 131.0);
     rays = 1.0 - exp(-1.3 * rays);                         // soft cap where rays overlap near the rims
     float full = 1.0 - smoothstep(0.2, 1.35, g);
     float r = uRayStrength * rays * mix(0.1, 1.0, full);
@@ -111,7 +120,14 @@ void main() {
   }
   float Lw = mix(1.0, 0.35, smoothstep(0.0, 2.2, g));  // Lommel-Seeliger weight: strong near full, Lambert-ish at crescent
   float ls = 2.0 * cosI / (cosI + cosE + 1e-4);
-  float photo = mix(cosI, ls, Lw);
+  float photoRelief = mix(cosI, ls, Lw);
+  // Same photometry on the smooth sphere. Near full Moon the eye looks down the sunbeam, so a slope turned away
+  // from the Sun is also turned away from us and hardly shows: the real full Moon looks flat. A normal map can't
+  // hide those slopes, so they came out as black dashes. Relief contrast therefore grows with phase angle:
+  // a quarter of it at full, all of it by about 35 degrees (where crater shadows start to read).
+  float cosI0 = max(dot(Ng, L), 0.0), cosE0 = max(dot(Ng, V), 0.02);
+  float photoSmooth = mix(cosI0, 2.0 * cosI0 / (cosI0 + cosE0 + 1e-4), Lw);
+  float photo = mix(photoSmooth, photoRelief, relief * mix(0.25, 1.0, smoothstep(0.08, 0.6, g)));
   photo *= 1.0 + 0.25 * exp(-g / 0.06);                // opposition surge
   // Sharp but not aliased terminator on the smooth sphere; relief adds the long crater shadows inside it.
   photo *= smoothstep(-0.015, 0.04, dot(Ng, L));

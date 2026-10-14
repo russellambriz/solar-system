@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-14: Clean full Moon, plus Kepler and Aristarchus rays (MoonBot)
+
+### Fixed
+- **No more black and white speckles on the full Moon.** Slopes turned away from the Sun were drawn as black dashes near full phase, and the disc's edge sparkled. On the real full Moon the eye looks straight down the sunbeam, so those slopes are hidden too and the disc looks flat. Relief contrast now grows with phase angle: a quarter of it at full Moon, all of it by about 35°. It also fades out right at the limb, where the relief map is squashed to a few pixels. Quarter and crescent crater shadows are unchanged.
+
+### Added
+- **Kepler** (8.1° N, 38.0° W) and **Aristarchus** (23.7° N, 47.5° W) ray systems, in the same analytic style as Tycho and Copernicus. Kepler's rays reach about 400 km and cross Copernicus's. Aristarchus, the brightest spot on the Moon, gets a short, tight fan. Both are strongest near full. No new textures.
+
+### Testing
+- `moon-shots/shoot.js` adds a Kepler/Aristarchus close-up and a full-Moon limb view. No console errors on desktop or iPad.
+
 ## 2026-10-13: Bright ray craters on the Moon: Tycho and Copernicus (MoonBot)
 
 ### Added
