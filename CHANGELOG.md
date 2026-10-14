@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-10-14: Real Moon phases and Galilean moon longitudes (Space Model Coder)
+
+### Fixed
+- **Earth's Moon phase.** The Moon no longer starts at longitude 0° at J2000. It now uses Meeus's mean ecliptic longitude (~218.316° at J2000, ~13.176°/day) plus the leading equation-of-center term (6.289° sin M), in the same ecliptic frame as the planets (`x = cos L`, `z = −sin L`). Full Moons land on about **2026-10-26** and **2026-11-24**, and new Moons on about **2026-11-09** / **2026-12-09** (within a few hours of the USNO times). `slow` stays 1.
+
+### Added
+- **Moon phase readout.** Controls shows a live line under the date (`Moon: Waxing gibbous · 82% lit`), and the Moon's info card gains a Phase row. Illumination comes from the Sun–Earth–Moon elongation in the scene. 44px-friendly; works on iPad touch and desktop.
+- **`ephemeris/moons.js`.** Shared helpers for the Moon's longitude, Galilean mean longitudes (Meeus Ch. 44 shifted to J2000), date-anchoring of slowed moons, and phase naming.
+
+### Changed
+- **Galilean moons (Io, Europa, Ganymede, Callisto)** use Meeus mean longitudes / periods. Motion is still slowed 20× so they stay readable at 10 days/s; whenever the date is set (picker, Today, or load) their phase is re-anchored so the position at that date is the real mean longitude. Relative angles keep the 1:2:4 Laplace resonance.
+- Saturn / Uranus / Neptune moons in `outermoons.js` are unchanged: easy-to-drop-in mean elements in the same frame weren't cleanly sourced this pass, so their decorative phases stay as they were.
+
+### Notes
+- Success check (headless): Oct 26 & Nov 24 → Full Moon ~100% lit; Nov 9 & Dec 9 → New Moon ~0% lit; Oct 14 → Waxing crescent ~15% lit.
+- Tested on desktop 1280×800 and iPad Pro 11 portrait + landscape (touch). Page loads with zero console errors; Moon / Jupiter / Io focus still work; galaxy view still enters.
+- Screenshots: `screenshot-moon-phase.png` (new).
+
+
 ## 2026-10-13: Earth gets 4K ocean mask and 4K clouds (EarthBot)
 
 ### Changed

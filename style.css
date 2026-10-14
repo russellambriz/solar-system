@@ -174,6 +174,9 @@ body.touch .row.toggle { min-height: 44px; margin: 0; }
   border: 1px solid rgba(120, 150, 255, 0.25); border-radius: 8px; padding: 3px 6px; font: inherit; font-size: 14px; color-scheme: dark;
   font-variant-numeric: tabular-nums; -webkit-appearance: none; appearance: none; }
 .date-row button { flex: none; }
+.moon-phase { font-size: 12.5px; color: #c5d0ea; padding: 2px 0 6px; min-height: 22px;
+  font-variant-numeric: tabular-nums; }
+body.touch .moon-phase { font-size: 13px; min-height: 28px; padding: 4px 0 8px; }
 .toggle { cursor: pointer; }
 input[type="range"] { width: 100%; accent-color: #7f9cff; touch-action: none; }
 body.touch input[type="range"] { height: 36px; }
