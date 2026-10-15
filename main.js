@@ -19,6 +19,7 @@ import { SMALL_BODIES, CHARON_INFO, CHARON_MASS_RATIO, keplerAU, scaleAU, orbitP
 import { createSpacecraft } from './spacecraft/index.js';
 import { createComets } from './comets/index.js';
 import { createRealPositions } from './ephemeris/index.js';
+import { moonEclipticLongitude, MOON_SIDEREAL_DAYS, galileanLongitude, galileanElements, anchorMoonPhase, moonPhaseFromPositions } from './ephemeris/moons.js';
 import { createSearch } from './search/index.js';
 import { createPerfGuard } from './perf/index.js';
 import { createScaleTools } from './scale/index.js';
@@ -34,6 +35,7 @@ document.body.classList.toggle('touch', IS_TOUCH);
 const EARTH_DIAMETER = 12742; // km
 const SPIN_SLOWDOWN = 50;     // self-rotation is shown 50x slower than real
 const J2000 = Date.UTC(2000, 0, 1, 12); // epoch for mean longitudes
+const DAY_MS = 86400000;
 
 const PLANETS = [
   { name: 'Mercury', type: 'Terrestrial planet', diameter: 4879, au: 0.387, period: 87.97, rotation: 58.65, tilt: 0.03, L0: 252.25, color: '#9e9a95',
@@ -63,8 +65,8 @@ const SUN_INFO = {
         'which can spark auroras on Earth days later.',
 };
 const MOON_INFO = {
-  name: 'Moon', type: 'Natural satellite of Earth', diameter: 3474, period: 27.32, color: '#bbbbbb',
-  distLabel: 'Distance from Earth', distanceText: '384,400 km (0.00257 AU)', periodText: '27.32 days (around Earth)',
+  name: 'Moon', type: 'Natural satellite of Earth', diameter: 3474, period: MOON_SIDEREAL_DAYS, color: '#bbbbbb',
+  distLabel: 'Distance from Earth', distanceText: '384,400 km (0.00257 AU)', periodText: '27.32 days (sidereal; around Earth)',
   dayText: '27.3 days (tidally locked)',
   fact: 'The Moon is tidally locked, so we always see the same side. It drifts about 3.8 cm farther from Earth every year.',
 };
@@ -88,23 +90,25 @@ const MOON_SYSTEMS = {
       fact: 'Deimos is so small that its escape velocity is only ~5.6 m/s — a strong throw could send a ball into space. ' +
             'A thick blanket of dust smooths its surface, and from Mars it looks like a bright star.' },
   ] },
+  // Galilean periods/L0 from Meeus (ephemeris/moons.js). Motion still slowed 20× so they don't blur at 10 days/s;
+  // phase is re-anchored to the real mean longitude whenever the date is set (see anchorGalileanMoons).
   Jupiter: { slow: 20, moons: [
-    { name: 'Io', kind: 'galilean', size: 0.46, orbit: 5.2, period: 1.769, phase: 0.3, color: '#e8c44a',
+    { name: 'Io', kind: 'galilean', size: 0.46, orbit: 5.2, period: galileanElements('Io').period, phase: 0, color: '#e8c44a',
       type: 'Galilean moon of Jupiter', diameter: 3643,
       distLabel: 'Distance from Jupiter', distanceText: '421,700 km', periodText: '1.77 days', dayText: 'Tidally locked (= orbital period)',
       fact: 'The most volcanic place in the solar system: ~400 active volcanoes, some shooting sulfur plumes 400 km high. ' +
             'Tidal squeezing by Jupiter heats its interior. Io, Europa and Ganymede are locked in a 1:2:4 orbital resonance.' },
-    { name: 'Europa', kind: 'galilean', size: 0.42, orbit: 6.4, period: 3.551, phase: 2.2, color: '#d9cbb3',
+    { name: 'Europa', kind: 'galilean', size: 0.42, orbit: 6.4, period: galileanElements('Europa').period, phase: 0, color: '#d9cbb3',
       type: 'Galilean moon of Jupiter', diameter: 3122,
       distLabel: 'Distance from Jupiter', distanceText: '671,034 km', periodText: '3.55 days', dayText: 'Tidally locked (= orbital period)',
       fact: 'Under its cracked ice shell (~15–25 km thick) lies a global salty ocean holding about twice as much water as all of ' +
             'Earth\'s oceans — one of the best places to look for life. NASA\'s Europa Clipper arrives in 2030.' },
-    { name: 'Ganymede', kind: 'galilean', size: 0.55, orbit: 7.8, period: 7.155, phase: 4.1, color: '#9c948a',
+    { name: 'Ganymede', kind: 'galilean', size: 0.55, orbit: 7.8, period: galileanElements('Ganymede').period, phase: 0, color: '#9c948a',
       type: 'Galilean moon of Jupiter', diameter: 5268,
       distLabel: 'Distance from Jupiter', distanceText: '1,070,412 km', periodText: '7.15 days', dayText: 'Tidally locked (= orbital period)',
       fact: 'The largest moon in the solar system — bigger than the planet Mercury — and the only moon with its own magnetic field, ' +
             'which even makes auroras. Its bright terrain is scored with long parallel grooves.' },
-    { name: 'Callisto', kind: 'galilean', size: 0.53, orbit: 9.6, period: 16.689, phase: 5.4, color: '#6f665c',
+    { name: 'Callisto', kind: 'galilean', size: 0.53, orbit: 9.6, period: galileanElements('Callisto').period, phase: 0, color: '#6f665c',
       type: 'Galilean moon of Jupiter', diameter: 4821,
       distLabel: 'Distance from Jupiter', distanceText: '1,882,709 km', periodText: '16.69 days', dayText: 'Tidally locked (= orbital period)',
       fact: 'One of the most heavily cratered surfaces known, about 4 billion years old. Its Valhalla impact basin is ringed by ' +
@@ -436,7 +440,7 @@ for (const p of PLANETS) {
     moonGroup.add(moonMesh);
     moonPivot.add(orbitLine(moonDist, 0xb8c4e6, 0.4));  // faint ring around Earth; follows Earth; toggled with "Orbit lines"
     const moonBody = { name: 'Moon', info: MOON_INFO, group: moonGroup, mesh: moonMesh, radius: moonR, isMoon: true,
-      parent: body, orbitDist: moonDist, period: MOON_INFO.period, slow: 1, phase: 0, baseRadius: moonR };
+      parent: body, orbitDist: moonDist, period: MOON_INFO.period, slow: 1, phase: 0, baseRadius: moonR, realLon: true };
     body.moons = [moonBody]; body.systemRadius = moonDist;
     moonBody.labelEl = addLabel(moonGroup, 'Moon', moonR + 0.5, true);
     addPickSphere(moonGroup, moonR * 0.8, moonBody);
@@ -455,7 +459,8 @@ for (const p of PLANETS) {
       mg.add(mesh);
       pivot.add(orbitLine(m.orbit, 0xb8c4e6, 0.3));   // faint ring; follows the planet; toggled with "Orbit lines"
       const mb = { name: m.name, info: m, group: mg, mesh, radius: m.size, isMoon: true,
-        parent: body, orbitDist: m.orbit, period: m.period, slow: sys.slow, phase: m.phase };
+        parent: body, orbitDist: m.orbit, period: m.period, slow: sys.slow, phase: m.phase,
+        realLon: m.kind === 'galilean' };
       mb.labelEl = addLabel(mg, m.name, m.size + 0.4, true);
       addPickSphere(mg, m.size, mb);
       bodies.push(mb);
@@ -669,7 +674,12 @@ window.addEventListener('keydown', (e) => {
 });
 updateSpeed();
 // ephemeris/: planets on their real Keplerian orbits (eccentricity, inclination) for the sim date + the Controls date picker
-const realPositions = createRealPositions({ bodies, scaleDistance, getTime: () => simTime, setTime: (ms) => { simTime = ms; } });
+function setSimTime(ms) {
+  simTime = ms;
+  anchorGalileanMoons((simTime - J2000) / DAY_MS);
+}
+const realPositions = createRealPositions({ bodies, scaleDistance, getTime: () => simTime, setTime: setSimTime });
+anchorGalileanMoons((simTime - J2000) / DAY_MS);   // correct Galilean longitudes for "today" on load
 
 // Body list buttons
 const list = $('body-list');
@@ -770,11 +780,17 @@ function showInfo(b) {
   $('info-type').textContent = i.type;
   $('info-diameter').textContent = i.diameterText ||
     `${fmtNum(i.diameter)} km` + (b.name !== 'Earth' ? ` (${(i.diameter / EARTH_DIAMETER).toFixed(2)}× Earth)` : '');
+  const phaseRow = $('info-phase-row');
+  if (phaseRow) phaseRow.classList.toggle('hidden', b.name !== 'Moon');
   if (b.isMoon) {
     $('info-distance-label').textContent = i.distLabel;
     $('info-distance').textContent = i.distanceText;
     $('info-period').textContent = i.periodText;
     $('info-day').textContent = i.dayText;
+    if (b.name === 'Moon') {
+      const ph = currentMoonPhase();
+      if (ph && $('info-phase')) $('info-phase').textContent = ph.label;
+    }
   } else if (b.name === 'Sun') {
     $('info-distance-label').textContent = 'Distance from Sun';
     $('info-distance').textContent = i.distanceText;
@@ -1460,7 +1476,33 @@ function updateCamera(dt) {
 // ---------------------------------------------------------------------------
 const clock = new THREE.Clock();
 const dateEl = $('date');
-const DAY_MS = 86400000;
+
+
+/** Snap Jupiter's Galilean moons to their real mean longitudes at `days` (kept slowed while time runs). */
+function anchorGalileanMoons(days) {
+  for (const b of bodies) {
+    if (!b.realLon || b.name === 'Moon') continue;
+    anchorMoonPhase(b, days, galileanLongitude(b.name, days));
+  }
+}
+
+const _earthPos = new THREE.Vector3(), _moonPos = new THREE.Vector3();
+function currentMoonPhase() {
+  const earth = bodies.find((b) => b.name === 'Earth');
+  if (!MOON || !earth) return null;
+  earth.group.getWorldPosition(_earthPos);
+  MOON.group.getWorldPosition(_moonPos);
+  return moonPhaseFromPositions(_earthPos, _moonPos);
+}
+
+function updateMoonPhaseUI() {
+  const ph = currentMoonPhase();
+  if (!ph) return;
+  const ctrl = $('moon-phase');
+  if (ctrl) ctrl.textContent = 'Moon: ' + ph.label;
+  const infoPh = $('info-phase');
+  if (infoPh && focused && focused.name === 'Moon') infoPh.textContent = ph.label;
+}
 
 function updateBodies() {
   const days = (simTime - J2000) / DAY_MS;
@@ -1468,9 +1510,12 @@ function updateBodies() {
     if (b.update) { b.update(days); continue; }
     if (b.name === 'Sun') { b.mesh.rotation.y = (days / 25.4 / SPIN_SLOWDOWN) * Math.PI * 2; continue; }
     if (b.isMoon) {
-      const a = b.phase + (days / (b.period * b.slow)) * Math.PI * 2;
+      // Earth's Moon: real ecliptic longitude every frame (slow = 1) so phases match the calendar.
+      // Galilean moons: slowed motion from a phase anchored to the real longitude at the last date pick.
+      const a = b.name === 'Moon' ? moonEclipticLongitude(days)
+        : b.phase + (days / (b.period * b.slow)) * Math.PI * 2;
       b.group.position.set(Math.cos(a) * b.orbitDist, 0, -Math.sin(a) * b.orbitDist);
-      b.mesh.rotation.y = a + Math.PI; // tidally locked: same face toward Earth
+      b.mesh.rotation.y = a + Math.PI; // tidally locked: same face toward planet
       continue;
     }
     const p = b.info;
@@ -1503,6 +1548,7 @@ function animate() {
   if (!paused) simTime += daysPerSecond * dt * DAY_MS;
   updateBodies();
   scene.updateMatrixWorld();
+  updateMoonPhaseUI();
   if (MOON) updateMoon(MOON, camera, sunLight, (simTime - J2000) / DAY_MS);   // moon/: lighting, earthshine, 0.5x -> 0.273x size easing
   recordHistory();
   updateCamera(dt);
@@ -1579,4 +1625,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui };
+window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui };

@@ -62,6 +62,7 @@
         <input type="date" id="date-input" min="1000-01-01" max="3000-12-31" aria-label="Simulation date" />
         <button id="today-btn" title="Back to today">Today</button>
       </div>
+      <div id="moon-phase" class="moon-phase" aria-live="polite">Moon: —</div>
       <!-- Views: one compact row of icon + short label buttons (wraps to 2 lines) -->
       <div class="view-row deep-row">
         <button id="galaxy-btn" title="Galaxy view (G)"><span class="ico">🌌</span><span class="lbl">Galaxy</span></button>
@@ -111,6 +112,7 @@
       <tr><th id="info-distance-label">Distance from Sun</th><td id="info-distance"></td></tr>
       <tr><th id="info-period-label">Orbital period</th><td id="info-period"></td></tr>
       <tr><th id="info-day-label">Day length</th><td id="info-day"></td></tr>
+      <tr id="info-phase-row" class="hidden"><th>Phase</th><td id="info-phase"></td></tr>
     </table>
     <p id="info-fact"></p>
   </div>
