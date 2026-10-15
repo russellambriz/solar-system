@@ -322,6 +322,12 @@ The constellation module doesn't move the camera or change the FOV. Turn-to-face
   - Halley search/focus, Saturn focus and the galaxy view (in and back) still work, and so does the 3I/ATLAS event.
 - Screenshots: `screenshot-interstellar.png` (new): 3I/ATLAS at perihelion with its coma, tail, path and card.
 
+## 2026-10-14: Earth arrival framing pulled back (ScaleBot)
+
+### Changed
+- **Earth cinematic arrival.** Focusing Earth used to end ~2.8 Earth radii out, too close to see the whole globe. `main.js` now passes `{ distance }` to `earth.getCinematicStart()`. That is 4.5 Earth radii, or more on narrow screens so the globe's diameter stays at ~45% or less of the smaller screen side. It uses the horizontal FOV on iPad portrait, which gives about 6.9 R. The same options object is used for the fly-in goal and for the per-frame drift re-reads, so the drift does not snap and still follows the day/night line.
+- Other planets, rings, the Sun and the Moon keep their existing framing (`focusOffset` and the Moon's default 2.6 R are unchanged). Fly durations are still the distance-scaled log-space ones.
+
 ## 2026-10-14: Real Moon phases and Galilean moon longitudes (Space Model Coder)
 
 ### Fixed

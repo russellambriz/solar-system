@@ -1023,6 +1023,14 @@ const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 
 function bodyWorldPos(b, out) { return b.group.getWorldPosition(out); }
+// ScaleBot: Earth's cinematic arrival distance (Earth radii). ~4.5 R on desktop; on narrow screens (iPad portrait) backed
+// off so the globe's diameter is at most ~45% of the smaller screen side (uses the narrower horizontal FOV).
+const EARTH_ARRIVE_R = 4.5, EARTH_FRAME_FILL = 0.45;
+function earthCinematicDistance() {
+  const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  const tanMin = Math.min(tanV, tanV * camera.aspect);
+  return Math.max(EARTH_ARRIVE_R, 1 / Math.sin(Math.atan(EARTH_FRAME_FILL * tanMin)));
+}
 function focusOffset(b, out) {
   const p = bodyWorldPos(b, tmp2);
   // Earth: back off far enough that the whole Moon orbit is in frame
@@ -1065,8 +1073,9 @@ function cinematicMinDist(b) { return Math.max(b.radius * 1.5, 0.3); }
 function cinematicArrival(b) {
   const helper = cinematicHelper(b);
   if (!helper) return false;
+  const opts = b.earth ? { distance: earthCinematicDistance() } : undefined;   // Earth only (Moon keeps its default); reused by the drift
   let c;
-  try { c = helper.getCinematicStart(); } catch (e) { return false; }
+  try { c = helper.getCinematicStart(undefined, opts); } catch (e) { return false; }
   if (!c || !c.offset || !(c.offset.lengthSq() > 0)) return false;
   let last = c;
   const goalTarget = () => {
@@ -1074,7 +1083,7 @@ function cinematicArrival(b) {
     return last.target ? p.addScaledVector(last.target, b.radius) : p;
   };
   const goalCam = () => {
-    last = helper.getCinematicStart() || last;           // depends on the Sun direction: keep it current as the body moves
+    last = helper.getCinematicStart(undefined, opts) || last;           // depends on the Sun direction: keep it current as the body moves
     const t = goalTarget(), r = b.radius;
     const d = Math.max(last.offset.length() * r, cinematicMinDist(b) * 1.05);
     return t.add(_cineDir.copy(last.offset).normalize().multiplyScalar(d));
@@ -1082,7 +1091,7 @@ function cinematicArrival(b) {
   userTouched = false;
   flyTo(goalCam, goalTarget, CINEMATIC_MIN_SEC, () => {
     controls.minDistance = cinematicMinDist(b);           // radius is final now (Moon size easing has settled)
-    if (focused === b && !userTouched && last.driftAxis && last.driftSpeed) drift = { body: b, helper, useOut: helperTakesOut(helper), angle: 0 };
+    if (focused === b && !userTouched && last.driftAxis && last.driftSpeed) drift = { body: b, helper, opts, useOut: helperTakesOut(helper), angle: 0 };
   });
   transition.cinematic = b;
   // fly in around the body itself (not the moving orbit target), so the distance to the body shrinks steadily in log space
@@ -1112,7 +1121,7 @@ const _driftAxis = new THREE.Vector3(), _driftOff = new THREE.Vector3(), _driftP
 function applyDrift(dt) {
   const b = drift.body;
   let c;
-  try { c = drift.useOut ? drift.helper.getCinematicStart(_cineOut) : drift.helper.getCinematicStart(); } catch (e) { c = null; }
+  try { c = drift.useOut ? drift.helper.getCinematicStart(_cineOut, drift.opts) : drift.helper.getCinematicStart(undefined, drift.opts); } catch (e) { c = null; }
   if (!c || !c.offset || !c.driftAxis || !(c.offset.lengthSq() > 0)) { drift = null; return; }   // fall back to plain follow
   drift.angle += (c.driftSpeed || 0) * dt;
   const r = b.radius;
