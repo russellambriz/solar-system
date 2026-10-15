@@ -57,8 +57,13 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uKepler: { value: seleno(8.12, -38.01) },
     uAristarchus: { value: seleno(23.73, -47.49) },
     uTychoRayDir: { value: seleno(21.8, 17.9) },             // Bessel, in Mare Serenitatis: Tycho's famous long ray runs past it
+    // Close-up crater field: fades in below the maps' resolution once you fly close. 0 turns it off.
+    uDetail: { value: 1.0 },
+    uMapTexel: { value: (2 * Math.PI) / (isTouch ? 1024 : 2048) },   // updated when the 4K set streams in
   };
-  const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG });
+  // iPad: three size bands (down to ~3 km craters); desktop adds a fourth (~1.3 km) for the closest views.
+  const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG,
+    defines: { DETAIL_BANDS: isTouch ? 3 : 4 } });
 
   const lod = new THREE.LOD();
   const levels = isTouch ? [[96, 64, 0], [48, 32, 8], [24, 16, 40]] : [[160, 112, 0], [72, 48, 8], [24, 16, 40]];
@@ -116,7 +121,7 @@ export function updateMoon(moonBody, camera, sunLight, days) {
     moonBody.mesh.userData.hiRes = 'loading';
     let ready = 0;
     const map = loadHiRes('moon_color_4k.jpg', true), nrm = loadHiRes('moon_normal_4k.jpg', false);
-    function done() { if (++ready < 2) return; u.uMap.value = map; u.uNormalMap.value = nrm; moonBody.mesh.userData.hiRes = 'loaded'; }
+    function done() { if (++ready < 2) return; u.uMap.value = map; u.uNormalMap.value = nrm; u.uMapTexel.value = (2 * Math.PI) / 4096; moonBody.mesh.userData.hiRes = 'loaded'; }
     map.onReady = nrm.onReady = done;
   }
   moonBody.group.scale.setScalar(s);                       // mesh, pick sphere and label offset all live in this group

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-15: Close-up crater detail on the Moon (MoonBot)
+
+### Added
+- **Small craters up close.** Fly in to the Moon and the surface no longer turns into a soft blur where the NASA maps run out of pixels. A procedural field of small simple craters (about 1 to 20 km across: bowls with raised rims) fades in only below the maps' resolution, so it never doubles a real crater and never shimmers at normal viewing distances.
+  - Low Sun near the terminator fills the bowls with sharp black shadows (computed analytically from the crater's depth and the Sun's height), and the far wall catches the light, as in Apollo and LRO photos.
+  - The bright highlands get more than twice the crater count of the younger, smoother maria. Most craters are old and shallow; a few are fresh, with bright ejecta.
+  - The biggest win is on iPad, where only the 1K maps load: the close-up view goes from mush to a cratered surface with no new downloads. Desktop gets it below the 4K maps' ~2.7 km texel.
+  - Cost: nothing at normal distances (skipped outright). Up close, up to 8 cell lookups per size band: 3 bands on iPad, 4 on desktop (`DETAIL_BANDS`).
+- `uDetail` uniform on the Moon material (`mesh.userData.moonUniforms.uDetail`, 1 by default, 0 turns it off).
+
+### Testing
+- `moon-shots/shoot.js` adds a closest-allowed close-up with the detail on and off, and `moon-shots/closeup.js` is a quick version of just that comparison. No console errors on desktop or iPad.
+
 ## 2026-10-14: Clean full Moon, plus Kepler and Aristarchus rays (MoonBot)
 
 ### Fixed

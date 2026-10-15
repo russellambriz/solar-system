@@ -5,6 +5,12 @@
 // Rays: analytic bright ray systems for Tycho, Copernicus, Kepler and Aristarchus, laid over the LRO albedo. Ray material is fresh,
 // immature ejecta, so it stands out most at full Moon (no shadows, albedo contrast only) and nearly vanishes
 // near the terminator. Cost: ~7 hash lookups per ray system, skipped outright beyond each system's reach.
+// Close-up craters: when the camera is close enough that the colour/relief maps are magnified (one texel spread
+// over several pixels), a procedural field of small simple craters (bowls with raised rims, ~1-20 km across) fades
+// in below the maps' resolution, with analytic bowl shadows at low Sun. Denser on the bright highlands than on the
+// maria (the maria are younger, so they've collected fewer impacts). Each size band only appears where the map
+// can't already show real craters that size and where it's at least a few pixels wide, so nothing is doubled and
+// nothing shimmers. Skipped entirely at normal viewing distances.
 
 export const VERT = /* glsl */ `
 varying vec2 vUv;
@@ -35,6 +41,8 @@ uniform vec3 uCopernicus;
 uniform vec3 uKepler;
 uniform vec3 uAristarchus;
 uniform vec3 uTychoRayDir;    // far point of Tycho's long ray across Mare Serenitatis (past Bessel)
+uniform float uDetail;        // 0 turns the close-up crater field off
+uniform float uMapTexel;      // arc of one colour/relief texel at the equator (radians = 2*pi / map width)
 varying vec2 vUv;
 varying vec3 vObjN;
 varying vec3 vWorldPos;
@@ -79,6 +87,50 @@ float longRay(vec3 n, vec3 c, vec3 t, float R, float len) {
   return exp(-off * off / (w * w)) * smoothstep(1.0 * R, 2.0 * R, along) * (1.0 - smoothstep(0.55 * len, len, along)) * clump;
 }
 
+vec3 hash33(vec3 p) {
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.xxy + p.yxx) * p.zyx);
+}
+
+// One size band of small simple craters. Crater centres are jittered points of a 3D grid (F cells per Moon radius)
+// that lie close to the sphere's surface; only the 2x2x2 nearest cells are searched, which is exact because each
+// crater's reach (1.6 radii) stays under the 0.43-cell gap to any skipped point. Adds the slope (grad, a tangent
+// vector; the surface normal tilts away from it), the bowl's shadow at low Sun (shade) and fresh bright rims (bright).
+const float CR_DEPTH = 0.4, CR_RIM = 0.07;   // depth and rim height in crater radii (depth/diameter ~0.2, like real bowls)
+void craterBand(vec3 n, float F, float Rm, float amp, vec3 sunT, vec3 sunB, float tanE,
+                inout vec3 grad, inout float shade, inout float bright) {
+  vec3 base = floor(n * F - 0.5);
+  for (int i = 0; i < 8; i++) {
+    vec3 cell = base + vec3(mod(float(i), 2.0), mod(floor(float(i) * 0.5), 2.0), floor(float(i) * 0.25));
+    vec3 q = cell + hash33(cell);
+    float keep = 1.0 - smoothstep(0.17, 0.25, abs(length(q) - F));   // only points near the surface shell
+    if (keep <= 0.0) continue;
+    vec3 c = q / length(q);
+    vec3 h = hash33(cell + 17.31);
+    float R = Rm * (0.35 + h.x * h.x * h.x);                       // many small, a few large (reach stays < 0.43 cell)
+    vec3 dv = (n - c) - n * dot(n - c, n);                         // tangent offset from the crater centre
+    float r = length(dv) / R;
+    if (r >= 1.6) continue;
+    float fade = amp * keep;
+    float a = fade * (0.25 + 0.75 * h.y * h.y);                    // most are old, softened and shallow; a few are fresh
+    vec3 dir = dv / max(length(dv), 1e-9);
+    float slope;
+    if (r < 1.0) slope = 2.0 * CR_DEPTH * r;                       // parabolic bowl
+    else { float x = (r - 1.0) / 0.28; slope = -CR_RIM * 2.0 * x / 0.28 * exp(-x * x); }   // rim crest, falling away
+    grad += dir * slope * a * (1.0 - smoothstep(1.3, 1.6, r));
+    if (r < 1.0 && tanE > 0.0) {
+      // Bowl shadow: the sunward rim hides the floor until the Sun climbs above it. The ray from here toward the
+      // Sun meets the rim after (sr - s) radii and must have risen above the depth below the rim by then.
+      vec2 st = vec2(dot(dv, sunT), dot(dv, sunB)) / R;
+      float sr = sqrt(max(1.0 - st.y * st.y, 0.0));
+      float clear = tanE * (sr - st.x) - (CR_DEPTH * (1.0 - r * r) + CR_RIM) * a;
+      shade = min(shade, mix(1.0, smoothstep(-0.03, 0.03, clear), min(fade, 1.0)));
+    }
+    if (h.z > 0.86) bright += fade * h.y * exp(-r * r * 1.4) * (h.z - 0.86) * 7.0;   // a few young craters with bright ejecta
+  }
+}
+
 void main() {
   vec3 n = normalize(vObjN);
   // three.js SphereGeometry: +u runs east along cross(up, n), +v runs north.
@@ -90,6 +142,33 @@ void main() {
   vec3 pn = normalize(east * tn.x + north * tn.y + n * tn.z);
 
   mat3 m = mat3(modelMatrix);
+  vec3 albedo = texture2D(uMap, vUv).rgb;   // sRGB texture -> linear on fetch
+
+  // Close-up crater field (see craterBand). pixArc = Moon radii covered by one screen pixel here.
+  float crShade = 1.0, crBright = 0.0;
+  float pixArc = max(length(dFdx(vObjN)), length(dFdy(vObjN)));
+  if (uDetail > 0.0 && pixArc < 2.1 * uMapTexel) {   // beyond this no band can have weight (Rm > 1.2 px and < 2.5 texels)
+    vec3 Lo = normalize(transpose(m) * normalize(uSunPos - vWorldPos));   // Sun direction in mesh space
+    float up = dot(Lo, n);
+    vec3 sunT = Lo - n * up;
+    float th = length(sunT);
+    sunT = th > 1e-5 ? sunT / th : east;
+    vec3 sunB = cross(n, sunT);
+    float tanE = up / max(th, 1e-4);
+    float lum = dot(albedo, vec3(0.3, 0.59, 0.11));
+    float terrain = mix(0.4, 1.0, smoothstep(0.1, 0.24, lum));          // maria: well under half the highland crater count
+    vec3 grad = vec3(0.0);
+    float Rm = 0.012;                                                   // ~21 km craters, then 8, 3.3, 1.3 km
+    for (int k = 0; k < DETAIL_BANDS; k++) {
+      float w = smoothstep(1.2, 3.0, Rm / pixArc)                        // at least a few pixels across
+              * (1.0 - smoothstep(1.0, 2.5, Rm / uMapTexel));            // ...and finer than the map shows
+      if (w > 0.01) craterBand(n, 0.2 / Rm, Rm, w * terrain * uDetail, sunT, sunB, tanE, grad, crShade, crBright);
+      Rm *= 0.4;
+    }
+    pn = normalize(pn - grad);
+    albedo *= 1.0 + 0.6 * crBright;
+  }
+
   vec3 Ng = normalize(m * n);          // smooth sphere normal (for the terminator)
   vec3 L = normalize(uSunPos - vWorldPos);
   vec3 V = normalize(cameraPosition - vWorldPos);
@@ -98,8 +177,6 @@ void main() {
   // smooth-sphere photometry (no limb darkening) takes over there, as on the real full Moon.
   float relief = smoothstep(0.04, 0.3, dot(Ng, V));
   vec3 N = normalize(mix(Ng, normalize(m * pn), relief));   // relief normal (for crater shading)
-
-  vec3 albedo = texture2D(uMap, vUv).rgb;   // sRGB texture -> linear on fetch
 
   float cosI = max(dot(N, L), 0.0);
   float cosE = max(dot(N, V), 0.02);   // floor: a facet turned edge-on to the eye must not blow Lommel-Seeliger up to 2x
@@ -131,6 +208,7 @@ void main() {
   photo *= 1.0 + 0.25 * exp(-g / 0.06);                // opposition surge
   // Sharp but not aliased terminator on the smooth sphere; relief adds the long crater shadows inside it.
   photo *= smoothstep(-0.015, 0.04, dot(Ng, L));
+  photo *= mix(1.0, crShade, relief);                  // small-crater bowl shadows (1 unless close up at low Sun)
   vec3 color = albedo * photo * uSunIntensity;
 
   // Earthshine: sunlight bounced off Earth lights the night side, strongest when Earth looks full from here.
