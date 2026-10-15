@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-10-15: Interstellar visitors: 'Oumuamua, Borisov and 3I/ATLAS (Space Model Coder)
+
+### Added
+- **The three known interstellar objects**, on their real open (hyperbolic) paths through the Solar System. Each moves on its path at any date, from the year 1000 to 3000 (thousands of AU out at the extremes).
+  - **1I/'Oumuamua** (2017): a bare, elongated, reddish rock that tumbles. It has no coma or tail, because none was ever seen. Its card mentions the small non-gravitational push found in its tracking.
+  - **2I/Borisov** (2019): a real comet. A coma and a dusty tail switch on inside ~6 AU and are strongest at perihelion (2.01 AU, 8 Dec 2019).
+  - **3I/ATLAS** (C/2025 N1): a comet with a coma, an ion tail and a dust tail around perihelion (1.36 AU, 29 Oct 2025).
+- **Paths drawn as open curves**, in violet/magenta so they read as "from outside". They run from 80 AU on the way in, past perihelion and back out to 80 AU, and fade out beyond ~25 AU. Bright dashes flow along each path in the direction of travel, like little arrows. The paths are drawn as a few pixels wide (screen-space ribbons, 2.6 px on desktop and 3.2 px on touch), so they stand out from the 1 px planet orbits. The Orbits and Comets checkboxes hide them.
+- **Info cards** (tap the label, search, or the list). Each card shows the designation, the discovery date and discoverer, the live distance from the Sun (falling in / at its closest / leaving for good, and for the two comets whether the coma is on), and the closest-to-Sun distance and date. A live **Speed** row comes from vis-viva and also shows the speed far from the Sun, **v∞**, worked out from the elements: 'Oumuamua 26.4 km/s, Borisov 32.3 km/s and 3I/ATLAS 58.0 km/s. Each card also has a short fact paragraph.
+- **Search and list.** Search finds `oumuamua`, `1I`, `A/2017 U1`, `borisov`, `2I`, `C/2019 Q4`, `3I`, `atlas`, `C/2025 N1` and `interstellar`, tagged "Interstellar visitor", and flies there, tracking the moving object. The visitors also sit in the ☄ Comets list group.
+- **Mini-map.** Each visitor is a dot in its own colour. Past 50 AU it sits on the rim as an arrowhead, like the Voyagers.
+- **Events timeline.** Three new violet markers: 'Oumuamua rounds the Sun (2017-09-09), Borisov (2019-12-08) and 3I/ATLAS (2025-10-29). Each jumps to that date and flies to the object with its card open.
+
+### Changed
+- `comets/index.js` now also handles e > 1. It solves the hyperbolic Kepler equation M = e sinh H − H by Newton's method from Danby's log starter. The mean motion is k/|a|^1.5, with elements in the same heliocentric J2000-ecliptic frame and `scaleDistance` compression as Halley and Hale-Bopp. The resulting paths and positions use the same frame and scaling. The `scale/` rebuild redraws the paths too.
+- On touch, comet labels keep their 44 px tap areas clear of the planets' labels (the placement test now includes the padding), so a tap on a comet label can't land on a neighbouring label.
+- Halley and Hale-Bopp are unchanged. There are no `main.js` changes: `createComets` already wires search, the mini-map, the Comets toggle and the scale tools.
+
+### Notes
+- **Elements:** from JPL's Small-Body Database API (`sbdb.api?sstr=1I|2I|3I&full-prec=1`, fetched 2026-10-15), cited in `comets/interstellar.js`: 'Oumuamua JPL solution 16 (2018-06-26), Borisov solution 54 (2024-06-24), 3I/ATLAS solution 54 (2026-02-19). Motion is pure two-body. The small non-gravitational terms in JPL's fits are not modelled.
+- **Checks** (headless; sim distances against SBDB q):
+  - 3I/ATLAS on 2025-10-29: 1.356 AU (q = 1.3565). 0.194 AU from Mars on 2025-10-03, and 1.80 AU from Earth on 2025-12-19, both matching the published close passes.
+  - 'Oumuamua on 2017-09-09: 0.256 AU (q = 0.2559).
+  - Borisov on 2019-12-08: 2.007 AU (q = 2.0065).
+  - Positions stay finite at 1000-01-01 and 3000-12-31.
+- Tested on desktop 1280×800 and iPad Pro 11 portrait + landscape (touch):
+  - The page loads with zero console errors.
+  - Each visitor can be found in search, focused, and shows its card. A label tap opens the card.
+  - Halley search/focus, Saturn focus and the galaxy view (in and back) still work, and so does the 3I/ATLAS event.
+- Screenshots: `screenshot-interstellar.png` (new): 3I/ATLAS at perihelion with its coma, tail, path and card.
+
 ## 2026-10-14: Real Moon phases and Galilean moon longitudes (Space Model Coder)
 
 ### Fixed

@@ -39,12 +39,15 @@ const EVENTS = [
   ['2006-08-24', 'Pluto is reclassified as a dwarf planet', 'Pluto', 'body'],
   ['2012-08-25', 'Voyager 1 reaches interstellar space', 'Voyager 1', 'craft'],
   ['2015-07-14', 'New Horizons flies past Pluto', 'Pluto', 'craft', 'New Horizons'],
+  ['2017-09-09', "'Oumuamua, the first known interstellar object, rounds the Sun", "1I/'Oumuamua", 'visitor'],
   ['2018-11-05', 'Voyager 2 reaches interstellar space', 'Voyager 2', 'craft'],
+  ['2019-12-08', 'Interstellar comet 2I/Borisov rounds the Sun', '2I/Borisov', 'visitor'],
   ['2022-01-24', 'JWST arrives at Sun–Earth L2', 'James Webb Space Telescope', 'craft'],
   ['2024-12-24', "Parker Solar Probe's record close pass of the Sun", 'Parker Solar Probe', 'craft'],
+  ['2025-10-29', 'Interstellar comet 3I/ATLAS rounds the Sun', '3I/ATLAS', 'visitor'],
   ['2061-07-28', "Halley's Comet returns", "Halley's Comet", 'comet'],
 ].map(([date, title, target, kind, card]) => ({ date, title, target, kind, card, ms: Date.parse(date + 'T12:00:00Z') }));
-const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', body: '#d9b99a' };
+const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', visitor: '#e98cff', body: '#d9b99a' };
 
 export function createUI(o) {
   const { bodies, camera, scaleDistance } = o;
@@ -225,7 +228,7 @@ export function createUI(o) {
     picks = [{ x: C, y: C, name: 'Sun', w: 2 }];
     ctx.shadowColor = '#ffb347'; ctx.shadowBlur = 8; dot(C, C, 3.6, '#ffd27a'); ctx.shadowBlur = 0;
     for (const b of dwarfs) mark(keplerAU(b.info, days, _p), 1.8, b.info.color || '#cccccc', b.name);
-    for (const it of o.comets?.items || []) if (it.posAU && it.posAU.lengthSq() > 0) mark(it.posAU, 1.8, '#c9f2ff', it.info.name);
+    for (const it of o.comets?.items || []) if (it.posAU && it.posAU.lengthSq() > 0) mark(it.posAU, 1.8, it.info.hyperbolic ? it.info.color : '#c9f2ff', it.info.name);
     for (const it of o.spacecraft?.items || []) {
       if (it.kind !== 'craft' || !it.active || !it.posAU || it.posAU.lengthSq() < 0.01) continue;        // JWST/ISS ride with Earth
       mark(it.posAU, 2.4, '#8fe3ff', it.name, 'craft');

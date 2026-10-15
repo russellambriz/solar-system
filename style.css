@@ -386,3 +386,6 @@ body.touch .tl-strip { height: 44px; }
 .tl-cap { font-size: 12px; color: #ffe2a8; line-height: 1.35; margin-top: 4px; }
 .tl-cap:empty { display: none; }
 @media (max-width: 600px) { #controls .panel-head { gap: 4px; } }
+/* Interstellar visitors (comets/interstellar.js): violet/magenta, "from outside" */
+.label.comet-label.visitor-label { color: #f3c8ff; border-color: rgba(230, 130, 255, 0.55); background: rgba(26, 6, 34, 0.62); }
+.label.comet-label.visitor-label.active { border-color: #ffd27a; color: #ffd27a; }
