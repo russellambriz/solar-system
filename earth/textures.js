@@ -3,13 +3,14 @@
 // Three tiers live in textures/earth/:
 //   mobile/   1024×512  day, night lights, water mask, clouds (no normal map; iPad/phones)
 //   desktop/  2048×1024 day, night lights, water mask, clouds + a normal map   (first paint / fallback)
-//   desktop/  4096×2048 earth_{day,night,water,clouds}_4k.jpg                 (progressive upgrade)
+//   desktop/  4096×2048 earth_{day,night,water,clouds,normal}_4k.jpg          (progressive upgrade)
 //
 // Desktop loads the 2K set first; once its day + night maps are on screen and the GPU can take 4096² textures
 // (and the device is not touch-first), the 4K day/night maps are fetched, decoded off the main thread where
 // createImageBitmap exists, pre-uploaded with renderer.initTexture(), and only then swapped in. The 4K water mask
 // and cloud map follow right after (same path), so the ocean glint, coastlines and cloud shadows stay as sharp as
 // the 4K surface. The 4K cloud map is level-matched to the 2K one, so the swap does not change cloud density.
+// The 4K normal map (GEBCO_08 relief, same exaggeration as the 2K one) comes last.
 //
 // Paths are resolved relative to this module, so the site keeps working from a subpath
 // (e.g. https://user.github.io/solar-system/).
@@ -22,6 +23,7 @@ const HI_RES = {
   night:  { file: 'earth_night_4k.jpg',  srgb: true  },
   water:  { file: 'earth_water_4k.jpg',  srgb: false },
   clouds: { file: 'earth_clouds_4k.jpg', srgb: false },
+  normal: { file: 'earth_normal_4k.jpg', srgb: false },   // land relief (tangent space: R east, G north)
 };
 
 /**
