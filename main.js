@@ -24,6 +24,7 @@ import { createSearch } from './search/index.js';
 import { createPerfGuard } from './perf/index.js';
 import { createScaleTools } from './scale/index.js';
 import { createUI } from './ui/index.js';
+import { createConstellations } from './constellations/index.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -587,6 +588,7 @@ let starfield;
 // Milky Way sky band (galactic plane tilted ~60° to the ecliptic, center toward Sagittarius)
 const skyBand = createSkyBand({ isTouch: IS_TOUCH, renderer });
 scene.add(skyBand.group);
+const constellations = createConstellations({ scene, renderer, isTouch: IS_TOUCH }); // constellations/: bright stars + IAU stick figures at infinity
 
 // spacecraft/: Voyager 1 & 2, New Horizons, Parker Solar Probe, JWST, ISS, and the Apollo/Artemis sites on the Moon
 const spacecraft = createSpacecraft({ scene, bodies, renderer, isTouch: IS_TOUCH, scaleDistance, orbitLines });
@@ -644,6 +646,7 @@ $('toggle-labels').addEventListener('change', (e) => (labelRenderer.domElement.s
 $('toggle-asteroids').addEventListener('change', (e) => (asteroidBelt.visible = e.target.checked));
 $('toggle-kuiper').addEventListener('change', (e) => (kuiperBelt.visible = e.target.checked));
 $('toggle-milkyway').addEventListener('change', (e) => (skyBand.group.visible = e.target.checked));
+$('toggle-constellations')?.addEventListener('change', (e) => constellations.setEnabled(e.target.checked));
 $('overview-btn').addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy() : goOverview()));
 $('galaxy-btn').addEventListener('click', () => (mode === 'galaxy' ? exitGalaxy() : enterGalaxy()));
 $('andromeda-btn').addEventListener('click', () => {
@@ -1581,6 +1584,7 @@ function animate() {
   scaleTools.update((simTime - J2000) / DAY_MS, camera, activeScene === galaxy.scene);
   ui.update((simTime - J2000) / DAY_MS, camera, activeScene === galaxy.scene);
   dateEl.textContent = 'Date: ' + new Date(simTime).toISOString().slice(0, 10) + (paused || daysPerSecond === 0 ? '  ⏸' : '');
+  constellations.update(camera, { mode, transition, inSolarScene: activeScene === scene });
   renderer.render(activeScene, camera);
   declutterLabels();
   labelRenderer.render(activeScene, camera);
@@ -1625,4 +1629,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui };
+window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations };

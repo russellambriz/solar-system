@@ -389,3 +389,9 @@ body.touch .tl-strip { height: 44px; }
 /* Interstellar visitors (comets/interstellar.js): violet/magenta, "from outside" */
 .label.comet-label.visitor-label { color: #f3c8ff; border-color: rgba(230, 130, 255, 0.55); background: rgba(26, 6, 34, 0.62); }
 .label.comet-label.visitor-label.active { border-color: #ffd27a; color: #ffd27a; }
+
+/* constellations/: small, dim constellation names; never steal taps from planets but keep 44px targets on touch */
+.label.const-label { font-size: 9.5px; padding: 1px 5px; color: #9fb4e0; background: transparent; border-color: transparent; letter-spacing: 0.04em; pointer-events: none; opacity: 0.55; }
+body.touch .label.const-label { font-size: 10.5px; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; }
+body.touch .label.const-label::before { inset: 0; }
+.label.const-label.overlap { opacity: 0 !important; }

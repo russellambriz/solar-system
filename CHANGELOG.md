@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-15: Constellations (constellations/)
+
+### Added
+- **Real bright stars** (V ≤ 5.0: 1,627 on desktop, 921 to V 4.5 on touch) at their true J2000 RA/Dec, rotated into the scene's ecliptic frame by 23.44°. Each star is tinted by its B-V colour index (Betelgeuse orange, Rigel blue-white) and sized by magnitude. One Points draw.
+- **Stick figures for all 88 IAU constellations** as faint lines (one LineSegments draw) and small, dim name labels (`.label.const-label`, 44 px touch targets, hidden where they would overlap other labels).
+- The sky sphere is re-centred on the camera every frame (at infinity, no distortion at true distances or during fly-tos), drawn in the opaque pass right after the Milky Way band with depthTest/depthWrite off, so planets, rings and night sides always cover it. It fades out with the transition progress on the way to the galaxy view and stays hidden in the galaxy, Andromeda and TON 618 views.
+- **Constellations** checkbox in Layers (on by default). `window.solar.constellations` for the console.
+- Data embedded in `constellations/data.js` (≈44 KB, no runtime fetch): d3-celestial by Olaf Frohn (BSD-3-Clause), stars from HYG/Hipparcos.
+
 ## 2026-10-15: Interstellar visitors: 'Oumuamua, Borisov and 3I/ATLAS (Space Model Coder)
 
 ### Added
