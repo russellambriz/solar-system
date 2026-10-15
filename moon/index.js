@@ -15,6 +15,12 @@ const BASE = new URL('../textures/moon/', import.meta.url);
 const REAL_RATIO = 0.273;           // real Moon radius / Earth radius
 const OVERVIEW_RATIO = 0.5;         // what main.js draws at overview zoom (moonR = Earth radius * 0.5)
 
+// Selenographic lat/lon (deg, east-positive) -> unit vector in mesh space (+x = lon 0 facing Earth, +y = north, east = -z).
+function seleno(latDeg, lonDeg) {
+  const la = THREE.MathUtils.degToRad(latDeg), lo = THREE.MathUtils.degToRad(lonDeg);
+  return new THREE.Vector3(Math.cos(la) * Math.cos(lo), Math.sin(la), -Math.cos(la) * Math.sin(lo));
+}
+
 const _sun = new THREE.Vector3(), _earth = new THREE.Vector3(), _moon = new THREE.Vector3();
 
 function loadTex(file, srgb) {
@@ -44,8 +50,20 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uEarthLit: { value: 0.5 },                              // how much of Earth's day side faces the Moon (0..1)
     uEarthTint: { value: new THREE.Color(0.55, 0.66, 0.9) }, // replaced by EarthBot's shared uniform when available
     uEarthshine: { value: 0.3 },                             // scaled for EarthBot's uEarthTint (~0.31 grey-blue)
+    // Bright ray craters (analytic, on top of the LRO albedo; strongest near full Moon). 0 turns them off.
+    uRayStrength: { value: 1.0 },
+    uTycho: { value: seleno(-43.31, -11.36) },
+    uCopernicus: { value: seleno(9.62, -20.08) },
+    uKepler: { value: seleno(8.12, -38.01) },
+    uAristarchus: { value: seleno(23.73, -47.49) },
+    uTychoRayDir: { value: seleno(21.8, 17.9) },             // Bessel, in Mare Serenitatis: Tycho's famous long ray runs past it
+    // Close-up crater field: fades in below the maps' resolution once you fly close. 0 turns it off.
+    uDetail: { value: 1.0 },
+    uMapTexel: { value: (2 * Math.PI) / (isTouch ? 1024 : 2048) },   // updated when the 4K set streams in
   };
-  const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG });
+  // iPad: three size bands (down to ~3 km craters); desktop adds a fourth (~1.3 km) for the closest views.
+  const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG,
+    defines: { DETAIL_BANDS: isTouch ? 3 : 4 } });
 
   const lod = new THREE.LOD();
   const levels = isTouch ? [[96, 64, 0], [48, 32, 8], [24, 16, 40]] : [[160, 112, 0], [72, 48, 8], [24, 16, 40]];
@@ -103,7 +121,7 @@ export function updateMoon(moonBody, camera, sunLight, days) {
     moonBody.mesh.userData.hiRes = 'loading';
     let ready = 0;
     const map = loadHiRes('moon_color_4k.jpg', true), nrm = loadHiRes('moon_normal_4k.jpg', false);
-    function done() { if (++ready < 2) return; u.uMap.value = map; u.uNormalMap.value = nrm; moonBody.mesh.userData.hiRes = 'loaded'; }
+    function done() { if (++ready < 2) return; u.uMap.value = map; u.uNormalMap.value = nrm; u.uMapTexel.value = (2 * Math.PI) / 4096; moonBody.mesh.userData.hiRes = 'loaded'; }
     map.onReady = nrm.onReady = done;
   }
   moonBody.group.scale.setScalar(s);                       // mesh, pick sphere and label offset all live in this group

@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026-10-15: Close-up crater detail on the Moon (MoonBot)
+
+### Added
+- **Small craters up close.** Fly in to the Moon and the surface no longer turns into a soft blur where the NASA maps run out of pixels. A procedural field of small simple craters (about 1 to 20 km across: bowls with raised rims) fades in only below the maps' resolution, so it never doubles a real crater and never shimmers at normal viewing distances.
+  - Low Sun near the terminator fills the bowls with sharp black shadows (computed analytically from the crater's depth and the Sun's height), and the far wall catches the light, as in Apollo and LRO photos.
+  - The bright highlands get more than twice the crater count of the younger, smoother maria. Most craters are old and shallow; a few are fresh, with bright ejecta.
+  - The biggest win is on iPad, where only the 1K maps load: the close-up view goes from mush to a cratered surface with no new downloads. Desktop gets it below the 4K maps' ~2.7 km texel.
+  - Cost: nothing at normal distances (skipped outright). Up close, up to 8 cell lookups per size band: 3 bands on iPad, 4 on desktop (`DETAIL_BANDS`).
+- `uDetail` uniform on the Moon material (`mesh.userData.moonUniforms.uDetail`, 1 by default, 0 turns it off).
+
+### Testing
+- `moon-shots/shoot.js` adds a closest-allowed close-up with the detail on and off, and `moon-shots/closeup.js` is a quick version of just that comparison. No console errors on desktop or iPad.
+
+## 2026-10-14: Clean full Moon, plus Kepler and Aristarchus rays (MoonBot)
+
+### Fixed
+- **No more black and white speckles on the full Moon.** Slopes turned away from the Sun were drawn as black dashes near full phase, and the disc's edge sparkled. On the real full Moon the eye looks straight down the sunbeam, so those slopes are hidden too and the disc looks flat. Relief contrast now grows with phase angle: a quarter of it at full Moon, all of it by about 35°. It also fades out right at the limb, where the relief map is squashed to a few pixels. Quarter and crescent crater shadows are unchanged.
+
+### Added
+- **Kepler** (8.1° N, 38.0° W) and **Aristarchus** (23.7° N, 47.5° W) ray systems, in the same analytic style as Tycho and Copernicus. Kepler's rays reach about 400 km and cross Copernicus's. Aristarchus, the brightest spot on the Moon, gets a short, tight fan. Both are strongest near full. No new textures.
+
+### Testing
+- `moon-shots/shoot.js` adds a Kepler/Aristarchus close-up and a full-Moon limb view. No console errors on desktop or iPad.
+
+## 2026-10-13: Bright ray craters on the Moon: Tycho and Copernicus (MoonBot)
+
+### Added
+- **Tycho's and Copernicus's ray systems** stand out at full Moon, the way they do through binoculars. They are drawn analytically in `moon/shaders.js` on top of the LRO colour map, with no new textures and no download cost on iPad.
+  - **Tycho** (43.3° S, 11.4° W): a bright ejecta halo and about 30 rays of mixed length, streaky and clumpy like real chains of secondary craters. The longest run more than 1,500 km. Its famous long ray crosses the near side past Bessel in Mare Serenitatis.
+  - **Copernicus** (9.6° N, 20.1° W): a denser, fainter, feathery fan out to about 800 km.
+  - Ray material is fresh, bright ejecta, so the rays depend on the phase angle. They are strongest near full, a faint trace at quarter and gone at crescent, where the terminator's shadows take over. Crescents and the earthshine side are unchanged.
+  - Cost: a few hash lookups per pixel, skipped entirely outside each crater's reach.
+- `uRayStrength` uniform on the Moon material (`mesh.userData.moonUniforms.uRayStrength`, 1 by default, 0 turns the rays off).
+
+### Testing
+- `moon-shots/shoot.js` pauses the sim and steps to the sim's next full Moon. It then shoots the near side and a Sun-side close-up of Tycho, with the rays on and off. No console errors on desktop or iPad.
+
 ## 2026-10-14: Real Moon phases and Galilean moon longitudes (Space Model Coder)
 
 ### Fixed
