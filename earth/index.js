@@ -65,7 +65,9 @@ const DEFAULTS = {
   specular: 0.15,         // glint strength (calm-sea peak ≈ 0.5 × sun before the knee → stays peaked)
   glintCap: 0.5,           // max glint radiance relative to the sun colour (desktop) — never a white disc
   glintCapMobile: 0.32,    // lower on the iPad tier (1K water mask, bigger blurrier hotspot)
-  glintShininess: 5000,    // calm-sea exponent (tight, small glint, ~1° lobe); rough patches drop to 60% of this
+  glintShininess: 5000,    // reference exponent (tight, small glint, ~1° lobe); the sea-state map scales it ×0.25…×1.6
+  seaState: 1.0,           // sea-state roughness map strength (calm gulfs / rough westerlies); 0 = uniform sea
+  sheen: 0.5,              // broad wind-roughened glint around the core (Cox–Munk-like); 0 = tight core only
   normalStrength: 1.0,     // × the baked relief (GEBCO_08, 20× vertical exaggeration; see SOURCES.md), land only
   ambient: 0.015,          // a bit below the scene's MeshStandard ambient so city lights read on the night side
 };
@@ -105,6 +107,8 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uSpecular:      { value: P.specular },
     uGlintCap:      { value: isMobile ? P.glintCapMobile : P.glintCap },
     uGlintShininess:{ value: P.glintShininess },
+    uSeaState:      { value: P.seaState },
+    uSheen:         { value: P.sheen },
     uNormalStrength:{ value: P.normalStrength },
     uAtmoColor:     { value: P.atmoColor },
     uAtmoIntensity: { value: P.atmoIntensity },
