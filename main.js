@@ -25,6 +25,7 @@ import { createPerfGuard } from './perf/index.js';
 import { createScaleTools } from './scale/index.js';
 import { createUI } from './ui/index.js';
 import { createConstellations } from './constellations/index.js';
+import { orientTilt } from './axes/index.js';
 
 // ---------------------------------------------------------------------------
 // Data (real values) — sizes/distances are scaled below for visibility
@@ -405,7 +406,7 @@ for (const p of PLANETS) {
   const dist = scaleDistance(p.au);
   const group = new THREE.Group();          // moves along the orbit (no rotation)
   const tiltGroup = new THREE.Group();      // axial tilt
-  tiltGroup.rotation.z = THREE.MathUtils.degToRad(p.tilt);
+  orientTilt(tiltGroup, p.name, p.tilt);    // axes/: +Y at the IAU north pole (Earth → Polaris)
   group.add(tiltGroup);
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 64, 48),
     new THREE.MeshStandardMaterial({ map: TEXTURES[p.name](), roughness: 0.95, metalness: 0 }));
@@ -500,7 +501,7 @@ for (const sb of SMALL_BODIES) {
   const radius = sb.name === 'Vesta' ? 0.22 : scaleRadius(sb.diameter);
   const group = new THREE.Group();          // heliocentric position (for Pluto: the Pluto–Charon barycenter)
   const tiltGroup = new THREE.Group();
-  tiltGroup.rotation.z = THREE.MathUtils.degToRad(sb.tilt);
+  orientTilt(tiltGroup, sb.name, sb.tilt);
   group.add(tiltGroup);
   scene.add(group);
   const sbOrbit = ellipseLine(sb, sb.group === 'belt' ? 0xa89a86 : 0x9d8cd9, sb.group === 'belt' ? 0.3 : 0.32);   // scale/ redraws it

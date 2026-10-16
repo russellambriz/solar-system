@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-15: Real planet spin axes (axes/)
+
+### Fixed
+- **Spin axes point at the real IAU north poles.** Every planet's tilt group (and Pluto's) is now oriented with a quaternion so its +Y is the body's IAU (WGCCRE 2015) north pole, converted from J2000 RA/Dec to the ecliptic frame. Before, `tiltGroup.rotation.z` leaned every axis toward ecliptic longitude 180°. Earth's axis now sits at λ 90°, β 66.56° and points at Polaris (0.74° away, as in the real sky). The north pole is lit at the June solstice (Sun 23.4° up) and dark in December.
+- Venus, Uranus and Pluto use their IAU north poles and keep negative spin periods, so they still turn retrograde. Parenting is unchanged: earth.group, the moon pivots and the Saturn and Uranus rings stay in their tilt groups. The Moon and the camera code are untouched.
+
 ## 2026-10-15: Constellations (constellations/)
 
 ### Added
