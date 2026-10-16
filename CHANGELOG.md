@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-15: Constellation names stay off planets (constellations/)
+
+### Fixed
+- Constellation name labels are now hidden wherever they fall over the projected disc of a planet, the Moon, a moon or the Sun. Each disc's screen radius comes from the body's geometry radius times its world scale, so the Moon's size easing is included. The check runs every 3 frames. Stars and lines needed no change: they are drawn first with depth testing off, so the opaque bodies already cover them.
+- Checked that the Apollo 11 marker sits on the Moon's surface at selenographic 0.67° N, 23.47° E, on the near side.
+
 ## 2026-10-15: Close-up crater detail on the Moon (MoonBot)
 
 ### Added
