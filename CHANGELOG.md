@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-16: No more seam down the Moon's far side (MoonBot)
+
+### Fixed
+- **The far side no longer has a vertical seam at longitude 180°.** The Moon's colour and relief maps wrap around in longitude, but they were filtered as if they stopped at the edge. Each side of the 180° meridian ended on its own edge texel with no blending, which drew a straight line from pole to pole with a step in the shading. It was worst on iPad, where the 1K maps are magnified most up close. The maps now repeat in longitude (`wrapS = RepeatWrapping`), so filtering blends across the wrap.
+- The relief maps' edge columns had been built with one-sided slopes, so they didn't quite match across the wrap either. They are now interpolated across it (1K, 2K and 4K; the rest of each map is unchanged). See `textures/moon/SOURCES.md`.
+
+### Testing
+- New far-side check (`moon-shots/seam.js`): it pauses at a date when the Sun is low over longitude 180° and shoots it close up, from orbit and toward the north, on desktop and iPad. The seam is gone in both. `moon-shots/shoot.js` still passes with no console errors.
+
 ## 2026-10-15: Constellation names stay off planets (constellations/)
 
 ### Fixed

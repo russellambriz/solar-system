@@ -10,3 +10,7 @@ Equirectangular, longitude 0 at the image center (that point faces Earth when th
 Desktop close-up set (streamed in when the camera gets near the Moon):
 - `moon_color_4k.jpg`: `lroc_color_poles_4k.tif` from the same kit.
 - `moon_normal_4k.jpg`: generated from `ldem_16.tif` (16 px/deg LOLA elevation, resampled to 4096x2048), slopes exaggerated 2.5x.
+
+2026-10-16: the normal maps' first and last columns (longitude 180°, the far side) were rebuilt by interpolating
+across the wrap. They had been made with one-sided slopes, so they didn't match each other across the seam.
+Nothing else in the maps changed. The maps are sampled with repeat wrapping in longitude.

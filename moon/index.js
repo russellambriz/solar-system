@@ -23,15 +23,20 @@ function seleno(latDeg, lonDeg) {
 
 const _sun = new THREE.Vector3(), _earth = new THREE.Vector3(), _moon = new THREE.Vector3();
 
+// The maps wrap around in longitude, so filtering at the 180° meridian (the u = 0/1 edge on the far side) must
+// blend the left and right edge columns. With the default clamp each side stopped at its own edge texel, which
+// drew a hard vertical seam down the far side, worst on iPad's magnified 1K maps.
+function wrapLon(t) { t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; return t; }
+
 function loadTex(file, srgb) {
-  const t = new THREE.TextureLoader().load(new URL(file, BASE).href);
+  const t = wrapLon(new THREE.TextureLoader().load(new URL(file, BASE).href));
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.anisotropy = 4;
   return t;
 }
 
 function loadHiRes(file, srgb) {
-  const tex = new THREE.TextureLoader().load(new URL(file, BASE).href, () => tex.onReady && tex.onReady());
+  const tex = wrapLon(new THREE.TextureLoader().load(new URL(file, BASE).href, () => tex.onReady && tex.onReady()));
   tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   tex.anisotropy = 8;
   return tex;
