@@ -101,20 +101,38 @@ export function createConstellations({ scene, renderer, isTouch = false } = {}) 
 
   let enabled = true, fade = 1, lastMode = 'solar', outgoing = true, frame = 0;
   const own = new Set(labels);
+  const _bp = new THREE.Vector3(), _bs = new THREE.Vector3();
+  let lastCamera = null;
   function setEnabled(on) { enabled = on; group.visible = on && fade > 0.001; }
 
   function hideOverlaps() {
-    const layer = labels[0]?.parentElement;  // CSS2DRenderer root
+    const layer = labels.find((e) => e.parentElement)?.parentElement;  // CSS2DRenderer root
     if (!layer) return;
     const rects = [];
     for (const el of layer.querySelectorAll('.label')) {
       if (own.has(el) || el.classList.contains('overlap') || el.classList.contains('off') || el.style.display === 'none') continue;
       const r = el.getBoundingClientRect(); if (r.width) rects.push(r);
     }
+    // projected discs of planets / moons / Sun (window.solar.bodies; each body's mesh world radius -> screen radius)
+    const discs = [], bodies = window.solar?.bodies, cam = lastCamera;
+    if (bodies && cam) {
+      const k = innerHeight / 2 / Math.tan(cam.fov * D2R / 2);
+      for (const b of bodies) {
+        if (!b.mesh || !b.radius) continue;
+        b.mesh.getWorldPosition(_bp); const d = _bp.distanceTo(cam.position);
+        b.mesh.getWorldScale(_bs);
+        const gr = b.mesh.geometry?.parameters?.radius || b.radius;   // geometry radius x world scale (Moon size easing lives in a parent scale)
+        const rpx = (gr * _bs.x) / Math.max(d, 1e-6) * k;
+        if (rpx < 3) continue;
+        _bp.project(cam); if (_bp.z > 1) continue;
+        discs.push([(_bp.x + 1) / 2 * innerWidth, (1 - _bp.y) / 2 * innerHeight, rpx * 1.08]);
+      }
+    }
     for (const el of labels) {
       if (el.style.display === 'none') continue;
       const r = el.getBoundingClientRect();
-      const hit = rects.some((p) => r.left < p.right + 4 && r.right > p.left - 4 && r.top < p.bottom + 4 && r.bottom > p.top - 4);
+      const hit = rects.some((p) => r.left < p.right + 4 && r.right > p.left - 4 && r.top < p.bottom + 4 && r.bottom > p.top - 4) ||
+        discs.some(([x, y, rr]) => { const nx = Math.max(r.left, Math.min(x, r.right)), ny = Math.max(r.top, Math.min(y, r.bottom)); return (nx - x) ** 2 + (ny - y) ** 2 < rr * rr; });
       el.classList.toggle('overlap', hit);
     }
   }
@@ -130,13 +148,15 @@ export function createConstellations({ scene, renderer, isTouch = false } = {}) 
     fade = target;
     group.visible = enabled && fade > 0.001;
     if (!group.visible) return;
+    lastCamera = camera;
     group.position.copy(camera.position);                       // at infinity
     group.scale.setScalar(camera.far * 0.45);
     sMat.uniforms.uOpacity.value = fade;
     lMat.color.copy(baseLineColor).multiplyScalar(fade);
     const op = String(0.55 * fade);
-    if ((frame++ % 6) === 0) { for (const el of labels) el.style.opacity = op; hideOverlaps(); }
+    if ((frame++ % 3) === 0) { for (const el of labels) el.style.opacity = op; hideOverlaps(); }
   }
 
-  return { group, points, lines, labels, update, setEnabled, raDecToScene, get starCount() { return n; }, get fade() { return fade; } };
+  const api = { group, points, lines, labels, update, setEnabled, raDecToScene, get starCount() { return n; }, get fade() { return fade; } };
+  return api;
 }
