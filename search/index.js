@@ -31,6 +31,8 @@ const LANDMARKS = [
 const ALIASES = {
   Sun: ['sol', 'star'], Moon: ['luna'], 'James Webb Space Telescope': ['jwst', 'webb'], 'International Space Station': ['iss', 'space station'],
   'Parker Solar Probe': ['parker', 'psp'], "Halley's Comet": ['halley', '1p', '1p/halley'], 'Comet Hale-Bopp': ['hale bopp', 'c/1995 o1'],
+  "1I/'Oumuamua": ['oumuamua', '1i', '1i oumuamua', 'a/2017 u1', '1i/2017 u1', 'interstellar'], '2I/Borisov': ['borisov', '2i', '2i borisov', 'c/2019 q4', 'interstellar'],
+  '3I/ATLAS': ['3i', 'atlas', '3i atlas', 'c/2025 n1', 'interstellar'],
   'Andromeda Galaxy (M31)': ['m31', 'andromeda'], 'Sombrero Galaxy (M104)': ['m104', 'sombrero'], 'Sagittarius A*': ['sgr a*', 'sgr a', 'black hole', 'galactic center'],
   'TON 618': ['quasar', 'ton618'], 'Milky Way': ['our galaxy', 'galaxy'], 'Large Magellanic Cloud (LMC)': ['lmc', 'magellanic'],
   'Small Magellanic Cloud (SMC)': ['smc', 'magellanic'], 'Triangulum Galaxy (M33)': ['m33', 'triangulum'], 'Artemis landing area': ['artemis', 'south pole'],
@@ -89,6 +91,7 @@ export function createSearch(api) {
   }
   for (const it of comets?.items || []) {
     add({ name: it.info.name, kind: 'comet', color: it.info.color, aliases: ALIASES[it.info.name], track: it,
+      sub: it.info.hyperbolic ? 'Interstellar visitor' : null,
       go: () => goTracked(it, () => Math.max(2.5, (it.ion?.userData.pts[0].distanceTo(it.ion.userData.pts.at(-1)) || 0) * 0.9), () => comets.showInfo(it.info.name)) });
   }
   const galaxyGo = (fn) => () => {

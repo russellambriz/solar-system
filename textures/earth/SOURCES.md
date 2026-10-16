@@ -71,9 +71,52 @@ Processing (Python/Pillow + numpy, ImageMagick 7 encode):
 | `desktop/earth_water.jpg`     | 2048×1024 | 187 KB |
 | `mobile/earth_water.jpg`      | 1024×512  | 64 KB |
 
-The 2K/1K **cloud** maps and the normal map below are unchanged.
+The 2K/1K **cloud** maps below are unchanged.
 
-## Clouds (2K/1K), normal map, old water mask — three.js example textures
+## Normal maps (desktop 4K + 2K) — from NASA GEBCO_08 topography (public domain)
+
+| File(s) | Source (exact URL) | Original |
+|---|---|---|
+| `desktop/earth_normal_4k.jpg`, `desktop/earth_normal.jpg` | NASA Visible Earth — *Blue Marble Next Generation: Topography* (GEBCO_08 land elevation): <https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73934/gebco_08_rev_elev_21600x10800.png> (record page: <https://visibleearth.nasa.gov/images/73934>) | 21600×10800 8-bit greyscale PNG, 18.4 MB (0 = sea level … 255 = 6400 m) |
+
+Licence as for the NASA maps above (public domain). Credit: *"Topography: NASA Earth Observatory, Blue Marble Next
+Generation (elevation from the GEBCO_08 Grid)."* Same plate-carrée layout as the day map and water mask (−180° at the left edge, north up).
+
+Processing — `tools/make_normal.py` (Python 3, Pillow + numpy), then ImageMagick 7:
+
+```
+python3 textures/earth/tools/make_normal.py gebco_08_rev_elev_21600x10800.png /tmp/n
+magick /tmp/n/n4096.png -strip -sampling-factor 4:4:4 -interlace Plane -quality 90 desktop/earth_normal_4k.jpg
+magick /tmp/n/n2048.png -strip -sampling-factor 4:4:4 -interlace Plane -quality 90 desktop/earth_normal.jpg
+```
+
+- Heights: elevation level × 6400/255 m, area-averaged (box filter) from 21600 to 4096 / 2048 wide in float, so
+  the 8-bit 25 m steps average out instead of terracing.
+- Anti-pinch: each row is low-passed along longitude (circular FFT, so the ±180° seam wraps) with
+  σ ≈ 0.5·(1/cos φ − 1) px, giving roughly isotropic ground resolution up to the poles.
+- Slopes: central differences in metres — east spacing 2πR·cos φ / W, north spacing πR / H — with a 20× vertical
+  exaggeration baked in (`n = normalize(−20·∂h/∂east, −20·∂h/∂north, 1)`). The 2K map uses the same exaggeration,
+  so the 2K → 4K swap only adds detail. Land |xy| percentiles (50/90/99 %): 4K 0.06 / 0.39 / 0.77, 2K 0.05 / 0.27 / 0.60.
+- Encoding: **R = east, G = north, B = up** (OpenGL/+Y), matching `earthMaterial.js` (T = east tangent,
+  B = cross(N, T) = north). Checked on the data: Himalaya south face mean normal points south (G < 0.5), Andes west
+  face points west (R < 0.5), east face east; seam column difference ≈ JPEG noise. Checked on screen with a
+  low morning Sun over India: the west-facing Western Ghats escarpment falls into shade. Ocean is ~flat in the map
+  (sea level = 0) and the shader masks relief by the water map anyway.
+- JPEG 4:4:4 (no chroma subsampling: R/G carry the slopes), q90, progressive.
+- `earthMaterial.js` uses `uNormalStrength` = 1.0 (`earth/index.js` DEFAULTS.normalStrength) on top of the baked 20×.
+
+| File | Size | Bytes |
+|---|---|---|
+| `desktop/earth_normal_4k.jpg` | 4096×2048 | 1.22 MB |
+| `desktop/earth_normal.jpg`    | 2048×1024 | 265 KB |
+
+Loading: the 2K normal map is part of the desktop first-paint set; the 4K one is the last map of the progressive 4K
+upgrade (`earth/textures.js`, desktop only, `?earth4k=0|1`). iPad/mobile has no normal map.
+
+The previous normal map (three.js `earth_normal_2048.jpg`, below) was replaced on 2026-10-15: it was softer and its
+green channel was the opposite (DirectX, +G = south) convention, so north/south-facing slopes were lit backwards.
+
+## Clouds (2K/1K), old normal map, old water mask — three.js example textures
 
 These were downloaded from the three.js repository at tag **r160**:
 `https://github.com/mrdoob/three.js/tree/r160/examples/textures/planets`
@@ -89,14 +132,14 @@ three.js example textures (MIT)."*
 |-----------------------------|-------------|---------------------------------------------------------------|
 | `earth_specular_2048.jpg`   | 2048×1024   | former `earth_water.jpg`; now only the inland-lake source for the NASA mask above |
 | `earth_clouds_2048.png`     | 2048×1024   | `earth_clouds.jpg` (its **alpha** channel → greyscale coverage)|
-| `earth_normal_2048.jpg`     | 2048×1024   | `earth_normal.jpg` (tangent-space normal map, desktop only)   |
+| `earth_normal_2048.jpg`     | 2048×1024   | former `earth_normal.jpg` (replaced 2026-10-15 by the GEBCO normal map above) |
 
 The Solar System Scope 4096 maps that also live in that folder (`earth_day_4096.jpg`, `earth_night_4096.jpg`,
 `earth_bump_roughness_clouds_4096.jpg`, CC BY 4.0) were deliberately **not** used.
 
 ### Processing (sharp / libvips, mozjpeg)
 
-- `desktop/` — 2048×1024: water q85 greyscale, clouds q85 greyscale (alpha extracted), normal q88.
+- `desktop/` — 2048×1024: water q85 greyscale, clouds q85 greyscale (alpha extracted), (former) normal q88.
 - `mobile/`  — 1024×512 (Lanczos downscale) of the same, no normal map.
 - PNG → JPEG conversion keeps the 2048 cloud map at ~0.4 MB instead of 4.4 MB.
 

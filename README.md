@@ -21,6 +21,7 @@ An interactive 3D model of the solar system that runs in your browser. It's buil
 - **Solar flares**: zoom into the Sun to see its boiling granulated surface, sunspots, glowing prominence loops, and random solar flares and CMEs erupting off the edge
 - **Spacecraft**: Voyager 1 and 2, New Horizons (with their paths past the planets they visited), Parker Solar Probe on its 88-day orbit and JWST at Sun–Earth L2, at approximate real positions for the shown date; the ISS circling Earth (shown at ~1,500 km instead of ~420 km so it clears the surface); and markers for the six Apollo landing sites and the planned Artemis south-pole landing area, which appear when you zoom in on the Moon. Tap any label for facts; the Layers group has a checkbox for each
 - **Comets**: Halley's Comet and Hale-Bopp on their real elliptical orbits, with a blue ion tail pointing straight away from the Sun and a curved dust tail, both growing as the comet nears the Sun (Halley's next visit is 2061). Tap a comet's label for facts; Layers has a Comets checkbox
+- **Interstellar visitors**: 1I/'Oumuamua (2017), 2I/Borisov (2019) and 3I/ATLAS (2025) on their real open (hyperbolic) paths from JPL, drawn as violet/magenta curves with dashes flowing in their direction of travel. 'Oumuamua is a bare, elongated reddish rock; Borisov and 3I/ATLAS grow a coma and tail near the Sun. Their cards show the live distance and speed, and the speed they keep far from the Sun (v∞)
 - **Andromeda & the Local Group**: zoom even farther out (or press 🔭 Andromeda / `A`) to see the Andromeda Galaxy (M31) with its companions M32 and M110, shown at its true distance of ~2.5 million light-years
 - **Magellanic Clouds & Triangulum (M33)**: the Large and Small Magellanic Clouds (~160,000 and ~200,000 light-years, joined by the Magellanic Bridge) and the Triangulum Galaxy (~2.7 million light-years, near Andromeda) at their true distances and sizes in the galaxy view. Tap one or its label to fly there; Layers has an LMC · SMC · M33 checkbox
 - **Scale slider**: morph from the comfortable compressed view to true distance ratios (with a live "Neptune is drawn N× too close" readout), and watch the planets spread out
@@ -89,7 +90,7 @@ The first load needs internet access, because Three.js comes from the jsDelivr C
 - `perf/`: frame-rate guard that thins particle clouds on slow devices
 - `ephemeris/`: JPL Keplerian elements for the planets (real positions and tilted, eccentric orbits for any date from 3000 BC to 3000 AD) and the Controls date picker
 - `spacecraft/`: spacecraft positions (flyby trajectories, Parker's Kepler orbit, JWST's L2 halo loop, the ISS via `earth.latLonToWorld`), small procedural models, the Moon landing sites (via `moon.latLonToWorld`), their labels and info cards
-- `comets/`: Halley's and Hale-Bopp's orbits (robust Kepler solver), coma, ion and dust tails, labels and info cards
+- `comets/`: Halley's and Hale-Bopp's orbits (robust Kepler solver), coma, ion and dust tails, labels and info cards; `comets/interstellar.js` holds the JPL elements of the three interstellar visitors (hyperbolic Kepler solver in `comets/index.js`)
 - `style.css`: dark space-themed UI that adapts to touch screens
 - `.nojekyll`: tells GitHub Pages to serve the files as they are
 

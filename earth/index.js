@@ -66,7 +66,7 @@ const DEFAULTS = {
   glintCap: 0.5,           // max glint radiance relative to the sun colour (desktop) — never a white disc
   glintCapMobile: 0.32,    // lower on the iPad tier (1K water mask, bigger blurrier hotspot)
   glintShininess: 5000,    // calm-sea exponent (tight, small glint, ~1° lobe); rough patches drop to 60% of this
-  normalStrength: 0.9,
+  normalStrength: 1.0,     // × the baked relief (GEBCO_08, 20× vertical exaggeration; see SOURCES.md), land only
   ambient: 0.015,          // a bit below the scene's MeshStandard ambient so city lights read on the night side
 };
 
