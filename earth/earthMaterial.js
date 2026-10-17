@@ -3,7 +3,10 @@
 // Per fragment:
 //   • day map lit by the Sun (Lambert, optional normal map on land), with a soft, slightly reddened terminator
 //   • night city lights that fade in across the terminator (and are dimmed under thick cloud)
-//   • ocean sun glint (normalised Blinn-Phong + Fresnel, noise-varied roughness) masked by the water map
+//   • ocean sun glint (normalised Blinn-Phong + Fresnel) masked by the water map, with a sea-state roughness map:
+//     calm enclosed seas / sheltered coasts (from a blurred lookup of the water mask), rough trade-wind belts and
+//     Southern Ocean westerlies, choppier water under cloud (storms), small noise patches, and no glint on sea ice;
+//     a tight core lobe plus a broad wind-roughened sheen around it whose width follows that roughness
 //   • soft cloud shadows: the cloud texture is sampled a little "towards the Sun" from each point, in the cloud
 //     layer's frame with the same latitude drift (CLOUD_FLOW), so the shadows move with the clouds and fall on the
 //     anti-sun side
@@ -61,6 +64,8 @@ uniform float uGlintShininess;  // Blinn-Phong exponent of the calmest sea
 uniform float uNormalStrength;  // land relief strength (desktop only)
 uniform float uGlintCap;        // peak glint radiance (× sun colour); soft knee below it, never a flat white disc
 uniform float uDetail;          // 1 = close-up detail, 0 = overview (glint broadened, cloud shadows off)
+uniform float uSeaState;        // strength of the sea-state roughness map (0 = uniform sea, 1 = full)
+uniform float uSheen;           // strength of the broad wind-roughened glint (Cox–Munk-like sheen) around the core
 
 varying vec2 vUv;
 varying vec3 vObjDir;
@@ -78,6 +83,27 @@ ${VALUE_NOISE}
 float cloudCover(vec3 groundDir) {
   vec2 uv = dirToUv(normalize(uGroundToCloud * groundDir));
   return cloudFlow(uv, dFdx(vUv), dFdy(vUv)) * uCloudsReady;      // same drift as the cloud deck → shadows follow
+}
+
+// Sea-state roughness (0 = glassy, 1 = rough), driving the glint exponent. Large-scale terms only use data we
+// already have, so it costs two extra (coarse-mip) texture reads and no new maps:
+//   • wind climatology by latitude: calm doldrums (~0°) and horse latitudes (~30°), breezy trade-wind belts
+//     (~15°), rough westerlies (~50°), roughest in the Southern Ocean's "roaring forties / furious fifties"
+//   • storms: water under cloud is choppier (cloud cover is a cheap proxy for wind)
+//   • shelter: the water mask read at fixed coarse mip levels (~256 and ~64 texels around) is < 1 wherever land
+//     is within a few hundred km, so enclosed seas, gulfs and lee coasts come out calm and glassy. Explicit LODs
+//     (from textureSize) keep the blur radius the same on the 1K, 2K and 4K masks and at every zoom level.
+float seaRoughness(float phi, float cloud, float noise) {
+  float a = abs(phi);
+  float trades = exp(-((a - 0.26) * (a - 0.26)) / 0.012);
+  float west   = exp(-((a - 0.88) * (a - 0.88)) / 0.035) * (phi < 0.0 ? 1.0 : 0.7);
+  float wind = 0.22 + 0.30 * trades + 0.55 * west;
+  float lw = log2(max(float(textureSize(uWaterMap, 0).x), 1.0));
+  float open = 0.5 * textureLod(uWaterMap, vUv, max(lw - 8.0, 0.0)).r
+             + 0.5 * textureLod(uWaterMap, vUv, max(lw - 6.0, 0.0)).r;
+  float shelter = 1.0 - smoothstep(0.55, 0.97, open);         // 1 = enclosed / right by the coast
+  float r = wind + 0.30 * cloud + (noise - 0.5) * 0.45;
+  return clamp(r * mix(1.0, 0.3, shelter), 0.0, 1.0);
 }
 
 void main() {
@@ -123,15 +149,30 @@ void main() {
   vec3  H    = normalize(L + V);
   float NdH  = max(dot(N, H), 0.0);
   float VdH  = max(dot(V, H), 0.0);
-  float sea  = vnoise(vObjDir * 22.0) * 0.65 + vnoise(vObjDir * 61.0) * 0.35;  // 0..1 "calmness"
+  float sea  = vnoise(vObjDir * 22.0) * 0.65 + vnoise(vObjDir * 61.0) * 0.35;  // 0..1 noise patches
   sea = mix(0.5, sea, uDetail);                                                 // no sub-pixel noise far away
-  float shin = mix(uGlintShininess * 0.6, uGlintShininess, sea);
+  // sea state: glassy (×1.6 the exponent: smaller, brighter glint) … rough (×0.25: broad, dim sheen). The
+  // normalisation keeps the reflected energy comparable, so roughness reshapes the glint rather than hiding it.
+  float rough = seaRoughness((vUv.y - 0.5) * 3.14159265, overhead, sea);
+  float shin = uGlintShininess * exp2(mix(-0.35, mix(0.7, -2.0, rough), uSeaState));
+  // sea ice (white, unsaturated pixels in the day map that the water mask still calls ocean) has no glint
+  float ice = smoothstep(0.22, 0.45, min(day.r, min(day.g, day.b)));
   // overview: a broad, dim sheen instead of a sub-pixel glint (the normalisation keeps the energy comparable)
   shin = mix(60.0, shin, uDetail);
   float norm = (shin + 8.0) * 0.03978874;                                       // (n + 8) / (8π)
   float fres = 0.02 + 0.98 * pow(1.0 - VdH, 5.0);
   float glint = norm * pow(NdH, shin) * fres * max(NdLgeo, 0.0) * uSpecular;
-  glint *= water * term * (1.0 - shadow) * (1.0 - 0.85 * overhead) * mix(0.6, 1.0, uDetail);
+  // Broad sheen: a real sea is a mosaic of wave facets, so around the tight core the sunlight is also mirrored
+  // over a wide area whose size follows the wave-slope spread (Cox & Munk: σ² ≈ 0.003 + 0.005·wind; Blinn-Phong
+  // n ≈ 2/σ² → ~400 for a glassy gulf, ~50 for a gale). Rough water spreads it into a faint silvery haze, calm
+  // patches and sheltered seas light up as bright, sharp-edged areas inside it, as in astronaut photos.
+  // Wind streaks / slicks: value noise stretched ~3:1 along longitude (the mean wind runs roughly east–west), so
+  // inside the sheen the calm and rough lanes read as elongated bands rather than round blobs.
+  float streak = vnoise(vObjDir * vec3(26.0, 85.0, 26.0)) * 0.7 + vnoise(vObjDir * vec3(70.0, 210.0, 70.0)) * 0.3;
+  float roughB = clamp(rough + (smoothstep(0.3, 0.7, streak) - 0.5) * 0.9 * uDetail, 0.0, 1.0);
+  float nB = mix(420.0, 50.0, mix(0.45, roughB, uSeaState));
+  glint += (nB + 8.0) * 0.03978874 * pow(NdH, nB) * fres * max(NdLgeo, 0.0) * uSheen;
+  glint *= water * (1.0 - ice) * term * (1.0 - shadow) * (1.0 - 0.85 * overhead) * mix(0.6, 1.0, uDetail);
   // Gentle (Reinhard) knee with a low ceiling: ≈ linear for small values, approaches uGlintCap only very slowly,
   // so the lobe keeps its peaked profile instead of flattening into a uniform white plateau. The lobe is tight
   // (high exponent) and the strength low, so the typical peak stays below the knee; the colour is the Sun's
