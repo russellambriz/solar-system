@@ -50,7 +50,7 @@ within ~5 % of the old value, so `uEarthTint` was left unchanged (the Moon's ear
 | File(s) | Source (exact URL) | Original |
 |---|---|---|
 | `desktop/earth_water_4k.jpg`, `desktop/earth_water.jpg`, `mobile/earth_water.jpg` | NASA Visible Earth — *Blue Marble Next Generation: Bathymetry* (GEBCO): <https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73963/gebco_08_rev_bath_21600x10800.png> (record page: <https://visibleearth.nasa.gov/images/73963>) | 21600×10800 PNG, 35 MB (land = 255) |
-| `desktop/earth_clouds_4k.jpg` | NASA Visible Earth — *Blue Marble: Clouds*: <https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57747/cloud_combined_8192.tif> (record page: <https://visibleearth.nasa.gov/images/57747>) | 8192×4096 TIFF, 34 MB |
+| `desktop/earth_clouds_4k.jpg`, `desktop/earth_clouds.jpg`, `mobile/earth_clouds.jpg` (all three since 2026-10-17) | NASA Visible Earth — *Blue Marble: Clouds*: <https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57747/cloud_combined_8192.tif> (record page: <https://visibleearth.nasa.gov/images/57747>) | 8192×4096 TIFF, 34 MB |
 
 Processing (Python/Pillow + numpy, ImageMagick 7 encode):
 
@@ -60,18 +60,47 @@ Processing (Python/Pillow + numpy, ImageMagick 7 encode):
   (this drops the old mask's false "water" on Antarctic ice shelves and the Siberian Arctic coast). Water area,
   cos-latitude weighted: 69.6 %. Alignment check against `earth_day_4k.jpg`: correlation peaks at 0 px offset.
   2K and 1K masks are box downscales of the 4K mask. Greyscale progressive JPEG q90 (4K), q88 (2K), q86 (1K).
-- **Clouds**: greyscale, Lanczos 8192→4096, then a 256-step quantile map onto the old 2K cloud map's levels
-  (the 2K map is the same NASA pattern, correlation 0.991 before / 0.996 after, mean 66.8 vs 67.3), so the
-  shaders' `cloudCurve` and `uEarthTint` stay tuned. Greyscale progressive JPEG q80.
+- **Clouds** (2026-10-13 4K only; since 2026-10-17 all three tiers, cleaned) — `tools/clean_clouds.py`
+  (Python 3, Pillow + numpy):
+
+  ```
+  git show 8e4ba46:textures/earth/desktop/earth_clouds.jpg > ref2k.jpg     # the old three.js 2K map = level reference
+  python3 textures/earth/tools/clean_clouds.py cloud_combined_8192.tif ref2k.jpg /tmp/c
+  cp /tmp/c/earth_clouds_4k.jpg desktop/earth_clouds_4k.jpg
+  cp /tmp/c/earth_clouds_2k.jpg desktop/earth_clouds.jpg
+  cp /tmp/c/earth_clouds_1k.jpg mobile/earth_clouds.jpg
+  ```
+
+  1. **Dateline seam** (the visible artifact): the mosaic's left and right edges come from different satellite
+     passes, so at lon ±180° the clouds were cut off along a straight N–S line (most visible 0–30° S, e.g. east of
+     Fiji). Seam |Δ| / mean column |Δ| between 30° N and 50° S was 1.79 (4K), 1.91 (2K), 1.65 (1K), i.e. the
+     single worst column of every map. At 8192 px the jump excess D(y) (edge difference minus the slope continued
+     from both sides) is removed with a Laplace-like correction: each vertical frequency of D decays away from the
+     seam as exp(−d/L), L = 3/|k_y| clamped to 8…256 px, half on each side, so large-scale offsets blend over up to
+     ~11° of longitude and fine-scale mismatch over a few px (no smear band). After: 1.13 (4K), 1.28 (2K), 1.29 (1K),
+     ~70th–90th percentile of ordinary columns, so the seam is no longer distinguishable.
+  2. **Vertical swath stripes**: checked, none to remove. In square Hann tiles the 2D power of N–S stripes over the
+     diagonal directions at equal |k| is 0.70–1.09 at every octave (30° N – 50° S) in the source and in every
+     output (clouds are zonally elongated, so the E–W direction is the strong one), i.e. no periodic swath gain
+     striping, so no frequency-domain notch is applied (it would only remove real cloud texture). The mosaic's
+     short diagonal swath-gap edges are left untouched.
+  3. Lanczos downscale in float, longitude wrap-padded (so the resampling kernel sees across ±180°), to
+     4096 / 2048 / 1024, then a 256-step quantile map onto the old 2K map's levels, so `cloudCurve` and `uEarthTint`
+     stay tuned. All three tiers are now the same NASA pattern (the old three.js 2K/1K were a slightly different
+     version of it, correlation 0.996), so the 2K → 4K swap no longer shifts any cloud. Mean grey 67.33 for every
+     tier (old 2K 67.31, old 4K 66.86); cos-latitude-weighted cover > 100: 20.2 % (old 2K 20.0 %, old 4K 20.6 %).
+  4. Greyscale progressive JPEG q80 (Pillow, optimize): 4K 1.62 MB, 2K 452 KB, 1K 126 KB.
 
 | File | Size | Bytes |
 |---|---|---|
 | `desktop/earth_water_4k.jpg`  | 4096×2048 | 523 KB |
-| `desktop/earth_clouds_4k.jpg` | 4096×2048 | 1.67 MB |
+| `desktop/earth_clouds_4k.jpg` | 4096×2048 | 1.62 MB |
+| `desktop/earth_clouds.jpg`    | 2048×1024 | 452 KB |
+| `mobile/earth_clouds.jpg`     | 1024×512  | 126 KB |
 | `desktop/earth_water.jpg`     | 2048×1024 | 187 KB |
 | `mobile/earth_water.jpg`      | 1024×512  | 64 KB |
 
-The 2K/1K **cloud** maps below are unchanged.
+The 2K/1K **cloud** maps used to be the three.js ones below; since 2026-10-17 they come from the same NASA source.
 
 ## Normal maps (desktop 4K + 2K) — from NASA GEBCO_08 topography (public domain)
 
@@ -116,7 +145,7 @@ upgrade (`earth/textures.js`, desktop only, `?earth4k=0|1`). iPad/mobile has no 
 The previous normal map (three.js `earth_normal_2048.jpg`, below) was replaced on 2026-10-15: it was softer and its
 green channel was the opposite (DirectX, +G = south) convention, so north/south-facing slopes were lit backwards.
 
-## Clouds (2K/1K), old normal map, old water mask — three.js example textures
+## Old clouds (2K/1K), old normal map, old water mask — three.js example textures (no longer shipped)
 
 These were downloaded from the three.js repository at tag **r160**:
 `https://github.com/mrdoob/three.js/tree/r160/examples/textures/planets`
@@ -131,7 +160,7 @@ three.js example textures (MIT)."*
 | Original file (r160)        | Size        | Used as                                                       |
 |-----------------------------|-------------|---------------------------------------------------------------|
 | `earth_specular_2048.jpg`   | 2048×1024   | former `earth_water.jpg`; now only the inland-lake source for the NASA mask above |
-| `earth_clouds_2048.png`     | 2048×1024   | `earth_clouds.jpg` (its **alpha** channel → greyscale coverage)|
+| `earth_clouds_2048.png`     | 2048×1024   | former `earth_clouds.jpg` (its **alpha** channel → greyscale coverage); replaced 2026-10-17 by the cleaned NASA map above, still the grey-level reference |
 | `earth_normal_2048.jpg`     | 2048×1024   | former `earth_normal.jpg` (replaced 2026-10-15 by the GEBCO normal map above) |
 
 The Solar System Scope 4096 maps that also live in that folder (`earth_day_4096.jpg`, `earth_night_4096.jpg`,
