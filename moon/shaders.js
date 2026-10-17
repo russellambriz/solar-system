@@ -11,6 +11,12 @@
 // maria (the maria are younger, so they've collected fewer impacts). Each size band only appears where the map
 // can't already show real craters that size and where it's at least a few pixels wide, so nothing is doubled and
 // nothing shimmers. Skipped entirely at normal viewing distances.
+// Terrain shadows: near the terminator each pixel looks toward the Sun across the real LOLA elevation map and
+// finds its horizon, so mountains and crater rims cast long shadows, sunlit peaks and rims stand out past the
+// terminator (a peak 5 km up still sees the Sun when it has set ~4 degrees away on the flat), and deep basins go
+// dark early. The terminator is ragged, as it is through a telescope, instead of a clean curve. The edge of
+// every shadow is softened by the Sun's real size (half a degree across). Cost: up to SHADOW_STEPS height
+// lookups, only where the Sun is less than ~17 degrees up or just below the horizon; everywhere else is free.
 
 export const VERT = /* glsl */ `
 varying vec2 vUv;
@@ -43,6 +49,9 @@ uniform vec3 uAristarchus;
 uniform vec3 uTychoRayDir;    // far point of Tycho's long ray across Mare Serenitatis (past Bessel)
 uniform float uDetail;        // 0 turns the close-up crater field off
 uniform float uMapTexel;      // arc of one colour/relief texel at the equator (radians = 2*pi / map width)
+uniform sampler2D uHeightMap; // LOLA elevation, 10-bit in red (high byte) + green (low byte), see SOURCES.md
+uniform float uHeightTexel;   // arc of one height texel (radians = 2*pi / map width)
+uniform float uShadow;        // 0 = the old smooth terminator, 1 = terrain shadows from the height map
 varying vec2 vUv;
 varying vec3 vObjN;
 varying vec3 vWorldPos;
@@ -131,6 +140,37 @@ void craterBand(vec3 n, float F, float Rm, float amp, vec3 sunT, vec3 sunB, floa
   }
 }
 
+// Height above the 1737.4 km reference sphere, in Moon radii, at unit mesh-space direction p. Linear filtering of
+// the two bytes separately is still exact linear filtering of the 16-bit value (it's a weighted sum of both).
+const float H_LO = -9.5 / 1737.4, H_SPAN = 20.5 / 1737.4;   // the map's encoding range
+float heightAt(vec3 p) {
+  vec2 uv = vec2(0.5 + atan(-p.z, p.x) / 6.2831853, 0.5 + asin(clamp(p.y, -1.0, 1.0)) / 3.1415927);
+  vec2 rg = texture2D(uHeightMap, uv).rg;
+  return H_LO + H_SPAN * (rg.r * 65280.0 + rg.g * 255.0) / 65472.0;
+}
+
+// How much of the Sun's disc this point sees over the terrain (1 = all, 0 = in shadow). n = the point (unit, mesh
+// space), sunT = unit tangent pointing at the Sun, e = Sun elevation above the smooth-sphere horizon (radians),
+// pen = half-width of the shadow edge (the Sun's angular radius, or one pixel if that's wider). Walks the great
+// circle toward the Sun with growing steps (half a texel out to ~380 km) and keeps the highest horizon angle seen;
+// the Moon's curvature is in the geometry, so a high point sees past the smooth terminator.
+float sunVisibility(vec3 n, vec3 sunT, float e, float pen) {
+  if (e > 0.3) return 1.0;            // no slope in a ~5 km/texel map hides a Sun this high
+  if (e < -0.13) return 0.0;          // below the horizon even from the highest peak (dip = sqrt(2 h / R))
+  float r0 = 1.0 + heightAt(n);
+  float s = 0.5 * uHeightTexel;
+  float k = pow(0.22 / s, 1.0 / float(SHADOW_STEPS - 1));
+  float tanE = tan(e), tanStop = tan(e + pen), maxT = -1e3;
+  for (int i = 0; i < SHADOW_STEPS; i++) {
+    vec3 p = n * cos(s) + sunT * sin(s);
+    float r = 1.0 + heightAt(p);
+    maxT = max(maxT, (r * cos(s) - r0) / (r * sin(s)));   // tan of the elevation of that terrain point, seen from here
+    if (maxT > tanStop) return 0.0;   // the whole Sun is already hidden
+    s *= k;
+  }
+  return smoothstep(-pen, pen, e - atan(maxT));
+}
+
 void main() {
   vec3 n = normalize(vObjN);
   // three.js SphereGeometry: +u runs east along cross(up, n), +v runs north.
@@ -206,8 +246,18 @@ void main() {
   float photoSmooth = mix(cosI0, 2.0 * cosI0 / (cosI0 + cosE0 + 1e-4), Lw);
   float photo = mix(photoSmooth, photoRelief, relief * mix(0.25, 1.0, smoothstep(0.08, 0.6, g)));
   photo *= 1.0 + 0.25 * exp(-g / 0.06);                // opposition surge
-  // Sharp but not aliased terminator on the smooth sphere; relief adds the long crater shadows inside it.
-  photo *= smoothstep(-0.015, 0.04, dot(Ng, L));
+  // Terminator. The smooth-sphere version (sharp but not aliased) is the fallback; terrain shadows replace it with
+  // the real ragged edge, long mountain shadows and sunlit peaks past it (see sunVisibility).
+  float term = smoothstep(-0.015, 0.04, dot(Ng, L));
+  if (uShadow > 0.0) {
+    vec3 Lm = normalize(transpose(m) * L);                  // Sun direction in mesh space
+    float up = dot(Lm, n);
+    vec3 sT = Lm - n * up;
+    sT = length(sT) > 1e-5 ? normalize(sT) : east;
+    float pen = max(0.00465, 0.7 * pixArc);                 // the Sun is 0.53 degrees across
+    term = mix(term, sunVisibility(n, sT, asin(clamp(up, -1.0, 1.0)), pen), uShadow);
+  }
+  photo *= term;
   photo *= mix(1.0, crShade, relief);                  // small-crater bowl shadows (1 unless close up at low Sun)
   vec3 color = albedo * photo * uSunIntensity;
 

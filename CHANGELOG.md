@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-17: Real terrain shadows along the Moon's terminator (MoonBot)
+
+### Added
+- **The terminator is ragged now, the way it looks through a telescope.** Near the line between day and night, each pixel looks toward the Sun across NASA's LOLA elevation map and finds its own horizon. Mountains and crater rims cast long black shadows, crater floors stay dark until the Sun clears the rim, and sunlit peaks and rims stand out as bright specks past the terminator (a peak 5 km up still sees the Sun after it has set about 4° away on the flat). Before, the day side faded smoothly into night along a clean curve.
+  - Shadow edges are softened by the Sun's real size (about half a degree across), or one screen pixel if that's wider, so they're sharp without aliasing.
+  - New elevation maps: `moon_height_1k.png` (all devices, ~0.56 MB) and `moon_height_2k.png` (desktop only, streamed in with the 4K close-up set). See `textures/moon/SOURCES.md`.
+  - Cost: only where the Sun is less than ~17° up or just below the horizon, up to 40 height lookups per pixel on desktop and 24 on iPad (`SHADOW_STEPS`). Everywhere else it's skipped.
+- `uShadow` uniform on the Moon material (`mesh.userData.moonUniforms.uShadow`, 1 by default, 0 goes back to the smooth terminator).
+
+### Testing
+- New check `moon-shots/terminator.js`: it pauses at a first-quarter date with the Sun 2° up at the centre of the near side and shoots the whole disc, the Apennines and the southern highlands with shadows on and off, on desktop and iPad. `moon-shots/shoot.js` still passes with no console errors.
+
 ## 2026-10-16: No more seam down the Moon's far side (MoonBot)
 
 ### Fixed

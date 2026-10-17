@@ -35,6 +35,15 @@ function loadTex(file, srgb) {
   return t;
 }
 
+// Elevation map for terrain shadows: read exactly, so no mipmaps or colour conversion (see SOURCES.md for the encoding).
+function loadHeight(file, onReady) {
+  const t = wrapLon(new THREE.TextureLoader().load(new URL(file, BASE).href, onReady));
+  t.colorSpace = THREE.NoColorSpace;
+  t.minFilter = THREE.LinearFilter;
+  t.generateMipmaps = false;
+  return t;
+}
+
 function loadHiRes(file, srgb) {
   const tex = wrapLon(new THREE.TextureLoader().load(new URL(file, BASE).href, () => tex.onReady && tex.onReady()));
   tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
@@ -65,10 +74,14 @@ export function createMoonMesh({ radius, isTouch = false }) {
     // Close-up crater field: fades in below the maps' resolution once you fly close. 0 turns it off.
     uDetail: { value: 1.0 },
     uMapTexel: { value: (2 * Math.PI) / (isTouch ? 1024 : 2048) },   // updated when the 4K set streams in
+    // Terrain shadows from the LOLA elevation map (ragged terminator, sunlit peaks past it). 0 = smooth terminator.
+    uHeightMap: { value: loadHeight('moon_height_1k.png') },          // desktop adds the 2K map with the 4K stream
+    uHeightTexel: { value: (2 * Math.PI) / 1024 },
+    uShadow: { value: 1.0 },
   };
   // iPad: three size bands (down to ~3 km craters); desktop adds a fourth (~1.3 km) for the closest views.
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG,
-    defines: { DETAIL_BANDS: isTouch ? 3 : 4 } });
+    defines: { DETAIL_BANDS: isTouch ? 3 : 4, SHADOW_STEPS: isTouch ? 24 : 40 } });
 
   const lod = new THREE.LOD();
   const levels = isTouch ? [[96, 64, 0], [48, 32, 8], [24, 16, 40]] : [[160, 112, 0], [72, 48, 8], [24, 16, 40]];
@@ -126,7 +139,13 @@ export function updateMoon(moonBody, camera, sunLight, days) {
     moonBody.mesh.userData.hiRes = 'loading';
     let ready = 0;
     const map = loadHiRes('moon_color_4k.jpg', true), nrm = loadHiRes('moon_normal_4k.jpg', false);
-    function done() { if (++ready < 2) return; u.uMap.value = map; u.uNormalMap.value = nrm; u.uMapTexel.value = (2 * Math.PI) / 4096; moonBody.mesh.userData.hiRes = 'loaded'; }
+    const hgt = loadHeight('moon_height_2k.png', () => done());
+    function done() {
+      if (++ready < 3) return;
+      u.uMap.value = map; u.uNormalMap.value = nrm; u.uMapTexel.value = (2 * Math.PI) / 4096;
+      u.uHeightMap.value = hgt; u.uHeightTexel.value = (2 * Math.PI) / 2048;
+      moonBody.mesh.userData.hiRes = 'loaded';
+    }
     map.onReady = nrm.onReady = done;
   }
   moonBody.group.scale.setScalar(s);                       // mesh, pick sphere and label offset all live in this group
