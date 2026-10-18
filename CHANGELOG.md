@@ -1,5 +1,64 @@
 # Changelog
 
+## 2026-10-16: Famous asteroids and near-Earth objects (Space Model Coder)
+
+> Built on 2026-10-16 and re-verified on 2026-10-17 (with the two fixes listed under *Fixed (2026-10-17)* below); both runs stopped before committing. **Shipped 2026-10-18** after a further re-verification on top of EarthBot's cloud-seam commit (`39bba59`).
+
+### Added
+- **Seven famous asteroids on their real orbits** (new `asteroids/` module), in the same heliocentric J2000-ecliptic frame and `scaleDistance` compression as the comets and dwarf planets. They move correctly at any sim date from 1000 to 3000.
+  - **99942 Apophis**, with its **13 Apr 2029 flyby**, when it passes 31,600 km above Earth's surface (closer than geostationary satellites). Its elements switch from the pre-flyby set to the post-flyby set at closest approach, blended over ±1.5 days. Earth's pull stretches its orbit from a = 0.922 AU (a 324-day year) to 1.103 AU (423 days), and the card's orbit line shows that.
+  - **101955 Bennu** (OSIRIS-REx, sample landed 24 Sep 2023) and **162173 Ryugu** (Hayabusa2), both as "spinning tops" with an equatorial ridge.
+  - **65803 Didymos with its moonlet Dimorphos**, which circles it in Didymos's equatorial plane with a faint orbit ring. Dimorphos is tidally locked. The card covers DART (26 Sep 2022, orbit about 33 min shorter) and Hera's arrival in Nov 2026.
+  - **16 Psyche** (the metal-rich one, slightly metallic material; NASA's Psyche arrives Aug 2029) and **433 Eros** (a long bent peanut; NEAR Shoemaker landed on 12 Feb 2001).
+  - **2024 YR4**: its 3.1% Earth-impact scare in 2025, and its Moon impact chance ruled out by JWST in 2026.
+- **Procedural shapes** (`asteroids/shapes.js`): lumpy potatoes, spinning tops and bent two-lobed peanuts, with craters and boulders, built once with vertex colours. Each has about 3.6k vertices on desktop and 1.2k on touch, one draw call. They are enlarged so the shapes can be seen. They spin in real time at their real rotation periods, sped up ×900, about their real spin poles where known (Bennu, Ryugu and Didymos spin retrograde). Apophis tumbles.
+- **Each asteroid has:**
+  - a constant-size marker dot when tiny;
+  - a faint orbit in its own colour (follows the Orbits checkbox);
+  - a `.label` with 44 px touch targets that stays clear of planet and comet labels;
+  - an info card with designation and class, size, discovery, a live distance from the Sun with the orbit's range and period, a live true distance from Earth, and a short fact.
+- **Apophis near Earth.** The real gap can't be drawn with the planets 1,000× enlarged, so close to Earth the drawn position is pushed outside the globe along the true direction: L → L + 2R·e^(−L/2R). The pass swings around Earth instead of disappearing inside it. The card shows the model's two-body distance plus the real JPL figures within 20 days of the flyby: 21:46 UT, 38,011 km from the centre, 31,600 km above the surface, below geostationary orbit at 35,786 km.
+- **Search** finds names, numbers and designations (`apophis`, `99942`, `2004 MN4`, `101955`, `ryugu`, `dimorphos`, `dart`, `16 psyche`, `433`, `yr4`, `osiris rex`, `hayabusa2`, `neo`…), tagged "Near-Earth asteroid · …" / "Metal-rich asteroid". The fly-to tracks the moving object and lowers the zoom limit so you arrive close. It looks from the sunlit side, and next to Earth it frames Earth and the asteroid together. The camera then keeps following the asteroid while its card is open, until you pan, tap something else or close the card.
+- A **◇ Famous asteroids** group in the object list, coloured dots on the **mini-map**, and a **Famous asteroids** checkbox in Layers.
+- **Events timeline:** six new markers, each jumping to the date and flying to the asteroid with its card open:
+  - NEAR Shoemaker lands on Eros (2001-02-12)
+  - Hayabusa2 reaches Ryugu (2018-06-27)
+  - OSIRIS-REx grabs Bennu's sample (2020-10-20)
+  - DART hits Dimorphos (2022-09-26)
+  - **Apophis passes closer than geostationary satellites (2029-04-13)**
+  - 2024 YR4 misses the Moon (2032-12-22)
+
+### Fixed (2026-10-17, before shipping)
+- **Apophis flyby framing.** The Events marker and search used to park the camera so close that Earth spilled off the top of the screen, and Jupiter could loom right behind Apophis. The camera now backs off until Earth and Apophis both fit (using the narrower field-of-view axis, and further back on a portrait iPad). It picks one of 12 view directions around the Earth–Apophis line: the sunlit side, with no big planet disc behind, and with Apophis left of or below Earth. Then it slides the view so Apophis stays clear of the info card (on the right, or the bottom sheet on a portrait iPad) and the mini-map.
+- **Dimorphos's orbit ring now obeys Layers → Orbits.** The per-frame close-up visibility check used to switch it back on.
+
+### Changed
+- `comets/index.js` creates the asteroids and drives them (`update`, `rebuild` after a scale change, `comets.asteroids`), so **there are no `main.js` changes**. `search/` and `ui/` read `comets.asteroids` for search, the list group, the mini-map and the events.
+- `search/`: `goTracked` takes an optional view direction, aim offset and zoom limit (used only by the asteroids). The list groups can also be picked by a filter.
+
+### Notes
+- **Elements:**
+  - JPL Small-Body Database API (`sbdb.api?sstr=…&full-prec=1`, fetched 2026-10-16), all at epoch JD 2461200.5 (2026-06-09): Apophis solution 220, Ryugu 270, Didymos 240, Psyche 92, Eros 659, 2024 YR4 80.
+  - JPL Horizons: Bennu (SBDB lists solution 118 at a 2011 epoch, so its elements were taken osculating at 2461200.5) and Apophis after the flyby (osculating 2029-06-03).
+  - Flyby time and distance from JPL's close-approach API. All cited in `asteroids/data.js`.
+  - Pure two-body motion.
+  - Vesta and Ceres were already bodies in `smallbodies.js` and are not duplicated.
+- **Checks** (headless, against JPL Horizons at 12:00 UT):
+  - On 2022-09-26, 2026-10-16 and 2029-04-13, all distances from the Sun and Earth agree within 0.01 AU. Most agree within 0.001 AU, and today's within 0.0002 AU.
+  - The exception is 2024 YR4 before its discovery (0.05 AU off in 2022), because its 2024 Earth pass isn't modelled.
+  - Didymos is 0.077 AU from Earth on DART day (JPL 0.076).
+  - The raw two-body Apophis–Earth minimum is **27,800 km at 2029-04-13 22:05 UT** (JPL: 38,012 km at 21:46 UT).
+  - Positions stay finite at 1000-01-01 and 3000-12-31.
+- Tested on desktop 1280×800 and iPad Pro 11 portrait + landscape (touch):
+  - The page loads with zero console errors.
+  - Each asteroid can be found in search, focused and followed, with its card shown. A label tap opens the card, and no asteroid label overlaps a planet label.
+  - The Apophis event jumps to 2029-04-13 and frames Apophis beside Earth with its card.
+  - The Famous asteroids and Orbits toggles work.
+  - Halley search/focus, 3I/ATLAS, Saturn focus and the galaxy view (in and back) still work.
+- Re-run 2026-10-17 on desktop 1280×800 and iPad Pro 11 portrait + landscape: all of the above pass again with zero console errors, plus Dimorphos's ring hiding with Orbits off and the new flyby framing (Earth and Apophis both on screen, clear of the card and mini-map).
+- Re-run 2026-10-18, on top of EarthBot's cloud-seam commit (`39bba59`), on desktop 1280×800 and iPad Pro 11 portrait + landscape (touch): everything above passes again with **zero console errors or page errors** on all three. Search finds, focuses and follows `apophis`, `bennu`, `dimorphos` and `psyche` (and the rest), tapping the Psyche label opens its card, the Apophis 2029-04-13 marker frames Apophis beside Earth (drawn 2 Earth radii out) with its card, both toggles work, and Halley, 3I/ATLAS, Saturn focus, the Earth view and the galaxy view (in and back) still work.
+- Screenshots: `screenshot-asteroids.png` (new): Apophis passing Earth on 2029-04-13 with its card, as the Events marker frames it. `screenshot.png`, `screenshot-ipad.png` and `screenshot-ipad-portrait.png` refreshed (all four re-taken 2026-10-18).
+
 ## 2026-10-15: Constellation names stay off planets (constellations/)
 
 ### Fixed

@@ -5,10 +5,10 @@
 //    (or H) brings them back.
 //  • "Why is this not to scale?": the bottom-left notes start folded to one line and open on a tap (remembered).
 //  • Mini-map (Layers → Mini-map, or M): top-down view of the Solar System on a log distance scale with the planets'
-//    real orbits, the belts, dwarf planets, comets and probes (anything past 50 AU sits on the rim), plus where the
+//    real orbits, the belts, dwarf planets, comets, famous asteroids and probes (anything past 50 AU sits on the rim), plus where the
 //    camera is and which way it looks. Tap a dot to fly there. It moves clear of open panels and hides in the galaxy view.
 //  • Events (Controls, under the date): a 1965–2065 timeline with markers, ◀ ▶ and a list of flybys, comet visits and
-//    landings. Picking one jumps to that day, pauses, and flies to the object.
+//    landings, asteroid missions and Apophis's 2029 flyby. Picking one jumps to that day, pauses, and flies to the object.
 //  • Motion trails (Layers → Trails): each planet and dwarf planet trails the last eighth of its orbit, with dots at
 //    equal time steps; they spread out near the Sun, where it moves fastest (Kepler's second law).
 //  • Signal delay on the probes' labels while Layers → Distances is on (spacecraft.setSignalDelay).
@@ -36,18 +36,24 @@ const EVENTS = [
   ['1989-08-25', 'Voyager 2 flies past Neptune', 'Neptune', 'craft', 'Voyager 2'],
   ['1990-02-14', 'Voyager 1 takes the "Pale Blue Dot" photo of Earth', 'Voyager 1', 'craft'],
   ['1997-04-01', 'Comet Hale-Bopp rounds the Sun', 'Comet Hale-Bopp', 'comet'],
+  ['2001-02-12', 'NEAR Shoemaker lands on asteroid Eros', '433 Eros', 'asteroid'],
   ['2006-08-24', 'Pluto is reclassified as a dwarf planet', 'Pluto', 'body'],
   ['2012-08-25', 'Voyager 1 reaches interstellar space', 'Voyager 1', 'craft'],
   ['2015-07-14', 'New Horizons flies past Pluto', 'Pluto', 'craft', 'New Horizons'],
   ['2017-09-09', "'Oumuamua, the first known interstellar object, rounds the Sun", "1I/'Oumuamua", 'visitor'],
+  ['2018-06-27', 'Hayabusa2 arrives at asteroid Ryugu', '162173 Ryugu', 'asteroid'],
   ['2018-11-05', 'Voyager 2 reaches interstellar space', 'Voyager 2', 'craft'],
   ['2019-12-08', 'Interstellar comet 2I/Borisov rounds the Sun', '2I/Borisov', 'visitor'],
+  ['2020-10-20', 'OSIRIS-REx grabs a sample of asteroid Bennu', '101955 Bennu', 'asteroid'],
   ['2022-01-24', 'JWST arrives at Sun–Earth L2', 'James Webb Space Telescope', 'craft'],
+  ['2022-09-26', 'DART crashes into Dimorphos, moonlet of Didymos', '65803 Didymos', 'asteroid'],
   ['2024-12-24', "Parker Solar Probe's record close pass of the Sun", 'Parker Solar Probe', 'craft'],
   ['2025-10-29', 'Interstellar comet 3I/ATLAS rounds the Sun', '3I/ATLAS', 'visitor'],
+  ['2029-04-13', 'Apophis passes closer to Earth than geostationary satellites', '99942 Apophis', 'asteroid'],
+  ['2032-12-22', 'Asteroid 2024 YR4 misses the Moon by ~21,000 km', '2024 YR4', 'asteroid'],
   ['2061-07-28', "Halley's Comet returns", "Halley's Comet", 'comet'],
 ].map(([date, title, target, kind, card]) => ({ date, title, target, kind, card, ms: Date.parse(date + 'T12:00:00Z') }));
-const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', visitor: '#e98cff', body: '#d9b99a' };
+const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', visitor: '#e98cff', body: '#d9b99a', asteroid: '#ffb48a' };
 
 export function createUI(o) {
   const { bodies, camera, scaleDistance } = o;
@@ -229,6 +235,7 @@ export function createUI(o) {
     ctx.shadowColor = '#ffb347'; ctx.shadowBlur = 8; dot(C, C, 3.6, '#ffd27a'); ctx.shadowBlur = 0;
     for (const b of dwarfs) mark(keplerAU(b.info, days, _p), 1.8, b.info.color || '#cccccc', b.name);
     for (const it of o.comets?.items || []) if (it.posAU && it.posAU.lengthSq() > 0) mark(it.posAU, 1.8, it.info.hyperbolic ? it.info.color : '#c9f2ff', it.info.name);
+    if (o.comets?.asteroids?.isOn()) for (const it of o.comets.asteroids.items) if (it.posAU.lengthSq() > 0) mark(it.posAU, 1.6, it.info.color, it.info.name);
     for (const it of o.spacecraft?.items || []) {
       if (it.kind !== 'craft' || !it.active || !it.posAU || it.posAU.lengthSq() < 0.01) continue;        // JWST/ISS ride with Earth
       mark(it.posAU, 2.4, '#8fe3ff', it.name, 'craft');
