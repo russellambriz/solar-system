@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-18: Second-tier bright ray craters on the Moon (MoonBot)
+
+### Added
+- **More of the bright spots and rays you see on a real full Moon.** After the big four (Tycho, Copernicus, Kepler, Aristarchus), the next tier of young craters now gets analytic rays and bright ejecta on top of the LRO albedo: Proclus, Messier A, Anaxagoras, Thales, Glushko, Byrgius A, Stevinus A, Furnerius A and Censorinus. Like the big four, they stand out near full Moon and nearly vanish toward the terminator.
+  - **Proclus** has an asymmetric fan: it formed in a low-angle impact, so there's an arc with no ejecta to the southwest (where Palus Somni sits), and its rays run out across Mare Crisium and to the north.
+  - **Messier A** throws its two nearly straight rays west across Mare Fecunditatis (the "comet").
+  - **Stevinus A and Furnerius A** are the two bright points in the south-east highlands, and Censorinus adds one small, very bright spot.
+  - Positions and crater sizes come from the IAU names (via Wikipedia). Ray lengths use the published reach where there is one (Proclus 600+ km, Anaxagoras 900+ km, Thales 600+ km) and are rough visual estimates otherwise.
+- Rays narrower than about a screen pixel are now widened and dimmed to match (same brightness on average), so small craters' thin rays don't shimmer from far away. This applies to the big four too; they look the same up close.
+- `uRayMinor` uniform on the Moon material (`mesh.userData.moonUniforms.uRayMinor`, 1 by default, 0 turns the new tier off). The crater list is `MINOR_RAYS` in `moon/index.js`.
+
+### Testing
+- New check `moon-shots/rays2.js`: it steps to the next full Moon and shoots the whole near side plus the east (Proclus/Messier), north (Anaxagoras), south-east (Stevinus A/Furnerius A) and west limb (Glushko/Byrgius A), with the new tier on and off, on desktop and iPad. `moon-shots/shoot.js` still passes with no console errors.
+
 ## 2026-10-17: Real terrain shadows along the Moon's terminator (MoonBot)
 
 ### Added

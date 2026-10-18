@@ -2,7 +2,9 @@
 // Photometry: Lunar-Lambert (McEwen) blend of Lambert and Lommel-Seeliger, which is why the full Moon looks
 // flat and evenly bright instead of shaded like a ball, plus a small opposition surge near full phase.
 // Relief: LOLA-derived normal map in an analytic east/north tangent frame (exact for a UV sphere).
-// Rays: analytic bright ray systems for Tycho, Copernicus, Kepler and Aristarchus, laid over the LRO albedo. Ray material is fresh,
+// Rays: analytic bright ray systems for Tycho, Copernicus, Kepler and Aristarchus, plus a second tier of younger
+// bright craters (Proclus with its ray-free arc to the southwest, Messier A's twin westward rays, Anaxagoras, Thales,
+// Glushko, Byrgius A, Stevinus A, Furnerius A, and Censorinus's bright spot), laid over the LRO albedo. Ray material is fresh,
 // immature ejecta, so it stands out most at full Moon (no shadows, albedo contrast only) and nearly vanishes
 // near the terminator. Cost: ~7 hash lookups per ray system, skipped outright beyond each system's reach.
 // Close-up craters: when the camera is close enough that the colour/relief maps are magnified (one texel spread
@@ -47,6 +49,13 @@ uniform vec3 uCopernicus;
 uniform vec3 uKepler;
 uniform vec3 uAristarchus;
 uniform vec3 uTychoRayDir;    // far point of Tycho's long ray across Mare Serenitatis (past Bessel)
+uniform float uRayMinor;      // 0 turns the second-tier ray craters off (see MINOR_RAYS in moon/index.js)
+uniform vec3 uMinorC[MINOR_RAYS];   // crater centres, unit vectors in mesh space
+uniform vec4 uMinorP[MINOR_RAYS];   // crater radius (rad), longest ray (rad), rays around the rim, strength
+uniform vec4 uMinorA[MINOR_RAYS];   // ray-free arc: centre azimuth (rad, clockwise from north), half-width (rad, 0 = none); seed; ray width radius (rad)
+uniform vec3 uMessierA;       // Messier A and the far ends of its two westward rays
+uniform vec3 uMessierT1;
+uniform vec3 uMessierT2;
 uniform float uDetail;        // 0 turns the close-up crater field off
 uniform float uMapTexel;      // arc of one colour/relief texel at the equator (radians = 2*pi / map width)
 uniform sampler2D uHeightMap; // LOLA elevation, 10-bit in red (high byte) + green (low byte), see SOURCES.md
@@ -62,38 +71,51 @@ float vnoise(float x) { float i = floor(x), f = fract(x); return mix(h11(i), h11
 // One crater's ray fan. c = crater centre, R = crater radius, len = longest ray (both radians of arc on the
 // sphere), nR = rays around the rim, seed = per-crater offset. Rays start at the rim, fan out a little, break
 // into streaky clumps (secondary-crater chains) and fade out at a random length; plus a bright ejecta nimbus.
-float raySystem(vec3 n, vec3 c, float R, float len, float nR, float seed) {
+// avoid = (azimuth, half-width) of an arc with no ejecta (oblique impacts leave one uprange; half-width 0 = none).
+// Rw sets the ray width (the crater radius for big craters; small young craters throw rays wider than their size
+// alone suggests). pix = arc of one screen pixel: a ray narrower than about a pixel is widened and dimmed to match, so small
+// craters' thin rays don't shimmer from orbit.
+float raySystem(vec3 n, vec3 c, float R, float len, float nR, float seed, vec2 avoid, float pix, float Rw) {
   float cd = dot(n, c);
   if (cd < cos(len)) return 0.0;
   float d = acos(clamp(cd, -1.0, 1.0));
   vec3 e1 = normalize(cross(vec3(0.0, 1.0, 0.0), c));
   vec3 e2 = cross(c, e1);
-  float a = (atan(dot(n, e2), dot(n, e1)) / 6.2831853 + 0.5) * nR;
+  float x1 = dot(n, e1), x2 = dot(n, e2);
+  float mask = 1.0;
+  if (avoid.y > 0.0) {
+    float da = abs(mod(atan(x1, x2) - avoid.x + 3.1415927, 6.2831853) - 3.1415927);   // angle from the arc's centre
+    mask = smoothstep(avoid.y, avoid.y + 0.35, da);
+    if (mask <= 0.0) return 0.0;
+  }
+  float a = (atan(x2, x1) / 6.2831853 + 0.5) * nR;
   float cell = floor(a), f = a - cell, sd = sin(d), s = 0.0;
   for (int k = -1; k <= 1; k++) {
     float id = mod(cell + float(k), nR) + seed;
     float h1 = h11(id * 1.37), h2 = h11(id * 2.71 + 5.3), h3 = h11(id * 4.13 + 9.1);
     float perp = abs(f - float(k) - (0.15 + 0.7 * h1)) * 6.2831853 / nR * sd;   // cross-track distance
     float L = len * (0.12 + 0.88 * h2 * h2 * h2);                                // many short rays, a few long
-    float w = R * (0.1 + 0.25 * h3) * (1.0 + 2.5 * d / len);                     // narrow at the rim, fanning out
+    float w = Rw * (0.1 + 0.25 * h3) * (1.0 + 2.5 * d / len);                    // narrow at the rim, fanning out
+    float wp = max(w, pix);
     float along = smoothstep(R, 2.2 * R, d) * (1.0 - smoothstep(0.35 * L, L, d)) / (1.0 + 2.0 * d / L);
     float clump = 0.25 + 0.75 * vnoise(d / R * 0.9 + id * 7.0);
-    s += exp(-perp * perp / (w * w)) * along * clump * (0.3 + 0.7 * fract(h2 * 7.3 + h3));
+    s += exp(-perp * perp / (wp * wp)) * (w / wp) * along * clump * (0.3 + 0.7 * fract(h2 * 7.3 + h3));
   }
-  float x = max(d - R, 0.0) / (1.4 * R);
-  return s + 0.6 * exp(-x * x) * smoothstep(0.7 * R, 1.05 * R, d);
+  float Rn = max(R, pix);                              // nimbus: same widen-and-dim rule as the rays
+  float x = max(d - R, 0.0) / (1.4 * Rn);
+  return mask * (s + 0.6 * (R / Rn) * (R / Rn) * exp(-x * x) * smoothstep(0.7 * R, 1.05 * R, d + Rn - R));
 }
 
-// A single named great-circle ray from crater c toward point t, length len (rad).
-float longRay(vec3 n, vec3 c, vec3 t, float R, float len) {
+// A single named great-circle ray from crater c toward point t, length len (rad). pix as in raySystem.
+float longRay(vec3 n, vec3 c, vec3 t, float R, float len, float pix) {
   vec3 p = normalize(cross(c, t));
   float off = dot(n, p);
   vec3 q = n - p * off;
   float along = atan(dot(q, cross(p, c)), dot(q, c));
   if (along < 0.0 || along > len) return 0.0;
-  float w = R * (0.25 + 0.9 * along / len);
+  float w = R * (0.25 + 0.9 * along / len), wp = max(w, pix);
   float clump = 0.3 + 0.7 * vnoise(along / R * 1.1 + 3.0);
-  return exp(-off * off / (w * w)) * smoothstep(1.0 * R, 2.0 * R, along) * (1.0 - smoothstep(0.55 * len, len, along)) * clump;
+  return exp(-off * off / (wp * wp)) * (w / wp) * smoothstep(1.0 * R, 2.0 * R, along) * (1.0 - smoothstep(0.55 * len, len, along)) * clump;
 }
 
 vec3 hash33(vec3 p) {
@@ -226,10 +248,22 @@ void main() {
   // ~400 km, crossing Copernicus's) and Aristarchus (40 km, the brightest spot on the Moon, short rays). Strong near
   // full, a faint trace at quarter, gone at crescent (where the LRO albedo already carries what little shows).
   if (uRayStrength > 0.0) {
-    float rays = raySystem(n, uTycho, 0.0248, 1.05, 30.0, 11.0) + 1.2 * longRay(n, uTycho, uTychoRayDir, 0.0248, 1.45)
-               + 0.55 * raySystem(n, uCopernicus, 0.0268, 0.45, 44.0, 57.0)
-               + 0.42 * raySystem(n, uKepler, 0.0089, 0.23, 22.0, 83.0)
-               + 0.38 * raySystem(n, uAristarchus, 0.0115, 0.16, 20.0, 131.0);
+    vec2 none = vec2(0.0);
+    float rays = raySystem(n, uTycho, 0.0248, 1.05, 30.0, 11.0, none, pixArc, 0.0248) + 1.2 * longRay(n, uTycho, uTychoRayDir, 0.0248, 1.45, pixArc)
+               + 0.55 * raySystem(n, uCopernicus, 0.0268, 0.45, 44.0, 57.0, none, pixArc, 0.0268)
+               + 0.42 * raySystem(n, uKepler, 0.0089, 0.23, 22.0, 83.0, none, pixArc, 0.0089)
+               + 0.38 * raySystem(n, uAristarchus, 0.0115, 0.16, 20.0, 131.0, none, pixArc, 0.0115);
+    // Second tier: younger, smaller bright craters that stand out at full Moon (see MINOR_RAYS in moon/index.js).
+    if (uRayMinor > 0.0) {
+      float minor = 0.0;
+      for (int i = 0; i < MINOR_RAYS; i++) {
+        vec4 P = uMinorP[i], A = uMinorA[i];
+        minor += P.w * raySystem(n, uMinorC[i], P.x, P.y, P.z, A.z, A.xy, pixArc, max(P.x, A.w));
+      }
+      // Messier A: a low-angle impact that threw two nearly straight rays west across Mare Fecunditatis (the "comet").
+      minor += 1.8 * (longRay(n, uMessierA, uMessierT1, 0.006, 0.085, pixArc) + longRay(n, uMessierA, uMessierT2, 0.006, 0.075, pixArc));
+      rays += uRayMinor * minor;
+    }
     rays = 1.0 - exp(-1.3 * rays);                         // soft cap where rays overlap near the rims
     float full = 1.0 - smoothstep(0.2, 1.35, g);
     float r = uRayStrength * rays * mix(0.1, 1.0, full);

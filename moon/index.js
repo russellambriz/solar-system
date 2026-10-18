@@ -21,6 +21,25 @@ function seleno(latDeg, lonDeg) {
   return new THREE.Vector3(Math.cos(la) * Math.cos(lo), Math.sin(la), -Math.cos(la) * Math.sin(lo));
 }
 
+// Second-tier ray craters: younger, smaller craters whose bright ejecta stand out at full Moon, after the big four
+// (Tycho, Copernicus, Kepler, Aristarchus). Positions and sizes from the IAU names via Wikipedia; ray lengths are
+// the published reach where there is one (Proclus 600+ km, Anaxagoras 900+ km, Thales 600+ km) and rough
+// visual estimates otherwise. Proclus formed at a low angle, so it has no ejecta in an arc to the southwest
+// (Palus Somni sits in that gap).
+//   [name, lat, lon, crater diameter km, longest ray km, rays around the rim, strength, ray-free arc centre deg,
+//    half-width deg, ray width scale km (rays of small young craters are wider than the crater size alone gives)]
+const MINOR_RAYS = [
+  ['Proclus', 16.1, 46.8, 27, 620, 16, 2.2, 225, 55, 42],
+  ['Anaxagoras', 73.48, -10.17, 51.9, 920, 22, 1.6, 0, 0, 52],
+  ['Thales', 61.8, 50.3, 32, 600, 18, 1.5, 0, 0, 42],
+  ['Glushko', 8.4, -77.6, 43, 420, 20, 1.7, 0, 0, 46],
+  ['Byrgius A', -24.5, -63.7, 19, 380, 16, 1.7, 0, 0, 38],
+  ['Stevinus A', -31.8, 51.6, 8, 260, 14, 1.8, 0, 0, 30],
+  ['Furnerius A', -33.5, 59.0, 12, 300, 14, 1.6, 0, 0, 32],
+  ['Censorinus', -0.4, 32.7, 4.1, 60, 10, 1.8, 0, 0, 8],
+];
+const KM = 1 / 1737.4;   // km -> radians of arc on the Moon
+
 const _sun = new THREE.Vector3(), _earth = new THREE.Vector3(), _moon = new THREE.Vector3();
 
 // The maps wrap around in longitude, so filtering at the 180° meridian (the u = 0/1 edge on the far side) must
@@ -71,6 +90,14 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uKepler: { value: seleno(8.12, -38.01) },
     uAristarchus: { value: seleno(23.73, -47.49) },
     uTychoRayDir: { value: seleno(21.8, 17.9) },             // Bessel, in Mare Serenitatis: Tycho's famous long ray runs past it
+    uRayMinor: { value: 1.0 },                               // second-tier ray craters (MINOR_RAYS); 0 turns them off
+    uMinorC: { value: MINOR_RAYS.map(([, lat, lon]) => seleno(lat, lon)) },
+    uMinorP: { value: MINOR_RAYS.map(([, , , dKm, lenKm, nR, k]) => new THREE.Vector4(0.5 * dKm * KM, lenKm * KM, nR, k)) },
+    uMinorA: { value: MINOR_RAYS.map(([, , , , , , , az, hw, wKm], i) =>
+      new THREE.Vector4(THREE.MathUtils.degToRad(az), THREE.MathUtils.degToRad(hw), 173 + 29 * i, 0.5 * wKm * KM)) },
+    uMessierA: { value: seleno(-2.03, 46.94) },              // Messier A's twin rays run west across Mare Fecunditatis
+    uMessierT1: { value: seleno(-1.1, 40.0) },
+    uMessierT2: { value: seleno(-2.6, 40.0) },
     // Close-up crater field: fades in below the maps' resolution once you fly close. 0 turns it off.
     uDetail: { value: 1.0 },
     uMapTexel: { value: (2 * Math.PI) / (isTouch ? 1024 : 2048) },   // updated when the 4K set streams in
@@ -81,7 +108,7 @@ export function createMoonMesh({ radius, isTouch = false }) {
   };
   // iPad: three size bands (down to ~3 km craters); desktop adds a fourth (~1.3 km) for the closest views.
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG,
-    defines: { DETAIL_BANDS: isTouch ? 3 : 4, SHADOW_STEPS: isTouch ? 24 : 40 } });
+    defines: { DETAIL_BANDS: isTouch ? 3 : 4, SHADOW_STEPS: isTouch ? 24 : 40, MINOR_RAYS: MINOR_RAYS.length } });
 
   const lod = new THREE.LOD();
   const levels = isTouch ? [[96, 64, 0], [48, 32, 8], [24, 16, 40]] : [[160, 112, 0], [72, 48, 8], [24, 16, 40]];
