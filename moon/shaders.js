@@ -19,15 +19,30 @@
 // dark early. The terminator is ragged, as it is through a telescope, instead of a clean curve. The edge of
 // every shadow is softened by the Sun's real size (half a degree across). Cost: up to SHADOW_STEPS height
 // lookups, only where the Sun is less than ~17 degrees up or just below the horizon; everywhere else is free.
+// Limb profile: the same LOLA heights displace the geometry (x2, uRelief), so up close the edge of the disc shows
+// real mountain ranges and basin rims in silhouette instead of a perfect circle. The closest LOD level is a much
+// finer sphere (640x320 desktop, 288x144 iPad) so the profile has ~20 km (desktop) steps along the limb.
 
 export const VERT = /* glsl */ `
+uniform sampler2D uHeightMap;
+uniform float uRelief;   // vertical exaggeration of the LOLA heights in the geometry (0 = smooth sphere)
 varying vec2 vUv;
 varying vec3 vObjN;      // unit position on the sphere (object space) = geometric normal
 varying vec3 vWorldPos;
 void main() {
   vUv = uv;
   vObjN = normalize(position);
-  vec4 wp = modelMatrix * vec4(position, 1.0);
+  // Real terrain in the silhouette: each vertex is pushed in or out by the LOLA height under it (same map and
+  // encoding as heightAt in the fragment shader). The vertices at a pole all share one position, so they all read
+  // the same texel; otherwise the slightly different heights around the pole row would open pinholes there.
+  vec3 pos = position;
+  if (uRelief > 0.0) {
+    vec2 huv = vec2(uv.y < 1e-4 || uv.y > 0.9999 ? 0.5 : uv.x, uv.y);
+    vec2 rg = texture2D(uHeightMap, huv).rg;
+    float h = (-9.5 + 20.5 * (rg.r * 65280.0 + rg.g * 255.0) / 65472.0) / 1737.4;   // Moon radii
+    pos *= 1.0 + uRelief * h;
+  }
+  vec4 wp = modelMatrix * vec4(pos, 1.0);
   vWorldPos = wp.xyz;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }`;

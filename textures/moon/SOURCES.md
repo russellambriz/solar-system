@@ -22,3 +22,6 @@ Terrain shadows (2026-10-17):
   v (0..1023), stored as the 16-bit number v * 64 split across red (high byte) and green (low byte); blue is 0.
   Decode: km = -9.5 + 20.5 * (R * 256 + G) / 65472. Lossless PNG, so the shader reads it exactly (about 20 m steps).
   Load with no mipmaps and no colour conversion.
+
+Limb profile (2026-10-19): no new files. `moon_height_1k.png` / `moon_height_2k.png` also displace the Moon's geometry
+(heights x2) in the vertex shader, and the 1K map is read once on the CPU (same decode) so surface markers sit on that ground.

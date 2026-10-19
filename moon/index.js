@@ -63,6 +63,37 @@ function loadHeight(file, onReady) {
   return t;
 }
 
+// CPU copy of the 1K elevation map, so latLonToWorld can put markers on the displaced ground (uRelief) instead of
+// the reference sphere. Read with no colour conversion so the bytes are exact. Until it's loaded, heights are 0.
+let _hgt = null;
+const RELIEF = 2.0;
+function loadHeightCpu(file) {
+  if (_hgt || typeof fetch === 'undefined' || typeof createImageBitmap === 'undefined') return;
+  _hgt = { w: 0, h: 0, km: null };
+  fetch(new URL(file, BASE).href).then((r) => r.blob())
+    .then((b) => createImageBitmap(b, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }))
+    .then((img) => {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, img.width, img.height).data, km = new Float32Array(img.width * img.height);
+      for (let i = 0; i < km.length; i++) km[i] = -9.5 + 20.5 * (d[4 * i] * 256 + d[4 * i + 1]) / 65472;
+      _hgt.w = img.width; _hgt.h = img.height; _hgt.km = km;
+    })
+    .catch(() => {});   // markers just sit on the reference sphere
+}
+/** LOLA height (km above the 1737.4 km sphere) at selenographic lat/lon, bilinear; 0 until the map has loaded. */
+export function surfaceHeightKm(latDeg, lonDeg) {
+  if (!_hgt || !_hgt.km) return 0;
+  const { w, h, km } = _hgt;
+  const x = ((((lonDeg + 180) / 360) % 1 + 1) % 1) * w - 0.5, y = Math.min(Math.max((90 - latDeg) / 180 * h - 0.5, 0), h - 1);
+  const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, y1 = Math.min(y0 + 1, h - 1);
+  const xa = ((x0 % w) + w) % w, xb = (xa + 1) % w;
+  const top = km[y0 * w + xa] * (1 - fx) + km[y0 * w + xb] * fx, bot = km[y1 * w + xa] * (1 - fx) + km[y1 * w + xb] * fx;
+  return top * (1 - fy) + bot * fy;
+}
+
 function loadHiRes(file, srgb) {
   const tex = wrapLon(new THREE.TextureLoader().load(new URL(file, BASE).href, () => tex.onReady && tex.onReady()));
   tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
@@ -105,16 +136,22 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uHeightMap: { value: loadHeight('moon_height_1k.png') },          // desktop adds the 2K map with the 4K stream
     uHeightTexel: { value: (2 * Math.PI) / 1024 },
     uShadow: { value: 1.0 },
+    // Limb profile: LOLA heights displace the geometry, exaggerated 2x (the relief maps use 2.5-3x). 0 = smooth sphere.
+    uRelief: { value: RELIEF },
   };
   // iPad: three size bands (down to ~3 km craters); desktop adds a fourth (~1.3 km) for the closest views.
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG,
     defines: { DETAIL_BANDS: isTouch ? 3 : 4, SHADOW_STEPS: isTouch ? 24 : 40, MINOR_RAYS: MINOR_RAYS.length } });
 
   const lod = new THREE.LOD();
-  const levels = isTouch ? [[96, 64, 0], [48, 32, 8], [24, 16, 40]] : [[160, 112, 0], [72, 48, 8], [24, 16, 40]];
+  // The closest level is fine enough for the displaced limb to show mountain profiles (~20 km steps on desktop,
+  // ~40 km on iPad); it only draws within 3 base radii (about 5.5 Moon radii once the size easing has settled).
+  const levels = isTouch ? [[288, 144, 0], [96, 64, 3], [48, 32, 8], [24, 16, 40]]
+    : [[640, 320, 0], [160, 112, 3], [72, 48, 8], [24, 16, 40]];
   for (const [w, h, d] of levels) lod.addLevel(new THREE.Mesh(new THREE.SphereGeometry(radius, w, h), material), d * radius);
   lod.userData.moonUniforms = uniforms;
   lod.userData.hiRes = isTouch ? 'never' : 'pending';   // desktop streams 4K maps in once you fly close
+  loadHeightCpu('moon_height_1k.png');                  // CPU copy so latLonToWorld can stand markers on the ground
   return lod;
 }
 
@@ -232,12 +269,15 @@ const MOON_RADIUS_KM = 1737.4;
  * body.moon.latLonToWorld(latDeg, lonDeg, altitudeKm = 0, out?) -> THREE.Vector3 in world space.
  * Selenographic coordinates: latitude north-positive, longitude east-positive, 0/0 = centre of the near side
  * (the point facing Earth). Follows tidal lock, libration and the 0.5x -> 0.273x size easing, so a marker placed
- * with it every frame stays glued to the surface. Altitude is real km, scaled with the Moon (e.g. Apollo 11:
- * latLonToWorld(0.674, 23.473)). Pass `out` to avoid allocations.
+ * with it every frame stays glued to the surface. Altitude is real km above the local ground as drawn (the LOLA
+ * height times the uRelief exaggeration, so markers sit on the displaced terrain), scaled with the Moon (e.g.
+ * Apollo 11: latLonToWorld(0.674, 23.473)). Pass `out` to avoid allocations.
  */
 export function latLonToWorld(moonBody, latDeg, lonDeg, altitudeKm = 0, out = new THREE.Vector3()) {
   const lat = THREE.MathUtils.degToRad(latDeg), lon = THREE.MathUtils.degToRad(lonDeg);
-  const r = (moonBody.baseRadius || moonBody.radius) * (1 + altitudeKm / MOON_RADIUS_KM);
+  const u = moonBody.mesh.userData.moonUniforms;
+  const ground = u && u.uRelief.value > 0 ? u.uRelief.value * surfaceHeightKm(latDeg, lonDeg) : 0;
+  const r = (moonBody.baseRadius || moonBody.radius) * (1 + (altitudeKm + ground) / MOON_RADIUS_KM);
   // mesh-local frame of three.js SphereGeometry: +x = lon 0 (faces Earth), +y = north, east = -z
   out.set(Math.cos(lat) * Math.cos(lon), Math.sin(lat), -Math.cos(lat) * Math.sin(lon)).multiplyScalar(r);
   moonBody.mesh.updateWorldMatrix(true, false);

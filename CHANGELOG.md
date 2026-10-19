@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-19: Real mountains on the Moon's edge (MoonBot)
+
+### Added
+- **Up close, the edge of the Moon is no longer a perfect circle.** NASA's LOLA elevation map (the same one the terrain shadows use) now pushes the Moon's surface in and out, so mountain ranges, basin rims and crater walls show in profile along the limb against black space, the way they do in close-up spacecraft photos and through a telescope at high magnification. Heights are exaggerated 2x (the relief maps use 2.5-3x), so the biggest peaks stand a few pixels proud at the closest zoom.
+  - A new, finer closest level of detail (640x320 segments on desktop, 288x144 on iPad) draws within ~5 Moon radii, so the profile changes every ~20 km along the limb on desktop (~40 km on iPad). Farther out the old levels are used, also displaced, so nothing pops when the levels switch.
+  - The vertices at each pole all read the same height, so the poles stay closed.
+- `body.moon.latLonToWorld(lat, lon, alt)` now measures altitude from the ground as drawn (LOLA height times the exaggeration), so the Apollo and Artemis markers stand on the surface instead of sinking into the higher ground (Apollo 16 and the south-pole rim). It uses a CPU copy of the 1K height map, loaded once in the background; until it arrives, heights are 0, as before. `surfaceHeightKm(lat, lon)` is exported from `moon/index.js`.
+- `uRelief` uniform on the Moon material (`mesh.userData.moonUniforms.uRelief`, 2 by default, 0 goes back to the smooth sphere).
+
+### Testing
+- New check `moon-shots/limb.js`: it aims the camera straight along the limb 1.55 radii from the centre, south and north of the subsolar point, and shoots it with the relief on and off. It also prints how high the Apollo 11, 16 and 17 markers sit (should be the LOLA height times 2).
+
 ## 2026-10-18: Second-tier bright ray craters on the Moon (MoonBot)
 
 ### Added
