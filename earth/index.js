@@ -64,6 +64,8 @@ const DEFAULTS = {
   cloudLimbFar: 0.5,       //   … fraction of it at overview distances (full from closeFrom→closeTo, like the halo boost)
   cloudSlantMax: 4.0,      //   cap on the 1/μ slant-path factor
   cloudLimbLift: 0.22,     //   max brightness lift of limb cloud tops (they sit above most of the haze)
+  cloudSilver: 1.2,        // forward-scattered "silver lining" on thin sunlit cloud when looking towards the Sun (clouds.js); 0 = previous look
+  cloudSilverG: 0.6,       //   Henyey–Greenstein asymmetry of that lobe
   cloudShadow: 0.45,
   nightGain: 1.7,          // city lights (warm); night side is otherwise near-black
   specular: 0.15,         // glint strength (calm-sea peak ≈ 0.5 × sun before the knee → stays peaked)
@@ -110,6 +112,8 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uCloudLimb:     { value: P.cloudLimb * P.cloudLimbFar },
     uCloudSlantMax: { value: P.cloudSlantMax },
     uCloudLimbLift: { value: P.cloudLimbLift },
+    uCloudSilver:   { value: P.cloudSilver },
+    uCloudSilverG:  { value: P.cloudSilverG },
     uNightGain:     { value: P.nightGain },
     uSpecular:      { value: P.specular },
     uGlintCap:      { value: isMobile ? P.glintCapMobile : P.glintCap },
@@ -200,6 +204,8 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     U.uCloudLimb.value = P.cloudLimb * (P.cloudLimbFar + (1 - P.cloudLimbFar) * close.k);
     U.uCloudSlantMax.value = P.cloudSlantMax;
     U.uCloudLimbLift.value = P.cloudLimbLift;
+    U.uCloudSilver.value = P.cloudSilver;
+    U.uCloudSilverG.value = P.cloudSilverG;
     // match MeshStandardMaterial's response to the same light: colour × intensity / π
     U.uSunColor.value.copy(sunLight.color).multiplyScalar(sunLight.intensity / Math.PI);
     // Level of detail for the high-frequency terms (ocean glint, cloud shadows): from Earth's projected radius
