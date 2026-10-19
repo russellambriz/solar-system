@@ -21,6 +21,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { scaleAU } from '../smallbodies.js';
 import { COMETS } from './data.js';
 import { VISITORS } from './interstellar.js';
+import { createAsteroids } from '../asteroids/index.js';
 
 const D2R = Math.PI / 180, TAU = Math.PI * 2, AU_KM = 149597870.7;
 const RIBBON_N = 28;                 // centre-line points per tail
@@ -175,6 +176,9 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
   const labelRoot = new THREE.Group();
   root.add(labelRoot);
   scene.add(root);
+  // asteroids/: famous asteroids and near-Earth objects (Apophis, Bennu, Ryugu, Didymos, Psyche, Eros, 2024 YR4), hooked
+  // in here so main.js needs no changes; exposed as comets.asteroids for search/ and ui/
+  const asteroids = createAsteroids({ scene, bodies, isTouch, scaleDistance, orbitLines });
   const glowTex = glowTexture();
   const scaleK = (r) => scaleDistance(r) / r;   // scene units per AU sideways at distance r (radial compression keeps directions)
 
@@ -405,6 +409,7 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
       }
       placeLabels(camera, cands, W, H);
     }
+    asteroids.update(days, camera, dt, on ? placed : []);   // their labels avoid the comet labels placed just now
     if (open) {
       if (!isOpenHere()) release();
       else if (performance.now() - lastRefresh > 300) { lastRefresh = performance.now(); fillRows(open, true); }
@@ -461,6 +466,7 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
     geo.computeBoundingSphere();
   }
   function rebuild() {
+    asteroids.rebuild();
     for (const it of items) {
       if (it.hyperbolic) { layoutPath(it); continue; }
       const pos = it.orbitLine.geometry.attributes.position;
@@ -470,7 +476,7 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
   }
 
   return {
-    group: root, items, update, rebuild,
+    group: root, items, update, rebuild, asteroids,
     showInfo: (name) => { const it = items.find((i) => i.name === name || i.info.short === name); return it ? showInfo(it) : false; },
     get: (name) => items.find((i) => i.name === name || i.info.short === name),
     stats: () => ({ on, comets: items.map((i) => ({ name: i.info.short, r: +i.r.toFixed(3), activity: +i.activity.toFixed(3),

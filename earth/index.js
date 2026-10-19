@@ -60,6 +60,10 @@ const DEFAULTS = {
   detailNear: 140,         // Earth's on-screen radius (px) above which glint + cloud shadows are at full detail
   detailFar: 45,           //   … and below which they are fully faded (overview distances: avoids shimmer)
   cloudOpacity: 0.95,
+  cloudLimb: 1.0,          // limb cloud thickening + cloud-top lift (clouds.js); 0 = previous look
+  cloudLimbFar: 0.5,       //   … fraction of it at overview distances (full from closeFrom→closeTo, like the halo boost)
+  cloudSlantMax: 4.0,      //   cap on the 1/μ slant-path factor
+  cloudLimbLift: 0.22,     //   max brightness lift of limb cloud tops (they sit above most of the haze)
   cloudShadow: 0.45,
   nightGain: 1.7,          // city lights (warm); night side is otherwise near-black
   specular: 0.15,         // glint strength (calm-sea peak ≈ 0.5 × sun before the knee → stays peaked)
@@ -103,6 +107,9 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uCloudsReady:   { value: 0 },
     uCloudShadow:   { value: P.cloudShadow },
     uCloudOpacity:  { value: P.cloudOpacity },
+    uCloudLimb:     { value: P.cloudLimb * P.cloudLimbFar },
+    uCloudSlantMax: { value: P.cloudSlantMax },
+    uCloudLimbLift: { value: P.cloudLimbLift },
     uNightGain:     { value: P.nightGain },
     uSpecular:      { value: P.specular },
     uGlintCap:      { value: isMobile ? P.glintCapMobile : P.glintCap },
@@ -190,6 +197,9 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     U.uRa.value = radius * (1 + thick) * _s.x;
     atmosphere.scale.setScalar((1 + thick) / (1 + P.atmoThickness));   // mesh must still enclose the shell
     U.uAtmoIntensity.value = P.atmoIntensity * (1 + P.closeBrighten * close.k);
+    U.uCloudLimb.value = P.cloudLimb * (P.cloudLimbFar + (1 - P.cloudLimbFar) * close.k);
+    U.uCloudSlantMax.value = P.cloudSlantMax;
+    U.uCloudLimbLift.value = P.cloudLimbLift;
     // match MeshStandardMaterial's response to the same light: colour × intensity / π
     U.uSunColor.value.copy(sunLight.color).multiplyScalar(sunLight.intensity / Math.PI);
     // Level of detail for the high-frequency terms (ocean glint, cloud shadows): from Earth's projected radius

@@ -389,6 +389,11 @@ body.touch .tl-strip { height: 44px; }
 /* Interstellar visitors (comets/interstellar.js): violet/magenta, "from outside" */
 .label.comet-label.visitor-label { color: #f3c8ff; border-color: rgba(230, 130, 255, 0.55); background: rgba(26, 6, 34, 0.62); }
 .label.comet-label.visitor-label.active { border-color: #ffd27a; color: #ffd27a; }
+/* asteroids/: famous asteroids and near-Earth objects */
+.label.ast-label { color: #ffe1c8; border-color: rgba(255, 180, 130, 0.5); background: rgba(30, 16, 8, 0.6); }
+.label.ast-label.active { border-color: #ffd27a; color: #ffd27a; }
+body.touch .label.ast-label { font-size: 12px; }
+body.touch .label.ast-label::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
 
 /* constellations/: small, dim constellation names; never steal taps from planets but keep 44px targets on touch */
 .label.const-label { font-size: 9.5px; padding: 1px 5px; color: #9fb4e0; background: transparent; border-color: transparent; letter-spacing: 0.04em; pointer-events: none; opacity: 0.55; }

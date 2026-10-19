@@ -9,7 +9,8 @@
 //
 // Camera moves only use main.js's own functions (no new camera code):
 //   • planets, moons, dwarf planets, the Sun: focusOn(body)
-//   • spacecraft and comets: flyTo(goalCam, goalTarget) with function goals, so the moving object stays tracked in flight;
+//   • spacecraft, comets and famous asteroids: flyTo(goalCam, goalTarget) with function goals, so the moving object stays
+//     tracked in flight (asteroids/ keeps following it after arrival);
 //     the ISS and JWST ride along with Earth, so they use focusOn(Earth); landing sites use focusOn(Moon)
 //   • galaxies: main.js's flyToAndromeda / flyToSombrero / … (entering the galaxy view first if needed);
 //     nebulae and clusters: galaxyFly() stages, like the Sombrero
@@ -39,7 +40,7 @@ const ALIASES = {
 };
 const KIND = {
   star: { icon: '☀', tag: 'Star', color: '#ffcc55' }, planet: { icon: '●', tag: 'Planet' }, moon: { icon: '◐', tag: 'Moon' },
-  dwarf: { icon: '○', tag: 'Dwarf planet' }, asteroid: { icon: '◇', tag: 'Asteroid' }, craft: { icon: '🛰', tag: 'Spacecraft' },
+  dwarf: { icon: '○', tag: 'Dwarf planet' }, asteroid: { icon: '◇', tag: 'Asteroid' }, neo: { icon: '◇', tag: 'Near-Earth asteroid' }, craft: { icon: '🛰', tag: 'Spacecraft' },
   site: { icon: '⚑', tag: 'Moon landing site' }, comet: { icon: '☄', tag: 'Comet' }, galaxy: { icon: '🌌', tag: 'Galaxy' },
   blackhole: { icon: '⚫', tag: 'Black hole' }, quasar: { icon: '✴', tag: 'Quasar' }, nebula: { icon: '✺', tag: 'Nebula' },
   cluster: { icon: '✧', tag: 'Star cluster' },
@@ -94,6 +95,13 @@ export function createSearch(api) {
       sub: it.info.hyperbolic ? 'Interstellar visitor' : null,
       go: () => goTracked(it, () => Math.max(2.5, (it.ion?.userData.pts[0].distanceTo(it.ion.userData.pts.at(-1)) || 0) * 0.9), () => comets.showInfo(it.info.name)) });
   }
+  // famous asteroids (asteroids/, hooked in through comets/): fly in close (the meshes are tiny), then keep following
+  const asteroids = comets?.asteroids;
+  for (const it of asteroids?.items || []) {
+    add({ name: it.info.name, kind: it.info.kind, color: it.info.color, aliases: it.info.aliases, track: it, sub: it.info.sub, notable: true,
+      go: () => goTracked(it, () => asteroids.framing(it).dist, () => asteroids.showInfo(it.info.name, true),
+        { minDist: Math.max(0.12, it.size * 2.5), dir: () => asteroids.framing(it).dir, offset: () => asteroids.framing(it).offset }) });
+  }
   const galaxyGo = (fn) => () => {
     if (getMode() === 'solar') { endTrip(); enterGalaxy(fn); } else if (getMode() === 'galaxy') fn();
   };
@@ -126,12 +134,17 @@ export function createSearch(api) {
     trip(group.getWorldPosition(new THREE.Vector3()), final);
   }
   // spacecraft / comets: function goals track the moving object during the flight
-  function goTracked(it, dist, onArrive) {
+  // opts.minDist: lower OrbitControls' zoom limit first (the asteroids are far smaller than its default 2 units);
+  // opts.dir(): view direction from the object (asteroids: from their sunlit side); opts.offset(): aim point offset
+  function goTracked(it, dist, onArrive, opts = {}) {
     const final = () => {
       const d = typeof dist === 'function' ? dist() : dist;
-      const dir = it.pos.clone().normalize().add(new THREE.Vector3(0, 0.55, 0)).normalize();   // from outside, a little above
-      if (it.pos.lengthSq() < 1e-6) dir.set(0, 0.5, 0.86);
-      flyTo(() => it.pos.clone().addScaledVector(dir, d), () => it.pos.clone(), 1.6, onArrive);
+      if (opts.minDist !== undefined) controls.minDistance = Math.min(controls.minDistance, opts.minDist);
+      const dir = opts.dir ? opts.dir() : it.pos.clone().normalize().add(new THREE.Vector3(0, 0.55, 0)).normalize();   // from outside, a little above
+      if (!opts.dir && it.pos.lengthSq() < 1e-6) dir.set(0, 0.5, 0.86);
+      const off = opts.offset ? opts.offset() : null;            // aim a little beside the object (asteroid passing Earth)
+      const aim = () => (off ? it.pos.clone().add(off) : it.pos.clone());
+      flyTo(() => aim().addScaledVector(dir, d), aim, 1.6, onArrive);
     };
     if (getMode() === 'galaxy') { endTrip(); exitGalaxy(final); return; }
     if (getMode() !== 'solar') return;
@@ -339,16 +352,16 @@ export function createSearch(api) {
 
   // ---- grouped, filterable object list ---------------------------------------------------------------------------------
   // main.js builds the bodies list (Sun, planets with folded moons, asteroid belt, dwarf planets); we add a top header and
-  // collapsible groups for spacecraft, comets, landing sites and the deep sky, and filter everything as you type.
+  // collapsible groups for spacecraft, comets, famous asteroids, landing sites and the deep sky, and filter everything as you type.
   if (list) {
     const top = document.createElement('div'); top.className = 'list-header'; top.textContent = '☀ Sun & planets';
     list.insertBefore(top, list.firstChild);
     const groups = [
-      ['craft', '🛰 Spacecraft'], ['comet', '☄ Comets'], ['site', '⚑ Moon landings'],
+      ['craft', '🛰 Spacecraft'], ['comet', '☄ Comets'], [(e) => e.notable, '◇ Famous asteroids'], ['site', '⚑ Moon landings'],
       [['galaxy', 'blackhole', 'quasar'], '🌌 Galaxies & black holes'], [['nebula', 'cluster'], '✺ Nebulae & star clusters'],
     ];
     for (const [kinds, title] of groups) {
-      const ks = [].concat(kinds), items = entries.filter((e) => ks.includes(e.kind));
+      const ks = [].concat(kinds), items = entries.filter((e) => (typeof kinds === 'function' ? kinds(e) : ks.includes(e.kind)));
       if (!items.length) continue;
       const g = document.createElement('div'); g.className = 'list-group collapsed';
       const h = document.createElement('button'); h.className = 'list-header group-toggle'; h.setAttribute('aria-expanded', 'false');
