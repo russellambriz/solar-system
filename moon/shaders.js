@@ -58,6 +58,7 @@ uniform vec3 uEarthPos;
 uniform float uEarthLit;
 uniform vec3 uEarthTint;
 uniform float uEarthshine;
+uniform float uEarthLS;      // 1 = Lommel-Seeliger earthshine filling terrain shadows, 0 = the old Lambert night-side fill
 uniform float uRayStrength;   // 0 turns the analytic ray systems off
 uniform vec3 uTycho;          // crater centres, unit vectors in mesh space (see moon/index.js)
 uniform vec3 uCopernicus;
@@ -310,10 +311,19 @@ void main() {
   photo *= mix(1.0, crShade, relief);                  // small-crater bowl shadows (1 unless close up at low Sun)
   vec3 color = albedo * photo * uSunIntensity;
 
-  // Earthshine: sunlight bounced off Earth lights the night side, strongest when Earth looks full from here.
+  // Earthshine: sunlight bounced off Earth lights whatever the Sun doesn't reach (the night side and the terrain
+  // shadows past the terminator), scaled by Earth's phase as seen from here (uEarthLit, see moon/index.js).
+  // Same regolith photometry as sunlight: Lommel-Seeliger, so the ashen disc seen from near Earth looks evenly lit
+  // right out to the limb instead of darkening like a Lambert ball, and relief shows only when the eye is off the
+  // Earth-Moon line. Earth is ~2 degrees across from the Moon, so its "terminator" on the far limb is soft.
   vec3 Le = normalize(uEarthPos - vWorldPos);
-  float night = 1.0 - smoothstep(-0.05, 0.1, dot(Ng, L));
-  color += albedo * uEarthTint * uEarthshine * uEarthLit * max(dot(Ng, Le), 0.0) * night;
+  float cosIe0 = dot(Ng, Le);
+  float eSoft = smoothstep(-0.035, 0.035, cosIe0);
+  float cosIe = max(dot(N, Le), 0.0);
+  float lsE = mix(cosIe, 2.0 * cosIe / (cosIe + cosE + 1e-4), 0.85);
+  float esPhoto = mix(max(cosIe0, 0.0), lsE, step(0.5, uEarthLS)) * eSoft;
+  float dark = 1.0 - mix(smoothstep(-0.05, 0.1, dot(Ng, L)), term, step(0.5, uEarthLS));
+  color += albedo * uEarthTint * uEarthshine * uEarthLit * esPhoto * dark;
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>

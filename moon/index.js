@@ -111,9 +111,10 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uSunPos: { value: new THREE.Vector3() },
     uSunIntensity: { value: 1.25 },                         // tuned to sit next to MeshStandard planets lit by sunLight
     uEarthPos: { value: new THREE.Vector3() },
-    uEarthLit: { value: 0.5 },                              // how much of Earth's day side faces the Moon (0..1)
+    uEarthLit: { value: 0.5 },                              // Earth's brightness from here, 1 = full Earth (see updateMoon)
     uEarthTint: { value: new THREE.Color(0.55, 0.66, 0.9) }, // replaced by EarthBot's shared uniform when available
     uEarthshine: { value: 0.3 },                             // scaled for EarthBot's uEarthTint (~0.31 grey-blue)
+    uEarthLS: { value: 1.0 },                                // 1 = Lommel-Seeliger earthshine + Earth phase law; 0 = the old Lambert fill
     // Bright ray craters (analytic, on top of the LRO albedo; strongest near full Moon). 0 turns them off.
     uRayStrength: { value: 1.0 },
     uTycho: { value: seleno(-43.31, -11.36) },
@@ -189,7 +190,11 @@ export function updateMoon(moonBody, camera, sunLight, days) {
   // Earth's phase seen from the Moon: 1 = full Earth (new Moon, brightest earthshine), 0 = new Earth.
   const toSun = _sun.clone().sub(_earth).normalize();
   const toMoon = _moon.clone().sub(_earth).normalize();
-  u.uEarthLit.value = 0.5 * (1 + toSun.dot(toMoon));
+  // Brightness follows a Lambert sphere's phase law, not the lit fraction: a half Earth sends the Moon about 32% of a
+  // full Earth's light (not 50%), and a thin crescent Earth almost none, as measured for the "ashen light".
+  const cosA = Math.max(-1, Math.min(1, toSun.dot(toMoon)));
+  const a = Math.acos(cosA);
+  u.uEarthLit.value = u.uEarthLS.value > 0.5 ? (Math.sin(a) + (Math.PI - a) * cosA) / Math.PI : 0.5 * (1 + cosA);
 
   // Size easing: one camera distance (to the nearer of Earth/Moon) drives scale, tap target and label together.
   const d = Math.min(camera.position.distanceTo(_moon), camera.position.distanceTo(_earth));

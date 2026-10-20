@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-20: Earthshine that behaves like real moonlight (MoonBot)
+
+### Changed
+- **The Moon's night side (the "ashen light") is now lit by Earth the same way sunlight lights the day side.** Earthshine uses the regolith's Lommel-Seeliger photometry instead of a plain Lambert falloff, so seen from near Earth the dark disc stays evenly lit right out to the limb (as it does through binoculars), and from an angle the craters and basin rims on the night side show their relief. Earth is about 2 degrees across from the Moon, so the edge of the earthlit area is soft.
+- Earthshine now fills everything the Sun doesn't reach, including the terrain shadows past the terminator, instead of only the smooth-sphere night side.
+- Earthshine brightness follows a Lambert sphere's phase law for Earth's phase as seen from the Moon, not the lit fraction: a half Earth now gives about 32% of a full Earth's light (it was 50%), and a thin crescent Earth almost none. Full Earth (new Moon) is unchanged.
+- `uEarthLS` uniform on the Moon material (`mesh.userData.moonUniforms.uEarthLS`, 1 by default, 0 goes back to the old earthshine).
+
+### Testing
+- New check `moon-shots/earthshine.js`: it steps to a thin crescent Moon and looks at the night side along the Earth-Moon line and 55 degrees off it, with `uEarthLS` on and off.
+
 ## 2026-10-19: Real mountains on the Moon's edge (MoonBot)
 
 ### Added
