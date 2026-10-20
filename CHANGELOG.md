@@ -1,5 +1,83 @@
 # Changelog
 
+## 2026-10-20: Real positions for Saturn's, Uranus's and Neptune's moons (Space Model Coder)
+
+> Built on 2026-10-19; that run stopped before committing. **Verified and shipped 2026-10-20** on top of EarthBot's cloud silver-lining commit (`3acf17f`). The re-test found no bugs, so the feature code is unchanged from 10-19. On 2026-10-20 the Saturn card reads `Titan 3.3′ E · Iapetus 2.4′ SW`.
+
+### Added
+- **Real positions for 17 moons.** Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Hyperion, Iapetus and Phoebe; Miranda, Ariel, Umbriel, Titania and Oberon; Proteus, Triton and Nereid now sit where they really are around their planet on the sim date, in their real orbit planes and moving the right way round. Before, they started from made-up angles.
+  - New `ephemeris/satellites.js`. Each moon follows a precessing Kepler ellipse (mean longitude, eccentricity and periapsis, inclination and node, apse and node precession) in its local Laplace plane (Uranus's moons: in Uranus's equator). Mimas, Tethys and Hyperion also get their resonance librations (Mimas ±43° over 70.6 years from the 2:1 Tethys resonance, Hyperion ±9° over 640 days from the 4:3 Titan resonance).
+  - Orbit planes come out right without special cases. Iapetus is tilted ~15° from the rings. Phoebe (175°) and Triton (157°) go round backwards. Uranus's moons circle its sideways equator in the same direction Uranus spins, which is backwards relative to the IAU north pole. **They used to go the wrong way round.**
+  - Hyperion, Phoebe and Nereid draw their real (compressed) ellipses, turned to the real periapsis, which precesses.
+- **Re-anchoring, like the Galilean moons.** While time runs, the moons still move 30× slower so they stay readable. Setting the date (date picker, Today, an Events marker, or loading the page) snaps every one of them back to its real position for that date. They all share one slowed clock, so Hyperion stays in step with Titan.
+- **"Seen from Earth" row on the cards.** It shows where the moons appear next to the planet in Earth's sky on the sim date (light time included): the separation in arcminutes (′) or arcseconds (″) and a compass direction (E = east on the sky).
+  - Planet cards: Saturn `Titan 3.2′ E · Iapetus 3.0′ SW` (19 Oct 2026), Uranus `Titania 32″ NE · Oberon 42″ E`, Neptune `Triton 14″ S`.
+  - Each of the 17 moon cards: e.g. Titan `3.2′ east of Saturn · real position (JPL)`.
+  - When a moon passes in front of or behind the planet's disc, the row says `crossing in front of` / `hidden behind`.
+  - It is one short line (no-break spaces keep each moon's entry together), shown only while that body's own card is open, so asteroid, comet and probe cards and the galaxy view never show it. Works the same on iPad.
+- The "Why is this not to scale?" note now says that setting a date puts the outer moons at their real places.
+
+### Changed
+- `outermoons.js`: each moon's pivot is turned into its real orbit plane every frame. The orbit frame is converted from ICRF to the scene with the same 23.44° obliquity as `axes/` and `constellations/`, then into the planet's tilt group. Tidally locked moons still keep one face to the planet. The old hand-set `phase`, `incl`, `node`, `peri` and `periRate` values are now only a fallback and aren't used by any of these moons.
+- `ephemeris/moons.js`: `anchorMoonPhase` hands the date to bodies that have their own `anchor(days)`. The outer moons are `realLon` bodies, so main.js's existing `anchorGalileanMoons()` (called from `setSimTime` and at load) re-anchors them too. **No `main.js` changes.**
+- `ui/index.js` creates the new `ui/skyreadout.js` and updates it every frame (throttled to 4 Hz). `index.html` gains the hidden `#info-sky-row` table row.
+
+### Notes
+- **Sources** (cited in `ephemeris/satellites.js`):
+  - **JPL SSD Planetary Satellite Mean Elements** (https://ssd.jpl.nasa.gov/sats/elem/, fetched 2026-10-19), from SAT441 (Jacobson 2022), URA182 (Jacobson & Park 2025), NEP097 and NEP105. Used for a, the Laplace-plane poles and the starting precession rates.
+  - **JPL Horizons API.** The angles and rates are a least-squares fit of that model to Horizons' planetocentric ICRF vectors (894 dates, every 1471 h from 1950 to 2100).
+  - Why the fit: the SSD table's own epoch angles (M, ω) did not reproduce Horizons. Saturn's moons came out 6–160° off at J2000, and the page itself warns that its elements are "not intended for ephemeris computation".
+  - Uranus's reference pole is RA 77.311°, Dec +15.175°, which is the moons' prograde side (the opposite end of the IAU pole used by `axes/`).
+- **Check against JPL Horizons:** the angle between the drawn direction from the planet and Horizons' (geometric, 12:00 UT).
+
+  | Moon | 2026-10-19 | 2026-12-25 | rms / max, 1950–2100 |
+  |---|---|---|---|
+  | Titan | 0.01° | 0.02° | 0.02° / 0.04° |
+  | Iapetus | 0.08° | 0.05° | 0.07° / 0.20° |
+  | Triton | 0.03° | 0.03° | 0.07° / 0.19° |
+  | Titania | 0.09° | 0.13° | 0.11° / 0.30° |
+  | Oberon | 0.05° | 0.10° | 0.15° / 0.37° |
+  | Tethys | 0.03° | 0.03° | |
+  | Dione | 0.11° | 0.23° | |
+  | Rhea | 0.19° | 0.17° | |
+  | Enceladus | 0.36° | 0.35° | |
+  | Ariel | 0.07° | 0.04° | |
+  | Umbriel | 0.32° | 0.14° | |
+  | Miranda | 0.30° | 0.34° | 1.0° / 1.8° |
+  | Proteus | 0.15° | 0.19° | |
+  | Mimas | 1.5° | 1.0° | 1.7° / 3.3° |
+  | Phoebe | 1.4° | 2.4° | 1.1° / 2.5° |
+  | Hyperion | 2.7° | 2.5° | 2.0° / 4.2° |
+  | Nereid | 0.35° | 3.5° | 1.4° / 10.6° |
+
+  - The rms / max column is the fit's error across 1950–2100. Nereid's 10.6° maximum is right at periapsis, where it swings round fast.
+  - The other dates checked (1990, 2000, 2010, 2020, 2035, 2050) are all within the same limits.
+  - Outside 1950–2100 the mean motion is simply extrapolated. Positions stay finite at 1000-01-01 and 3000-12-31.
+- **Sky readout vs Horizons** (observer table, quantity 6: satellite offset from the planet, geocentric, 2026-10-19 12:00 UT). Each pair is the sim (E, N) then JPL:
+
+  | Moon | Sim (E, N) | JPL (E, N) |
+  |---|---|---|
+  | Titan | (+190.9″, −16.4″) | (+190.9″, −16.5″) |
+  | Iapetus | (−126.5″, −129.0″) | (−124.9″, −127.7″) |
+  | Titania | (+27.4″, +16.1″) | (+27.5″, +16.1″) |
+  | Oberon | (+41.8″, +0.7″) | (+41.9″, +0.6″) |
+  | Triton | (+0.2″, −13.5″) | (+0.2″, −13.5″) |
+  | Miranda | (−7.5″, −5.9″) | (−7.5″, −6.0″) |
+
+  On 2026-12-25 Titan is (+105.3″, +11.5″) against JPL (+105.2″, +11.4″).
+- **In the browser** (headless, all three devices): the drawn direction of every one of the 17 moons equals `satellites.js` to 0.000° right after setting 2026-10-19, 2026-12-25, 1989-08-25 and 2050-06-01, and after the Voyager 2 at Neptune Events marker. Running time moves them (slowed), and re-picking the date snaps them back exactly. Titania and Triton go round retrograde about the IAU north pole, Titan prograde and Phoebe retrograde.
+- **Tested** on 2026-10-19 on desktop 1280×800 and re-tested on 2026-10-20 on desktop 1440×900. Both days also covered iPad Pro 11 portrait and landscape (touch):
+  - The page loads with zero console errors or page errors.
+  - Saturn focus shows all 9 moons with labels and the readout. Tapping the Titan label opens its card.
+  - 2026-10-20: tapping (iPad) or clicking (desktop) the 3D discs of Rhea and Titan in the Saturn view opens their cards with the sky row. The "Today" button sets 2026-10-20.
+  - Search finds `titan`, `triton`, `titania`, `iapetus` and `phoebe`, and `uranus` / `neptune` show their readouts.
+  - The row hides on the Apophis, Halley and Earth cards and in the galaxy view.
+  - Galaxy view in and back works, and so do Halley and Apophis.
+- Screenshots:
+  - `screenshot-outer-moons.png` (new, 1440×900): Saturn and its labelled moons on 2026-10-20, seen from Earth's side, with the card's `Seen from Earth` row.
+  - `screenshot.png`, `screenshot-ipad.png` and `screenshot-ipad-portrait.png` refreshed on 2026-10-20.
+  - Also committed: `screenshot-axes.png` and `screenshot-constellations.png`. They show the spin-axes (`ffe03b1`) and constellations (`bfbe463`) features and had been left uncommitted until now.
+
 ## 2026-10-16: Famous asteroids and near-Earth objects (Space Model Coder)
 
 > Built on 2026-10-16 and re-verified on 2026-10-17 (with the two fixes listed under *Fixed (2026-10-17)* below); both runs stopped before committing. **Shipped 2026-10-18** after a further re-verification on top of EarthBot's cloud-seam commit (`39bba59`).

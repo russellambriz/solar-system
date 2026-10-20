@@ -12,6 +12,7 @@
 //  • Motion trails (Layers → Trails): each planet and dwarf planet trails the last eighth of its orbit, with dots at
 //    equal time steps; they spread out near the Sun, where it moves fastest (Kepler's second law).
 //  • Signal delay on the probes' labels while Layers → Distances is on (spacecraft.setSignalDelay).
+//  • "Seen from Earth" row on the Saturn / Uranus / Neptune cards and their moons' cards (skyreadout.js).
 //
 // Usage (main.js): const ui = createUI({ bodies, smallBodies, scene, camera, scaleDistance, realPositions, search,
 //   spacecraft, comets, getMode, getFocused, isPaused, togglePause, isTransitioning, isTouch, isCompact });
@@ -19,6 +20,7 @@
 import * as THREE from 'three';
 import { keplerAU, scaleAU } from '../smallbodies.js';
 import { planetAU, planetOrbitAU, PLANET_NAMES } from '../ephemeris/planets.js';
+import { createSkyReadout } from './skyreadout.js';
 
 const J2000 = Date.UTC(2000, 0, 1, 12), DAY_MS = 86400000;
 const TL_FROM = Date.UTC(1965, 0, 1), TL_TO = Date.UTC(2065, 0, 1);
@@ -409,6 +411,7 @@ export function createUI(o) {
   function update(d, cam, inGalaxy) {
     days = d; inGal = !!inGalaxy;
     updateTrails();
+    skyReadout.update(d);
     if (pendingGo) { const t = pendingGo; pendingGo = null; o.search?.go(t); }
     else if (pendingCard) {                              // the probe's card once the camera has arrived at the planet
       if (performance.now() > pendingCard.until) pendingCard = null;
@@ -428,8 +431,10 @@ export function createUI(o) {
     if (now - lastDraw > 140) { lastDraw = now; drawMap(); }
   }
 
+  const skyReadout = createSkyReadout({ getFocused: o.getFocused });
+
   return {
-    update, setHelp, setClean, setMap, events: EVENTS, choose: (k) => EVENTS[k] && choose(EVENTS[k]),
+    update, setHelp, setClean, setMap, skyReadout, events: EVENTS, choose: (k) => EVENTS[k] && choose(EVENTS[k]),
     stats: () => ({ helpOpen, clean, mapOn, mapShown: !mapBox.classList.contains('hidden') && !mapBox.classList.contains('squeezed'), shift,
       picks: picks.map((p) => p.name), trailsOn, trails: trails.length, event: shownEvent?.date ?? null,
       events: EVENTS.length, eventsOpen: evBox.open }),
