@@ -91,8 +91,8 @@ export function createSearch(api) {
     }
   }
   for (const it of comets?.items || []) {
-    add({ name: it.info.name, kind: 'comet', color: it.info.color, aliases: ALIASES[it.info.name], track: it,
-      sub: it.info.hyperbolic ? 'Interstellar visitor' : null,
+    add({ name: it.info.name, kind: 'comet', color: it.info.color, aliases: ALIASES[it.info.name] || it.info.aliases, track: it,
+      sub: it.info.sub || (it.info.hyperbolic ? 'Interstellar visitor' : null),
       go: () => goTracked(it, () => Math.max(2.5, (it.ion?.userData.pts[0].distanceTo(it.ion.userData.pts.at(-1)) || 0) * 0.9), () => comets.showInfo(it.info.name)) });
   }
   // famous asteroids (asteroids/, hooked in through comets/): fly in close (the meshes are tiny), then keep following

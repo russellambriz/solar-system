@@ -16,11 +16,18 @@
 // comet (scaleDistance(r) / r), so their shape and their size next to the orbits around them stay true. They are
 // camera-facing additive ribbons: a few dozen vertices updated per frame, one draw call each. Each comet has a label that opens an info card, and the
 // #toggle-comets Layers checkbox hides everything; the orbits also follow the Orbits checkbox.
+// Also the famous periodic and great comets (comets/famous.js): 67P/Churyumov-Gerasimenko (with a two-lobed "duck"
+// nucleus), 2P/Encke, 9P/Tempel 1, 81P/Wild 2, 109P/Swift-Tuttle, 55P/Tempel-Tuttle, NEOWISE (C/2020 F3) and
+// Tsuchinshan-ATLAS (C/2023 A3, whose near-Sun orbit is just open, so it uses the hyperbolic path without being an
+// interstellar visitor: `interstellar: false`). The periodic ones carry one ellipse per perihelion passage (`sets`), picked
+// by date in useSet().
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { scaleAU } from '../smallbodies.js';
 import { COMETS } from './data.js';
 import { VISITORS } from './interstellar.js';
+import { FAMOUS } from './famous.js';
 import { createAsteroids } from '../asteroids/index.js';
 
 const D2R = Math.PI / 180, TAU = Math.PI * 2, AU_KM = 149597870.7;
@@ -67,6 +74,26 @@ const posFromH = (c, H, out) => toScene(c, c.a * (Math.cosh(H) - c.e), -c.a * Ma
 const velDirFromH = (c, H, out) => toScene(c, -Math.sinh(H), Math.sqrt(c.e * c.e - 1) * Math.cosh(H), out).normalize();
 const posFromE = (c, E, out) => toScene(c, c.a * (Math.cos(E) - c.e), c.a * Math.sqrt(1 - c.e * c.e) * Math.sin(E), out);
 const velDirFromE = (c, E, out) => toScene(c, -Math.sin(E), Math.sqrt(1 - c.e * c.e) * Math.cos(E), out).normalize();
+
+// elliptical orbit, sampled densely near perihelion (E = π·s³), where the curve turns sharply for e ≈ 1
+function orbitSamples(c, out) {
+  for (let i = 0; i < 720; i++) { const s = -1 + (2 * i) / 720; (out[i] ||= new THREE.Vector3()); posFromE(c, Math.PI * s * s * s, out[i]); }
+  return out;
+}
+// 67P's "rubber duck": a big lobe and a smaller head on a neck (lobes ~4.1 and 2.6 km), lumpy, in the 1.5 × 1 × 1 frame the
+// other nuclei use
+function duckGeometry() {
+  const lobe = (r, x, y, seed) => {
+    const g = new THREE.IcosahedronGeometry(1, 2), p = g.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i);
+      const bump = 1 + 0.12 * Math.sin(v.x * 4 + seed) * Math.cos(v.y * 3.1 - seed) + 0.06 * Math.sin(v.z * 7 + seed * 2);
+      p.setXYZ(i, x + v.x * r * 1.05 * bump, y + v.y * r * 0.8 * bump, v.z * r * 0.7 * bump);
+    }
+    return g;
+  };
+  return mergeGeometries([lobe(0.85, -0.55, -0.1, 1.3), lobe(0.55, 0.85, 0.32, 4.1), lobe(0.32, 0.22, 0.12, 2.2)]);
+}
 
 function canvasTexture(size, draw) {
   const cv = document.createElement('canvas'); cv.width = cv.height = size;
@@ -186,7 +213,7 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
   let on = toggle ? toggle.checked : true;
   toggle?.addEventListener('change', () => { on = toggle.checked; });
 
-  const items = [...COMETS, ...VISITORS].map((c, k) => {
+  const items = [...COMETS, ...VISITORS, ...FAMOUS].map((c, k) => {
     const hyp = !!c.hyperbolic;
     const it = { name: c.name, info: c, prio: 2 - k, posAU: new THREE.Vector3(), velDir: new THREE.Vector3(), pos: new THREE.Vector3(),
       activity: 0, r: 0, inbound: false, markerPx: isTouch ? 10 : 8, hyperbolic: hyp };
@@ -214,7 +241,8 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
       layoutPath(it);
     } else {
       // orbit: sampled densely near perihelion (E = π·s³), where the curve turns sharply for e ≈ 1
-      for (let i = 0; i < 720; i++) { const s = -1 + (2 * i) / 720; it.orbitAU.push(posFromE(c, Math.PI * s * s * s, new THREE.Vector3())); }
+      orbitSamples(c, it.orbitAU);
+      if (c.sets) it.setIdx = c.sets.findIndex((s) => s.T === c.T);
       const pts = it.orbitAU.map((p) => scaleAU(p.clone(), scaleDistance));
       line = it.orbitLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),
         new THREE.LineBasicMaterial({ color: c.color, transparent: true, opacity: 0.3, depthWrite: false }));
@@ -226,8 +254,8 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
     it.head = new THREE.Group(); root.add(it.head);
     it.marker = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: c.color, transparent: true, depthWrite: false, sizeAttenuation: false }));
     it.coma = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xd8f4ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-    const ng = new THREE.IcosahedronGeometry(1, 1), np = ng.attributes.position, v = new THREE.Vector3();
-    for (let i = 0; i < np.count; i++) { v.fromBufferAttribute(np, i); v.multiplyScalar(1 + 0.25 * Math.sin(v.x * 3 + k) * Math.cos(v.y * 2.3)); np.setXYZ(i, v.x * 1.5, v.y, v.z); }
+    const ng = c.shape === 'duck' ? duckGeometry() : new THREE.IcosahedronGeometry(1, 1), np = ng.attributes.position, v = new THREE.Vector3();
+    if (c.shape !== 'duck') for (let i = 0; i < np.count; i++) { v.fromBufferAttribute(np, i); v.multiplyScalar(1 + 0.25 * Math.sin(v.x * 3 + k) * Math.cos(v.y * 2.3)); np.setXYZ(i, v.x * 1.5, v.y, v.z); }
     ng.computeVertexNormals();
     const rock = c.rock;                 // 'Oumuamua: a bare, elongated, reddish body (no coma), tumbling
     it.nucleus = new THREE.Mesh(ng, new THREE.MeshStandardMaterial(rock
@@ -235,7 +263,7 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
       : { color: 0x3a3632, roughness: 1, metalness: 0, emissive: 0x0b0a09 }));
     // the geometry is already 1.5× long in x; rock.size is the half-length of the long axis (scene units, enlarged like all nuclei)
     if (rock) it.nucleus.scale.set(rock.stretch[0] / 1.5, rock.stretch[1], rock.stretch[2]).multiplyScalar(rock.size / rock.stretch[0]);
-    else it.nucleus.scale.setScalar(c.nucleusKm > 30 ? 0.05 : 0.035);
+    else it.nucleus.scale.setScalar(c.nucleusKm > 30 ? 0.05 : c.nucleusKm >= 20 ? 0.045 : 0.035);
     it.head.add(it.marker, it.coma, it.nucleus);
     // tails: ion (narrow, blue, straight away from the Sun) and dust (broad, cream, curving back along the orbit)
     it.ion = makeRibbon(0x6fa8ff, 0.95, 1, 1.2);
@@ -249,7 +277,7 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
   function makeLabel(it) {
     const wrap = document.createElement('div'); wrap.className = 'comet-wrap';
     const el = document.createElement('div');
-    el.className = 'label small solar-label comet-label' + (it.hyperbolic ? ' visitor-label' : '');
+    el.className = 'label small solar-label comet-label' + (it.hyperbolic && it.info.interstellar !== false ? ' visitor-label' : '');
     el.textContent = it.info.short;
     el.title = it.info.name;
     wrap.appendChild(el);
@@ -270,12 +298,13 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
     if (label === 'Distance from Sun') {
       const km = r * AU_KM, kmText = km >= 1e12 ? `${fmtN(km / 1e12, 2)} trillion km` : km >= 1e9 ? `${fmtN(km / 1e9, 2)} billion km` : `${fmtN(km / 1e6)} million km`;
       if (it.hyperbolic) {
-        const where = r < c.q * 1.05 ? 'at its closest to the Sun' : it.inbound ? 'falling in from interstellar space' : 'leaving the Solar System for good';
-        const act = !c.rOn ? '' : it.activity >= 0.01 ? ` · showing ${c.tailText}` : ' · no coma this far out';
+        const where = r < c.q * 1.05 ? 'at its closest to the Sun' : c.interstellar === false ? (it.inbound ? 'falling in from the Oort cloud' : 'heading back out to the Oort cloud')
+          : it.inbound ? 'falling in from interstellar space' : 'leaving the Solar System for good';
+        const act = c.tailsInline ? ' · ' + tailsText(it) : !c.rOn ? '' : it.activity >= 0.01 ? ` · showing ${c.tailText}` : ' · no coma this far out';
         return `${fmtN(r, r < 10 ? 2 : r < 1000 ? 1 : 0)} AU (${kmText}), ${where}${act}`;
       }
       const near = r < c.q * 1.05 ? 'at its closest to the Sun' : r > c.a * (1 + c.e) * 0.97 ? 'near its farthest point' : it.inbound ? 'heading in' : 'heading out';
-      return `${r.toFixed(r < 10 ? 2 : 1)} AU (${kmText}), ${near}`;
+      return `${r.toFixed(r < 10 ? 2 : 1)} AU (${kmText}), ${near}` + (c.tailsInline ? ' · ' + tailsText(it) : '');
     }
     if (label === 'Speed') {
       // vis-viva: v² = GM(2/r − 1/a); far from the Sun it settles to v∞ = √(GM/|a|)
@@ -286,6 +315,15 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
     if (it.activity < 0.01) return `None: at ${fmtN(r, r < 10 ? 1 : 0)} AU from the Sun its ices stay frozen`;
     const mkm = (au) => fmtN(au * it.activity * AU_KM / 1e6);
     return `Ion tail ~${mkm(c.ionAU)} million km, dust tail ~${mkm(c.dustAU)} million km (longest at perihelion)`;
+  }
+  // famous comets (famous.js) fold the tails into the distance row, so their fourth row can name the mission or meteor shower
+  function tailsText(it) {
+    const c = it.info;
+    if (it.activity < 0.01) return 'no tails this far out';
+    const mi = c.ionAU * it.activity * AU_KM / 1e6, md = c.dustAU * it.activity * AU_KM / 1e6;
+    if (Math.max(mi, md) < 1) return 'faint tails under 1 million km long';
+    const mkm = (m) => (m < 1 ? '<1' : '~' + fmtN(m, m < 10 ? 1 : 0));
+    return `tails ${mkm(mi)} (ion) and ${mkm(md)} million km (dust)`;
   }
   function fillRows(it, liveOnly) {
     it.info.rows.forEach(([label, value], k) => {
@@ -359,6 +397,7 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
           it.pathMat.uniforms.uTime.value = time;
           it.pathMat.uniforms.uRes.value.set(W, H);
         } else {
+          if (c.sets) useSet(it, days);
           const M = ((days - c.T) / c.period) * TAU;
           const E = solveKepler(M, c.e);
           posFromE(c, E, it.posAU);
@@ -450,6 +489,22 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
     }
   }
 
+  // famous.js periodic comets: one osculating ellipse per perihelion passage (Jupiter keeps reshaping them). Pick the one for
+  // this date; on a change, copy its elements in and redraw the orbit line (720 points, only when the set changes).
+  function useSet(it, days) {
+    const sets = it.info.sets;
+    let k = sets.length - 1;
+    while (k > 0 && !(sets[k].from <= days)) k--;
+    if (k === it.setIdx) return;
+    it.setIdx = k;
+    const s = sets[k], c = it.info;
+    c.q = s.q; c.e = s.e; c.i = s.i; c.node = s.node; c.peri = s.peri; c.T = s.T; c.period = s.period; c.a = s.a;
+    orbitSamples(c, it.orbitAU);
+    const pos = it.orbitLine.geometry.attributes.position;
+    it.orbitAU.forEach((p, i) => { _a.copy(p); scaleAU(_a, scaleDistance); pos.setXYZ(i, _a.x, _a.y, _a.z); });
+    pos.needsUpdate = true; it.orbitLine.geometry.computeBoundingSphere();
+  }
+
   // redraw the orbit lines after main.js's distance scale changes (positions and tails follow by themselves)
   function layoutPath(it) {
     const geo = it.orbitLine.geometry, A = geo.attributes, n = it.orbitAU.length;
@@ -480,7 +535,7 @@ export function createComets({ scene, bodies, renderer, isTouch = false, scaleDi
     showInfo: (name) => { const it = items.find((i) => i.name === name || i.info.short === name); return it ? showInfo(it) : false; },
     get: (name) => items.find((i) => i.name === name || i.info.short === name),
     stats: () => ({ on, comets: items.map((i) => ({ name: i.info.short, r: +i.r.toFixed(3), activity: +i.activity.toFixed(3),
-      tails: i.ion.visible || i.dust.visible, label: i.labelObj.visible,
-      ...(i.hyperbolic ? { inbound: i.inbound, posAU: i.posAU.toArray().map((x) => +x.toFixed(4)) } : {}) })), open: open && open.info.short }),
+      tails: i.ion.visible || i.dust.visible, label: i.labelObj.visible, posAU: i.posAU.toArray().map((x) => +x.toFixed(4)),
+      ...(i.hyperbolic ? { inbound: i.inbound } : {}), ...(i.info.sets ? { set: i.setIdx } : {}) })), open: open && open.info.short }),
   };
 }
