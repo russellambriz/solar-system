@@ -14,6 +14,11 @@
 //     terminator" it must be before it lights up
 //   • level of detail: uDetail (from Earth's on-screen size, see index.js) fades the cloud shadows and widens /
 //     dims the glint at overview distances, where the tight lobe and the offset shadow lookup would shimmer
+//   • seasons: the December 2004 and July 2004 Blue Marble maps are blended by the date (uSeasonW, from the
+//     Sun's position in index.js). Above ~25° latitude the blend is progressive with latitude, so the snow line
+//     sweeps south across Canada / Siberia in autumn and back north in spring, with a noisy, uneven edge; the
+//     southern hemisphere runs the other way round (Patagonian snow, winter sea ice round Antarctica). The tropics
+//     cross-fade evenly (wet / dry season greening).
 // The blue limb haze over the disc is no longer faked here: earth/atmosphere.js adds physically-based aerial
 // perspective (single scattering) on top of ground + clouds.
 //
@@ -49,6 +54,10 @@ uniform sampler2D uNightMap;
 uniform sampler2D uWaterMap;
 uniform sampler2D uCloudMap;
 uniform sampler2D uNormalMap;
+uniform sampler2D uDayMapJul;     // July day map (seasonal partner of uDayMap = December)
+uniform float uDayJulReady;       // 0 until it has loaded
+uniform float uSeasonW;           // December-map weight for the current date (1 = northern winter, 0 = summer)
+uniform float uSeason;            // seasonal blend strength (0 = December map only)
 
 uniform vec3  uSunDir;          // world-space unit vector Earth → Sun (updated each frame)
 uniform vec3  uSunDirObj;       // same, in the ground mesh's object space (tilt + spin removed)
@@ -106,6 +115,13 @@ float seaRoughness(float phi, float cloud, float noise) {
   return clamp(r * mix(1.0, 0.3, shelter), 0.0, 1.0);
 }
 
+// Weight of the December map at this latitude. x = seasonal weight (1 Dec … 0 Jul for the hemisphere's winter
+// map); poleward places switch first: threshold 0.06 at 80°, 0.94 at 35°, jittered by value noise.
+float seasonFront(float x, float alat, float n) {
+  float th = clamp((80.0 - alat) / 45.0, 0.0, 1.0) * 0.88 + 0.06 + (n - 0.5) * 0.16;
+  return smoothstep(th - 0.1, th + 0.1, x);
+}
+
 void main() {
   vec3 N = normalize(vNormalW);
   vec3 L = normalize(uSunDir);
@@ -113,6 +129,18 @@ void main() {
   float NdLgeo = dot(N, L);
 
   vec3  day   = texture2D(uDayMap, vUv).rgb;
+  // ---- seasons (December ↔ July map) --------------------------------------------------------------------------
+  {
+    float k = uSeason * uDayJulReady;
+    if (k > 0.001) {
+      float lat = (vUv.y - 0.5) * 180.0, alat = abs(lat);
+      float n = vnoise(vObjDir * 7.0) * 0.6 + vnoise(vObjDir * 23.0) * 0.4;
+      float front = lat > 0.0 ? seasonFront(uSeasonW, alat, n)            // north: winter = December map
+                              : 1.0 - seasonFront(1.0 - uSeasonW, alat, n); // south: winter = July map
+      float wDec = mix(uSeasonW, front, smoothstep(15.0, 35.0, alat));
+      day = mix(day, texture2D(uDayMapJul, vUv).rgb, (1.0 - wDec) * k);
+    }
+  }
   float water = texture2D(uWaterMap, vUv).r;
 
   // ---- relief (land only; oceans stay mirror-smooth) -------------------------------------------------

@@ -30,6 +30,11 @@ const DAY_MEAN = new THREE.Vector3(0.1014, 0.1014, 0.1165);
 const CLOUD_FRACTION = 0.3;
 export const EARTH_TINT = DAY_MEAN.clone().multiplyScalar(1 - CLOUD_FRACTION).addScalar(0.8 * CLOUD_FRACTION);
 
+// December-map weight per month (Jan … Dec, mid-month) for the seasonal day-map blend: approximate Northern
+// Hemisphere snow-cover climatology (Rutgers Global Snow Lab monthly means, ~3 M km² in Jul/Aug … ~47 in Jan),
+// normalised so July → 0 (the July 2004 map) and December → 1 (the December 2004 map), clamped to 0..1.
+const SNOW_W = [1, 1, 0.91, 0.67, 0.38, 0.14, 0, 0, 0.05, 0.38, 0.76, 1];
+
 // Tunables (exposed on earth.params for console experiments)
 const DEFAULTS = {
   cloudAltitude: 0.02,     // cloud sphere radius = radius · (1 + cloudAltitude)  (matches the old main.js value)
@@ -81,6 +86,9 @@ const DEFAULTS = {
   auroraSpeed: 1.0,        //   curtain drift speed (real time)
   auroraSamples: 8,        //   emission samples per pixel (mobile: auroraSamplesMobile)
   auroraSamplesMobile: 5,
+  season: 1.0,             // seasonal day map: blends the December and July Blue Marble maps by the Sun's position
+                           // (snow line advancing/retreating with latitude); 0 = December map only (previous look)
+  seasonWeight: null,      //   force the December-map weight 0..1 (testing); null = from the Sun's ecliptic longitude
   ambient: 0.015,          // a bit below the scene's MeshStandard ambient so city lights read on the night side
 };
 
@@ -103,6 +111,10 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
   const black = solidTexture(0, 0, 0);
   const U = {
     uDayMap:        { value: placeholderDay },
+    uDayMapJul:     { value: black },
+    uDayJulReady:   { value: 0 },
+    uSeasonW:       { value: 1 },   // December-map weight (1 = northern winter … 0 = northern summer)
+    uSeason:        { value: P.season },
     uNightMap:      { value: black },
     uWaterMap:      { value: black },
     uCloudMap:      { value: black },
@@ -158,10 +170,11 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     isMobile,
     renderer,
     onLoad(key, tex) {
-      const uni = { day: U.uDayMap, night: U.uNightMap, water: U.uWaterMap, clouds: U.uCloudMap, normal: U.uNormalMap }[key];
+      const uni = { day: U.uDayMap, dayJul: U.uDayMapJul, night: U.uNightMap, water: U.uWaterMap, clouds: U.uCloudMap, normal: U.uNormalMap }[key];
       const old = uni.value;
       uni.value = tex;
       if (key === 'clouds') U.uCloudsReady.value = 1;
+      if (key === 'dayJul') U.uDayJulReady.value = 1;
       if (old && old !== tex && old !== black) disposeTex(old);
     },
   });
@@ -185,6 +198,27 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
   // ---- per-frame update ---------------------------------------------------------------------------------------
   const _sun = new THREE.Vector3(), _earth = new THREE.Vector3(), _q = new THREE.Quaternion(),
         _m = new THREE.Matrix4(), _s = new THREE.Vector3(), _cam = new THREE.Vector3(), _buf = new THREE.Vector2();
+  const _axis = new THREE.Vector3(), _gam = new THREE.Vector3(), _e2 = new THREE.Vector3(), _ecl = new THREE.Vector3(0, 1, 0);
+  const season = { lambda: 0, month: 0, w: 1 };   // Sun's ecliptic longitude (deg), month (0 = 1 Jan), Dec weight
+  // Season from geometry, so it always matches the lighting on screen (and follows the time slider): the Sun's
+  // ecliptic longitude λ is measured from the March-equinox direction γ (node of the equator on the ecliptic,
+  // scene +Y = ecliptic north). λ → date (equinox ≈ 20 Mar, mean motion) → December-map weight from the
+  // northern snow-cover cycle, so autumn snow arrives late (Oct–Nov) and melts in Apr–Jun, not as a sine wave.
+  function updateSeason(dir, axis) {
+    _gam.crossVectors(axis, _ecl);
+    if (_gam.lengthSq() < 1e-10) _gam.set(1, 0, 0);
+    _gam.normalize();
+    _e2.crossVectors(_ecl, _gam);
+    if (_e2.dot(axis) < 0) { _gam.negate(); _e2.negate(); }       // λ = 90° must be the June solstice (δ > 0)
+    const lam = Math.atan2(dir.dot(_e2), dir.dot(_gam));
+    season.lambda = ((THREE.MathUtils.radToDeg(lam) % 360) + 360) % 360;
+    season.month = (((79.5 + season.lambda / 360 * 365.25) / 365.25 * 12) % 12 + 12) % 12;
+    const m = season.month - 0.5, i = Math.floor(m), f = m - i;          // table is at mid-month
+    const a = SNOW_W[(i + 12) % 12], b = SNOW_W[(i + 13) % 12];
+    season.w = P.seasonWeight ?? (a + (b - a) * f);
+    U.uSeasonW.value = season.w;
+    U.uSeason.value = P.season;
+  }
   const lod = { px: 0 };          // last measured on-screen radius (device px), for debugging/tests
   function update(camera) {
     sunLight.getWorldPosition(_sun);
@@ -194,6 +228,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     dir.normalize();
     // Sun direction in the ground's object frame (removes axial tilt + daily spin)
     surface.getWorldQuaternion(_q);
+    updateSeason(dir, _axis.set(0, 1, 0).applyQuaternion(_q));
     U.uSunDirObj.value.copy(dir).applyQuaternion(_q.invert());
     U.uWorldToGround.value.setFromMatrix4(_m.makeRotationFromQuaternion(_q));   // _q is now the inverse
     // aurora: geomagnetic pole in the ground frame (same lat/lon convention as latLonToWorld), slow real-time drift
@@ -295,7 +330,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
   }
 
   const api = { radius, group, surface, clouds, atmosphere, uniforms: U, uEarthTint: U.uEarthTint, params: P, textureInfo, lod,
-    cloudClock, update, dispose };
+    cloudClock, season, update, dispose };
   api.getCinematicStart = (out, opts) => getCinematicStart(api, sunLight, out, opts);
   api.latLonToWorld = (latDeg, lonDeg, altitudeKm = 0, out) => latLonToWorld(api, latDeg, lonDeg, altitudeKm, out);
   return api;
