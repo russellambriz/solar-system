@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-21: Sharper mountain and crater shadows up close (MoonBot)
+
+### Changed
+- On desktop, the close-up map set the Moon streams in when you fly near it now includes a 4K LOLA elevation map
+  (`textures/moon/moon_height_4k.png`, from NASA's CGI Moon Kit) instead of the 2K one. Terrain shadows along the
+  terminator are traced on ~2.7 km steps instead of ~5.3 km, so shadow edges are crisper, small craters near the
+  terminator cast their own shadows, and sunlit rims and peaks stand out more cleanly. Desktop shadow march: 44 steps (was 40).
+- iPad is unchanged (it keeps the 1K maps and never downloads the 4K set).
+- New check `moon-shots/heights4k.js` shoots the Apennines, the southern highlands and Plato at first quarter with the 4K
+  and the old 2K elevation map.
+
 ## 2026-10-20: Earthshine that behaves like real moonlight (MoonBot)
 
 ### Changed

@@ -17,7 +17,7 @@ Nothing else in the maps changed. The maps are sampled with repeat wrapping in l
 
 Terrain shadows (2026-10-17):
 - `moon_height_1k.png` (1024x512, all devices): the kit's LOLA elevation map `ldem_4_uint.tif` (4 px/deg), box-resampled.
-- `moon_height_2k.png` (2048x1024, desktop close-up set): `ldem_16_uint.tif` (16 px/deg), box-resampled.
+- `moon_height_2k.png` (2048x1024, the desktop close-up set until 2026-10-21; now only the before/after baseline in `moon-shots/heights4k.js`): `ldem_16_uint.tif` (16 px/deg), box-resampled.
 - Encoding: height above the 1737.4 km reference sphere, mapped linearly from -9.5 km .. +11.0 km to a 10-bit value
   v (0..1023), stored as the 16-bit number v * 64 split across red (high byte) and green (low byte); blue is 0.
   Decode: km = -9.5 + 20.5 * (R * 256 + G) / 65472. Lossless PNG, so the shader reads it exactly (about 20 m steps).
@@ -25,3 +25,8 @@ Terrain shadows (2026-10-17):
 
 Limb profile (2026-10-19): no new files. `moon_height_1k.png` / `moon_height_2k.png` also displace the Moon's geometry
 (heights x2) in the vertex shader, and the 1K map is read once on the CPU (same decode) so surface markers sit on that ground.
+
+Sharper terrain shadows (2026-10-21):
+- `moon_height_4k.png` (4096x2048, desktop close-up set, streamed with the 4K colour and normal maps): the kit's
+  `ldem_16_uint.tif` (16 px/deg, stored as half-metres above -10 km) box-resampled to 4096x2048, same 10-bit R/G encoding
+  as the other height maps. About 2.7 km per texel at the equator, half the old 2K map's step. Never loaded on iPad.

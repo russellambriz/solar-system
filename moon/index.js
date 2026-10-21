@@ -142,7 +142,7 @@ export function createMoonMesh({ radius, isTouch = false }) {
   };
   // iPad: three size bands (down to ~3 km craters); desktop adds a fourth (~1.3 km) for the closest views.
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG,
-    defines: { DETAIL_BANDS: isTouch ? 3 : 4, SHADOW_STEPS: isTouch ? 24 : 40, MINOR_RAYS: MINOR_RAYS.length } });
+    defines: { DETAIL_BANDS: isTouch ? 3 : 4, SHADOW_STEPS: isTouch ? 24 : 44, MINOR_RAYS: MINOR_RAYS.length } });
 
   const lod = new THREE.LOD();
   // The closest level is fine enough for the displaced limb to show mountain profiles (~20 km steps on desktop,
@@ -202,17 +202,18 @@ export function updateMoon(moonBody, camera, sunLight, days) {
   const far = base * 40, near = base * 8;                  // overview look beyond `far`, real ratio inside `near`
   const t = 1 - THREE.MathUtils.smoothstep(d, near, far);
   const s = THREE.MathUtils.lerp(1, REAL_RATIO / OVERVIEW_RATIO, t);
-  // Close-up detail: on desktop, swap in the 4K color + relief maps the first time the camera gets close.
+  // Close-up detail: on desktop, swap in the 4K color, relief and elevation maps the first time the camera gets close
+  // (the 4K elevation map halves the terrain-shadow step to ~2.7 km, so shadow edges and lit peaks come out sharper).
   // They load in the background; the 2K set stays on screen until both are ready, so there's no pop to grey.
   if (t > 0.35 && moonBody.mesh.userData.hiRes === 'pending') {
     moonBody.mesh.userData.hiRes = 'loading';
     let ready = 0;
     const map = loadHiRes('moon_color_4k.jpg', true), nrm = loadHiRes('moon_normal_4k.jpg', false);
-    const hgt = loadHeight('moon_height_2k.png', () => done());
+    const hgt = loadHeight('moon_height_4k.png', () => done());
     function done() {
       if (++ready < 3) return;
       u.uMap.value = map; u.uNormalMap.value = nrm; u.uMapTexel.value = (2 * Math.PI) / 4096;
-      u.uHeightMap.value = hgt; u.uHeightTexel.value = (2 * Math.PI) / 2048;
+      u.uHeightMap.value = hgt; u.uHeightTexel.value = (2 * Math.PI) / 4096;
       moonBody.mesh.userData.hiRes = 'loaded';
     }
     map.onReady = nrm.onReady = done;
