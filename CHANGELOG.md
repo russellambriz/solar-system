@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-21: Moon phase readout says "as seen from Earth"
+
+### Changed
+- The Moon's phase readout on the Moon info card and in the Controls panel now ends with ", as seen from Earth" (e.g. "Full Moon · 99% lit, as seen from Earth"). The longer text wraps on narrow screens instead of overflowing (`main.js`).
+
 ## 2026-10-21: Famous comets on real JPL orbits: 67P, Encke, Tempel 1, Wild 2, Swift-Tuttle, Tempel-Tuttle, NEOWISE and Tsuchinshan-ATLAS (Space Model Coder)
 
 ### Added

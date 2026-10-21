@@ -793,7 +793,7 @@ function showInfo(b) {
     $('info-day').textContent = i.dayText;
     if (b.name === 'Moon') {
       const ph = currentMoonPhase();
-      if (ph && $('info-phase')) $('info-phase').textContent = ph.label;
+      if (ph && $('info-phase')) setPhaseText($('info-phase'), moonPhaseText(ph));
     }
   } else if (b.name === 'Sun') {
     $('info-distance-label').textContent = 'Distance from Sun';
@@ -1499,13 +1499,22 @@ function currentMoonPhase() {
   return moonPhaseFromPositions(_earthPos, _moonPos);
 }
 
+// Phase readout wording, e.g. "Full Moon · 99% lit, as seen from Earth"
+function moonPhaseText(ph) { return ph.label + ', as seen from Earth'; }
+// let the longer readout wrap on narrow screens instead of overflowing/clipping
+function setPhaseText(el, text) {
+  if (el.textContent !== text) el.textContent = text;
+  el.style.whiteSpace = 'normal';
+  el.style.overflowWrap = 'anywhere';
+}
+
 function updateMoonPhaseUI() {
   const ph = currentMoonPhase();
   if (!ph) return;
   const ctrl = $('moon-phase');
-  if (ctrl) ctrl.textContent = 'Moon: ' + ph.label;
+  if (ctrl) setPhaseText(ctrl, 'Moon: ' + moonPhaseText(ph));
   const infoPh = $('info-phase');
-  if (infoPh && focused && focused.name === 'Moon') infoPh.textContent = ph.label;
+  if (infoPh && focused && focused.name === 'Moon') setPhaseText(infoPh, moonPhaseText(ph));
 }
 
 function updateBodies() {
