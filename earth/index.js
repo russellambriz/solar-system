@@ -75,6 +75,12 @@ const DEFAULTS = {
   seaState: 1.0,           // sea-state roughness map strength (calm gulfs / rough westerlies); 0 = uniform sea
   sheen: 0.5,              // broad wind-roughened glint around the core (Cox–Munk-like); 0 = tight core only
   normalStrength: 1.0,     // × the baked relief (GEBCO_08, 20× vertical exaggeration; see SOURCES.md), land only
+  aurora: 0.55,            // auroral ovals on the night side (atmosphere.js); 0 = previous look
+  auroraPoleLat: 80.8,     //   north geomagnetic (dipole) pole, IGRF ~2025
+  auroraPoleLon: -72.6,
+  auroraSpeed: 1.0,        //   curtain drift speed (real time)
+  auroraSamples: 8,        //   emission samples per pixel (mobile: auroraSamplesMobile)
+  auroraSamplesMobile: 5,
   ambient: 0.015,          // a bit below the scene's MeshStandard ambient so city lights read on the night side
 };
 
@@ -139,6 +145,10 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uR:             { value: radius },
     uRa:            { value: radius * (1 + P.atmoThickness) },
     uEarthTint:     { value: EARTH_TINT.clone() },
+    uAurora:        { value: P.aurora },
+    uAuroraPole:    { value: new THREE.Vector3(0, 1, 0) },
+    uAuroraTime:    { value: 0 },
+    uWorldToGround: { value: new THREE.Matrix3() },
   };
 
   // ---- meshes ------------------------------------------------------------------------------------------------
@@ -169,7 +179,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
 
   const clouds = createCloudMesh(radius * (1 + P.cloudAltitude), U, segs);
   const atmosphere = createAtmosphere(radius, U, P.atmoThickness, isMobile ? 48 : 64,
-    isMobile ? P.atmoSamplesMobile : P.atmoSamples);
+    isMobile ? P.atmoSamplesMobile : P.atmoSamples, isMobile ? P.auroraSamplesMobile : P.auroraSamples);
   group.add(clouds, atmosphere);
 
   // ---- per-frame update ---------------------------------------------------------------------------------------
@@ -185,6 +195,16 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     // Sun direction in the ground's object frame (removes axial tilt + daily spin)
     surface.getWorldQuaternion(_q);
     U.uSunDirObj.value.copy(dir).applyQuaternion(_q.invert());
+    U.uWorldToGround.value.setFromMatrix4(_m.makeRotationFromQuaternion(_q));   // _q is now the inverse
+    // aurora: geomagnetic pole in the ground frame (same lat/lon convention as latLonToWorld), slow real-time drift
+    {
+      const la = THREE.MathUtils.degToRad(P.auroraPoleLat), ph = THREE.MathUtils.degToRad(P.auroraPoleLon + 180);
+      U.uAuroraPole.value.set(-Math.cos(ph) * Math.cos(la), Math.sin(la), Math.sin(ph) * Math.cos(la));
+      const now = performance.now();
+      U.uAuroraTime.value = (U.uAuroraTime.value + Math.min((now - (auroraClock.t || now)) / 1000, 0.1) * P.auroraSpeed) % 1000;
+      auroraClock.t = now;
+      U.uAurora.value = P.aurora;
+    }
     // Cloud deck: locked to the ground frame. main.js still writes clouds.rotation.y = spin × 1.15 every frame
     // (updateBodies); that solid-body spin-up is overridden here, right before drawing, and replaced by the
     // latitude-dependent drift in the shaders (CLOUD_FLOW). No main.js change needed.
@@ -234,6 +254,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
   // slider). It is rate-limited to P.cloudMaxRate per real second, so at huge time speeds the clouds keep moving
   // smoothly instead of strobing; big jumps (tab switch, date change) are absorbed the same way.
   const close = { k: 0, t: performance.now() };
+  const auroraClock = { t: 0 };
   const cloudClock = { t: 0, lastSpin: null, lastNow: 0 };
   function lockClouds() {
     if (clouds.rotation.y !== surface.rotation.y || clouds.rotation.x !== surface.rotation.x || clouds.rotation.z !== surface.rotation.z) {

@@ -41,8 +41,12 @@ export function galileanElements(name) {
 /**
  * Anchor a slowed moon so that at `days` its `phase + days/(period·slow)·2π` equals the real mean longitude.
  * While time runs the moon still moves at the slowed rate (readable at 10 days/s); picking a date snaps it back.
+ * Bodies with their own `anchor(days)` (the outer moons) are handed the date instead.
  */
 export function anchorMoonPhase(b, days, realLonRad) {
+  // Saturn's, Uranus's and Neptune's moons (outermoons.js) carry full real elements (ephemeris/satellites.js) and
+  // re-anchor themselves: main.js's anchorGalileanMoons() reaches them here because they are `realLon` bodies too.
+  if (b.anchor) { b.anchor(days); return; }
   b.phase = realLonRad - (days / (b.period * b.slow)) * Math.PI * 2;
 }
 

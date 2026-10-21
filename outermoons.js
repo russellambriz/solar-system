@@ -2,13 +2,20 @@
 //  • Round moons: procedural color + height maps baked ONCE on the GPU (bake() from moons.js), used as map + bumpMap.
 //  • Titan: an extra translucent haze shell (orange, lit by the Sun, bluish detached haze at the limb).
 //  • Hyperion & Phoebe (Saturn), Proteus & Nereid (Neptune): irregular "potato" meshes (createPotatoMesh from moons.js).
-// Orbits: each moon sits in its planet's equatorial plane (Uranus's is tipped 97.8°), with real inclinations where they
-// matter (Iapetus 15.5°, Phoebe 173° and Triton 156.9° = retrograde, Nereid 7°). Distances use the real semi-major axes, compressed
-// logarithmically so the order and spacing ratios survive while the whole system fits between the planets.
-// Nereid (e = 0.75), Phoebe (0.16) and Hyperion (0.12) follow real Kepler ellipses (radius compressed the same way);
-// Hyperion's ellipse also precesses so it stays in its 4:3 resonance with Titan (they only line up at Hyperion's far point).
+// Orbits (2026-10-19): every moon is at its REAL position for the sim date — direction from the planet, orbit plane and
+// direction of travel — from ephemeris/satellites.js (JPL mean elements + a fit to JPL Horizons; see that file for
+// sources). Each moon's pivot is turned into its real orbit plane (Laplace-plane precession included), so inclinations come
+// out right by themselves: Iapetus ~15° off Saturn's rings, Phoebe (175°) and Triton (157°) go round backwards, and Uranus's
+// moons circle its sideways equator in the same (retrograde vs. IAU north) sense as Uranus spins.
+// Distances use the real semi-major axes, compressed logarithmically so the order and spacing ratios survive while the
+// whole system fits between the planets. Hyperion (e ≈ 0.10), Phoebe (0.16) and Nereid (0.75) follow real precessing Kepler
+// ellipses (radius compressed the same way); Hyperion keeps its 4:3 resonance with Titan.
+// Motion is slowed 30× (sys.slow) so the moons stay readable while time runs; whenever the date is set (picker, Today,
+// Events, page load) each moon's `anchor(days)` snaps it back to the real position for that date (called through
+// ephemeris/moons.js anchorMoonPhase, which main.js's anchorGalileanMoons already calls for every `realLon` body).
 import * as THREE from 'three';
 import { bake, POTATO, createPotatoMesh } from './moons.js';
+import { SAT_ELEMENTS, satelliteState } from './ephemeris/satellites.js';
 
 const SPIN_SLOWDOWN = 50;   // same as main.js (only used for the non-locked moons: Hyperion, Phoebe, Nereid)
 
@@ -360,13 +367,10 @@ function createSurfaceMesh(renderer, name, radius, diameter, isTouch) {
     new THREE.MeshStandardMaterial({ map, bumpMap, bumpScale: isTouch ? 2.0 : 3.0, roughness: 0.95, metalness: 0, emissive: 0x0b0b0e }));
 }
 
-// Kepler: mean anomaly → (true anomaly, r/a)
-function kepler(M, e) {
-  let E = M;
-  for (let i = 0; i < 8; i++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
-  const nu = 2 * Math.atan2(Math.sqrt(1 + e) * Math.sin(E / 2), Math.sqrt(1 - e) * Math.cos(E / 2));
-  return [nu, 1 - e * Math.cos(E)];
-}
+// ICRF (equatorial J2000) → scene axes, with the same obliquity as constellations/raDecToScene and axes/orientTilt
+// (ecliptic = XZ, north = +Y, ecliptic longitude λ: x = cos λ, z = −sin λ).
+const OBL = 23.44 * Math.PI / 180, CE = Math.cos(OBL), SE = Math.sin(OBL);
+const icrfToScene = (v, out) => out.set(v[0], -v[1] * SE + v[2] * CE, -(v[1] * CE + v[2] * SE));
 
 /**
  * Build one planet's moon system. Returns moon body objects (main.js pushes them into `bodies`).
@@ -378,13 +382,23 @@ export function createOuterMoons(planetName, { renderer, isTouch, tiltGroup, par
   const mapDist = (km) => sys.inner + sys.k * Math.log(km / a0);
   const out = [];
   let maxR = 0;
+  // real orbit frame → tilt-group local: the tilt group's +Y is the IAU pole (axes/), its parent group is unrotated
+  const toLocal = new THREE.Quaternion();
+  const _P = new THREE.Vector3(), _Q = new THREE.Vector3(), _W = new THREE.Vector3(), _m = new THREE.Matrix4(), _st = {};
+  let anchorDays = null;                                  // sim date of the last date pick (shared, so resonances stay in step)
+  const realDays = (days) => {
+    if (anchorDays === null) anchorDays = days;
+    return anchorDays + (days - anchorDays) / sys.slow;   // slowed clock that equals the sim date right after a date pick
+  };
   for (const m of sys.moons) {
     m.distLabel = `Distance from ${planetName}`;
+    const el = SAT_ELEMENTS[m.name];
+    const e = el ? el.e : (m.e || 0);
     const size = Math.max(0.16, 0.0068 * Math.sqrt(m.diameter));
     const pivot = new THREE.Group();
     pivot.rotation.order = 'YXZ';
-    pivot.rotation.y = m.node || 0;                       // line of nodes
-    pivot.rotation.x = THREE.MathUtils.degToRad(m.incl || 0);   // inclination to the planet's equator (>90° = retrograde)
+    pivot.rotation.y = m.node || 0;                       // fallback only (moons without real elements)
+    pivot.rotation.x = THREE.MathUtils.degToRad(m.incl || 0);
     tiltGroup.add(pivot);
     const mg = new THREE.Group();
     pivot.add(mg);
@@ -393,37 +407,43 @@ export function createOuterMoons(planetName, { renderer, isTouch, tiltGroup, par
     if (m.haze) mesh.add(titanHaze(size, isTouch));
     const orbitDist = mapDist(m.a);
     const ring = orbitLine(orbitDist, 0xb8c4e6, 0.3);      // faint ring; follows the planet; toggled with "Orbit lines"
-    let update;
-    if (m.e) {
-      // eccentric (Nereid): reshape the ring to the compressed Kepler ellipse, move along it with Kepler's law
+    const eccentric = e > 0.05;                           // Hyperion, Phoebe, Nereid: draw the (compressed) ellipse
+    if (eccentric) {
       const pts = [];
-      for (let i = 0; i <= 256; i++) {
-        const nu = i / 256 * Math.PI * 2, rr = (1 - m.e * m.e) / (1 + m.e * Math.cos(nu)), d = mapDist(m.a * rr), th = nu + m.peri;
-        pts.push(new THREE.Vector3(Math.cos(th) * d, 0, -Math.sin(th) * d));
+      for (let i = 0; i <= 256; i++) {                    // periapsis along +x; ring.rotation.y = ω turns it into place
+        const nu = i / 256 * Math.PI * 2, rr = (1 - e * e) / (1 + e * Math.cos(nu)), d = mapDist(m.a * rr);
+        pts.push(new THREE.Vector3(Math.cos(nu) * d, 0, -Math.sin(nu) * d));
         maxR = Math.max(maxR, d);
       }
       ring.geometry.setFromPoints(pts);
-      update = (days) => {
-        // periRate (rad/day): apsidal precession (Hyperion: keeps the 4:3 Titan resonance, so conjunctions stay at Hyperion's apoapsis)
-        const dw = (m.periRate || 0) * days / sys.slow;
-        if (m.periRate) ring.rotation.y = dw;
-        const M = m.phase + (days / (m.period * sys.slow)) * Math.PI * 2 - dw;
-        const [nu, rr] = kepler(((M % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2), m.e);
-        const d = mapDist(m.a * rr), th = nu + m.peri + dw;
-        mg.position.set(Math.cos(th) * d, 0, -Math.sin(th) * d);
-        mesh.rotation.y = (days / m.rotation / SPIN_SLOWDOWN) * Math.PI * 2;
-      };
-    } else {
-      maxR = Math.max(maxR, orbitDist);
-      update = (days) => {
-        const ang = m.phase + (days / (m.period * sys.slow)) * Math.PI * 2;
-        mg.position.set(Math.cos(ang) * orbitDist, 0, -Math.sin(ang) * orbitDist);
-        mesh.rotation.y = ang + Math.PI;                  // tidally locked: local +x faces the planet
-      };
-    }
+    } else maxR = Math.max(maxR, orbitDist);
+    const locked = !m.rotation;
+    const update = (days) => {
+      const s = el && satelliteState(m.name, realDays(days), _st);
+      let u;
+      if (s) {
+        // orbit plane: pivot x → ascending node (P), pivot +y → orbit normal (W), pivot z → −Q (so angle u runs along the orbit)
+        toLocal.copy(tiltGroup.quaternion).invert();
+        icrfToScene(s.P, _P).applyQuaternion(toLocal);
+        icrfToScene(s.W, _W).applyQuaternion(toLocal);
+        icrfToScene(s.Q, _Q).applyQuaternion(toLocal).negate();
+        pivot.quaternion.setFromRotationMatrix(_m.makeBasis(_P, _W, _Q));
+        u = s.u;
+        if (eccentric) ring.rotation.y = s.w;
+      } else {
+        u = m.phase + (days / (m.period * sys.slow)) * Math.PI * 2;
+      }
+      const d = eccentric && s ? mapDist(s.r) : orbitDist;
+      mg.position.set(Math.cos(u) * d, 0, -Math.sin(u) * d);
+      mesh.rotation.y = locked ? u + Math.PI               // tidally locked: local +x faces the planet
+        : (days / m.rotation / SPIN_SLOWDOWN) * Math.PI * 2;
+    };
     pivot.add(ring);
     const mb = { name: m.name, info: m, group: mg, mesh, radius: size, isMoon: true,
-      parent, orbitDist, period: m.period, slow: sys.slow, phase: m.phase, update };
+      parent, orbitDist, period: m.period, slow: sys.slow, phase: m.phase, update,
+      realLon: !!el,                                      // main.js anchorGalileanMoons → ephemeris/moons.js anchorMoonPhase → anchor()
+      anchor: (days) => { anchorDays = days; } };
+    m.realPos = !!el;
     mb.labelEl = addLabel(mg, m.name, size + 0.4, true);
     addPickSphere(mg, size, mb);
     out.push(mb);
