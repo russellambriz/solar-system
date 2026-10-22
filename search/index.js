@@ -43,7 +43,7 @@ const KIND = {
   dwarf: { icon: '○', tag: 'Dwarf planet' }, asteroid: { icon: '◇', tag: 'Asteroid' }, neo: { icon: '◇', tag: 'Near-Earth asteroid' }, craft: { icon: '🛰', tag: 'Spacecraft' },
   site: { icon: '⚑', tag: 'Moon landing site' }, comet: { icon: '☄', tag: 'Comet' }, galaxy: { icon: '🌌', tag: 'Galaxy' },
   blackhole: { icon: '⚫', tag: 'Black hole' }, quasar: { icon: '✴', tag: 'Quasar' }, nebula: { icon: '✺', tag: 'Nebula' },
-  cluster: { icon: '✧', tag: 'Star cluster' },
+  cluster: { icon: '✧', tag: 'Star cluster' }, constellation: { icon: '✦', tag: 'Constellation', color: '#9fb4e0' },
 };
 const DEEP_KIND = { nebula: ['nebula', 'Emission nebula'], snr: ['nebula', 'Supernova remnant'], open: ['cluster', 'Open star cluster'], globular: ['cluster', 'Globular cluster'] };
 const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’'`]/g, '').replace(/[^a-z0-9*/+]+/g, ' ').trim();
@@ -119,6 +119,13 @@ export function createSearch(api) {
     const [kind, tag] = DEEP_KIND[o.kind] || ['nebula', 'Deep-sky object'];
     add({ name: o.name, kind, color: kind === 'cluster' ? '#cfe0ff' : '#ffb8d0', sub: `${tag} · ${fmtN(o.distLy)} ly`, deep: o, tag,
       go: galaxyGo(() => flyToDeep(o, tag)) });
+  }
+  // constellations/: select = highlight + info card (+ 'constellation-select' event for camera code); no camera move here
+  const cons = api.constellations;
+  for (const abbr of Object.keys(cons?.info || {}).sort((a, b) => cons.info[a].name.localeCompare(cons.info[b].name))) {
+    const f = cons.info[abbr];
+    add({ name: f.name, kind: 'constellation', color: '#9fb4e0', aliases: [abbr, f.meaning.replace(/^The /, '')], sub: `Constellation · ${f.meaning}`,
+      go: () => { if (getMode() === 'galaxy') exitGalaxy(); cons.select(abbr); } });
   }
 
   // ---- fly-to actions -------------------------------------------------------------------------------------------------
@@ -358,7 +365,7 @@ export function createSearch(api) {
     list.insertBefore(top, list.firstChild);
     const groups = [
       ['craft', '🛰 Spacecraft'], ['comet', '☄ Comets'], [(e) => e.notable, '◇ Famous asteroids'], ['site', '⚑ Moon landings'],
-      [['galaxy', 'blackhole', 'quasar'], '🌌 Galaxies & black holes'], [['nebula', 'cluster'], '✺ Nebulae & star clusters'],
+      [['galaxy', 'blackhole', 'quasar'], '🌌 Galaxies & black holes'], [['nebula', 'cluster'], '✺ Nebulae & star clusters'], ['constellation', '✦ Constellations'],
     ];
     for (const [kinds, title] of groups) {
       const ks = [].concat(kinds), items = entries.filter((e) => (typeof kinds === 'function' ? kinds(e) : ks.includes(e.kind)));

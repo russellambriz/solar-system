@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-22: Constellations you can pick and learn about: highlight + info cards for all 88 (Constellations)
+
+### Added
+- **Select a constellation** by clicking/tapping its name, tapping near its stick figure (8 px mouse / 22 px touch slop), or searching its name, IAU abbreviation or English meaning (e.g. "Orion", "Ori", "Hunter") in the search box. There is also a new "✦ Constellations" group in the object list. The figure's lines and stars light up gold and its label brightens. Close with the card's ✕, Esc, or by tapping empty sky. Tapping a planet still focuses the planet and closes the card. This works on iPad touch too.
+- **Info card for each of the 88** (`constellations/info.js`): name, English meaning, abbreviation, a short myth or story, brightest star(s) with apparent magnitude, notable deep-sky objects, area rank (1–88) and area in square degrees (IAU/Delporte boundaries), and best months to see it from Boise, Idaho (43.6° N). Best months are computed from the figure's right ascension, using the month when it is highest at about 9 pm. Visibility is computed from its declination range: circumpolar, fully visible, low in the south, partly visible, or "never rises" (17 never rise, e.g. Crux and Octans).
+- Overlapped (hidden) constellation labels can't be clicked.
+
+### API for camera code (ScaleBot)
+The constellation module doesn't move the camera or change the FOV. Turn-to-face and zoom are left to the camera owner:
+- `window.solar.constellations.getTarget(abbr)` returns `{ abbr, name, centerDir, radiusDeg }`. `centerDir` is a unit `THREE.Vector3` in world space, pointing from the camera toward the figure's centre (the sky sphere is at infinity). `radiusDeg` is the angular radius that holds every star in the figure (Orion ≈ 17.5°).
+- `window` events: `constellation-select` (`detail` = `getTarget(abbr)`) when one is picked; `constellation-clear` (`detail` = `{ abbr }`) when it is closed. Restore the previous view on clear.
+- Also `select(abbr)`, `clear()`, `selected`, `pickAt(clientX, clientY, camera, slopPx)`, `info`.
+- Hooks in `main.js`: a tap that hits no body calls `constellations.pickAt`, and `constellations` is passed to `createSearch`. Camera functions are unchanged.
+
 ## 2026-10-21: Moon phase readout says "as seen from Earth"
 
 ### Changed

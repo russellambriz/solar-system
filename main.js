@@ -930,7 +930,10 @@ const endPointer = (e) => {
     return;
   }
   const b = pick(e.clientX, e.clientY, e.pointerType === 'mouse' ? 10 : 28);
-  if (b) focusOn(b);
+  if (b) { constellations.clear(); focusOn(b); return; }
+  // constellations/: tap a stick figure to select it (card + highlight); tapping empty sky closes the card
+  const cAbbr = mode === 'solar' ? constellations.pickAt(e.clientX, e.clientY, camera, e.pointerType === 'mouse' ? 8 : 22) : null;
+  if (cAbbr) constellations.select(cAbbr); else constellations.clear();
 };
 el.addEventListener('pointerup', endPointer);
 el.addEventListener('pointercancel', endPointer);
@@ -1618,7 +1621,7 @@ window.addEventListener('resize', onResize);
 window.addEventListener('orientationchange', () => setTimeout(onResize, 250)); // iOS reports new size a bit late
 
 // search/: find any object by name and fly there (cinematic past the orbits/belts on long trips); grouped, filterable list
-const search = createSearch({ bodies, spacecraft, comets, localGroup, galaxy, camera, controls, focusOn, flyTo, flyToFixed, galaxyFly,
+const search = createSearch({ constellations, bodies, spacecraft, comets, localGroup, galaxy, camera, controls, focusOn, flyTo, flyToFixed, galaxyFly,
   enterGalaxy, exitGalaxy, getMode: () => mode, getGalaxyFocus: () => galaxyFocus, isTransitioning: () => !!transition, flyToAndromeda,
   flyToMilkyWay, flyToSombrero, flyToSgrA, flyToTon618, flyToLocalGroup, showGalaxyInfo, scaleDistance, scene, isCompact, setPanelCollapsed,
   releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });

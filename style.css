@@ -396,7 +396,21 @@ body.touch .label.ast-label { font-size: 12px; }
 body.touch .label.ast-label::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
 
 /* constellations/: small, dim constellation names; never steal taps from planets but keep 44px targets on touch */
-.label.const-label { font-size: 9.5px; padding: 1px 5px; color: #9fb4e0; background: transparent; border-color: transparent; letter-spacing: 0.04em; pointer-events: none; opacity: 0.55; }
+.label.const-label { font-size: 9.5px; padding: 1px 5px; color: #9fb4e0; background: transparent; border-color: transparent; letter-spacing: 0.04em; pointer-events: auto; cursor: pointer; opacity: 0.55; }
+.label.const-label.active { color: #ffd27a; border-color: transparent; font-weight: 600; }
 body.touch .label.const-label { font-size: 10.5px; min-height: 44px; min-width: 44px; display: flex; align-items: center; justify-content: center; }
 body.touch .label.const-label::before { inset: 0; }
-.label.const-label.overlap { opacity: 0 !important; }
+.label.const-label.overlap { opacity: 0 !important; pointer-events: none; }
+
+/* constellations/: info card for a selected constellation (same place and look as #info-panel) */
+#const-card { right: calc(var(--gap) + var(--sar)); bottom: calc(var(--gap) + var(--sab)); width: 340px;
+  max-height: min(60vh, calc(100% - 2 * var(--gap) - var(--sat) - var(--sab)));
+  overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
+#const-card h2 { font-size: 20px; color: #ffd27a; margin: 0 48px 2px 0; }
+#const-card .const-story { font-size: 13.5px; line-height: 1.45; margin: 4px 0 10px; color: #cfd8ee; border-left: 3px solid #ffd27a; padding-left: 8px; }
+#const-card table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#const-card th { text-align: left; font-weight: 500; color: #9fb7ff; padding: 3px 8px 3px 0; width: 34%; vertical-align: top; }
+#const-card td { padding: 3px 0; line-height: 1.35; }
+#const-card .const-close { position: absolute; top: 8px; right: 8px; width: var(--btn-h); padding: 0; }
+body.clean-view #const-card { display: none !important; }
+@media (max-width: 600px) { #const-card { width: calc(100% - 2 * var(--gap) - var(--sal) - var(--sar)); max-height: 45vh; } }
