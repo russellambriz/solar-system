@@ -1,5 +1,7 @@
 // spacecraft/index.js: Voyager 1 & 2, New Horizons, Parker Solar Probe, JWST and the ISS at approximate real positions
-// for the sim date, plus the crewed Apollo landing sites and the planned Artemis south-pole landing area on the Moon.
+// for the sim date, today's interplanetary missions (Juno, Europa Clipper, JUICE, Psyche, Lucy, BepiColombo, Hera,
+// OSIRIS-APEX) on their real JPL Horizons trajectories (missions.js), plus the crewed Apollo landing sites and the
+// planned Artemis south-pole landing area on the Moon.
 //
 // Usage (main.js):
 //   import { createSpacecraft } from './spacecraft/index.js';
@@ -16,6 +18,9 @@
 //   • Parker Solar Probe: Kepler orbit (its final 88-day orbit), same keplerAU() as the dwarf planets.
 //   • JWST: Sun–Earth L2 (beyond Earth on the Sun–Earth line) plus a 6-month halo loop; drawn just outside the Moon's orbit.
 //   • ISS: body.earth.latLonToWorld(lat, lon, 1500 km), an inclined orbit that follows Earth's tilt and spin.
+//   • Missions (missions.js): Hermite-interpolated JPL Horizons vectors; near a planet they are planet-relative and added to
+//     the planet's drawn position, then pushed out of the enlarged globe like asteroids/ does (L → L + 2R·e^(−L/2R)). In
+//     orbit they are drawn around the planet with the distance compressed as (r/R)^0.33. Flown path solid, future dashed.
 //   • Landing sites: body.moon.latLonToWorld(lat, lon, 0) every frame (follows tidal lock, libration, size easing).
 // Labels: placed after main.js's own labels (they never cover a planet's label), hidden behind the Sun/planets/Moon, on the
 // Moon's far side, or when overlapping each other. ISS/JWST markers only show near Earth, landing sites only near the Moon.
@@ -24,6 +29,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { keplerAU, scaleAU, orbitPoints, SMALL_BODIES } from '../smallbodies.js';
 import { PROBES, PARKER, JWST, ISS, SITES, EPOCH, KMS_TO_AU_YR, day } from './data.js';
 import { MODELS } from './models.js';
+import { MISSIONS, createTrack, ellipseAt, solveE } from './missions.js';
 import { planetAU as ephemerisAU } from '../ephemeris/planets.js';
 
 const D2R = Math.PI / 180, TAU = Math.PI * 2;
@@ -278,6 +284,188 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
     return true;
   };
 
+  // ---- active missions on real JPL trajectories (missions.js) ----------------------------------------------------------
+  const planetByName = {};
+  for (const b of planets) planetByName[b.name] = b;
+  const LOCAL_P = 0.33;                // in orbit: drawn distance from the planet's centre = drawn radius × (r / R)^0.33
+  const _pa = new THREE.Vector3(), _pc = new THREE.Vector3(), _rel = new THREE.Vector3(), _q = new THREE.Vector3(), _sl = new THREE.Vector3();
+  const planetOcc = [];                // filled once occ exists (drawn planet centres, refreshed every frame)
+  // keep a drawn position out of the (hugely enlarged) planets, as asteroids/ does: L → L + R2·exp(−L / R2), R2 = 2 × radius
+  function pushFrom(p, c, R2) {
+    _q.subVectors(p, c);
+    const L = _q.length();
+    if (L >= R2 * 6) return false;
+    const L2 = L + R2 * Math.exp(-L / R2);
+    if (L > 1e-9) p.copy(c).addScaledVector(_q, L2 / L); else p.copy(c).add(_q.set(0, L2, 0));
+    return true;
+  }
+  // only the nearest planet (in drawn radii) pushes, so a neighbour (Venus near Earth) never nudges a flyby
+  const pushLive = (p) => {
+    let best = null, bq = Infinity;
+    for (const o of planetOcc) { const q = p.distanceTo(o.c) / o.b.radius; if (q < bq) { bq = q; best = o; } }
+    if (best) pushFrom(p, best.c, best.b.radius * 2);
+    return p;
+  };
+  const _pb = new THREE.Vector3();
+  const pushAt = (p, t) => {          // same, with the planets where main.js draws them on day t (for the static paths)
+    let best = null, bq = Infinity;
+    for (const b of planets) {
+      const q = p.distanceTo(auToScene(planetAU(b.name, t, _pc))) / b.radius;
+      if (q < bq) { bq = q; best = b; _pb.copy(_pc); }
+    }
+    if (best) pushFrom(p, _pb, best.radius * 2);
+    return p;
+  };
+  const localOffset = (rel, b, R, out) => { const r = rel.length(); return out.copy(rel).multiplyScalar(b.radius * Math.pow(r / R, LOCAL_P) / r); };
+  const fmtDate = (t) => {
+    const d = new Date(Date.UTC(2000, 0, 1, 12) + t * 86400000);
+    const s = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    return d.getUTCHours() || d.getUTCMinutes() ? `${s}, ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC` : s;
+  };
+  const fmtIn = (dd) => {
+    if (dd >= 1) { const d = Math.floor(dd), h = Math.floor((dd - d) * 24); return `${fmtN(d)} d ${h} h`; }
+    const h = Math.floor(dd * 24), m = Math.floor((dd * 24 - h) * 60);
+    return h ? `${h} h ${m} min` : `${m} min`;
+  };
+  const fmtLight = (s) => s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`;
+  const fmtPeriod = (d) => d < 1 ? `${(d * 24).toFixed(1)}-hour` : `${d.toFixed(1)}-day`;
+
+  const missions = MISSIONS.map((m, k) => {
+    const info = { name: m.name, short: m.short, color: m.color, type: m.type,
+      rows: [['Launched', m.launched], ['Status', 'live'], ['Distance', 'live'], ['Next', 'live']],
+      fact: m.fact + (m.orbitNote ? ' ' + m.orbitNote : '') + (m.tailNote ? ' ' + m.tailNote : '') };
+    const it = addCraft(info, m.model, 0.3, { prio: 8.5 - k * 0.1 });
+    it.mission = m;
+    it.track = createTrack(m.key);
+    if (m.key === 'bepi') it.track.parkUntil = m.phases[m.phases.length - 1][0];
+    it.posAU = new THREE.Vector3();
+    it.st = it.track.res;
+    it.slowM = null; it.lastT = null; it.orbitSet = -1;
+    // drawn path: sample times from the trajectory, AU kept for scale changes
+    const ts = it.track.pathTimes(), n = ts.length;
+    it.pathT = Float64Array.from(ts);
+    it.pathAU = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const st = it.track.eval(ts[i], _rel);
+      if (st.mode === 2) _rel.add(planetAU(st.c, ts[i], _pa));
+      it.pathAU[3 * i] = _rel.x; it.pathAU[3 * i + 1] = _rel.y; it.pathAU[3 * i + 2] = _rel.z;
+    }
+    const posAttr = new THREE.BufferAttribute(new Float32Array(n * 3), 3), distAttr = new THREE.BufferAttribute(new Float32Array(n), 1);
+    const gPast = new THREE.BufferGeometry(), gFut = new THREE.BufferGeometry();
+    gPast.setAttribute('position', posAttr); gFut.setAttribute('position', posAttr); gFut.setAttribute('lineDistance', distAttr);
+    const past = new THREE.Line(gPast, new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: 0.42, depthWrite: false }));
+    const fut = new THREE.Line(gFut, new THREE.LineDashedMaterial({ color: m.color, transparent: true, opacity: 0.34, depthWrite: false, dashSize: 0.22, gapSize: 0.18 }));
+    const tipGeo = (op, dashed) => {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+      const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: op, depthWrite: false }));
+      l.frustumCulled = false; return l;
+    };
+    const tipPast = tipGeo(0.42), tipFut = tipGeo(0.2);
+    for (const l of [past, fut, tipPast, tipFut]) orbitLines.push(l);
+    it.lines = { posAttr, distAttr, gPast, gFut, tipPast, tipFut };
+    it.trailWrap = new THREE.Group();
+    it.trailWrap.add(past, fut, tipPast, tipFut);
+    // the current orbit around its planet (Juno, Clipper, BepiColombo), redrawn when JPL's next ellipse takes over
+    if (it.track.orbit) {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(160 * 3), 3));
+      it.orbitLine = new THREE.LineLoop(g, new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: 0.4, depthWrite: false }));
+      it.orbitLine.frustumCulled = false; it.orbitLine.visible = false;
+      orbitLines.push(it.orbitLine);
+      it.orbitGroup = new THREE.Group(); it.orbitGroup.add(it.orbitLine);
+      it.trailWrap.add(it.orbitGroup);
+    }
+    craftGroup.add(it.trailWrap);
+    drawPath(it);
+    it.place = (t, dt) => placeMission(it, t, dt);
+    return it;
+  });
+  function drawPath(it) {
+    const { posAttr, distAttr, gPast, gFut } = it.lines, P = posAttr.array, D = distAttr.array, A = it.pathAU, n = it.pathT.length;
+    let acc = 0;
+    for (let i = 0; i < n; i++) {
+      _sl.set(A[3 * i], A[3 * i + 1], A[3 * i + 2]);
+      auToScene(_sl); pushAt(_sl, it.pathT[i]);
+      if (i) acc += Math.hypot(_sl.x - P[3 * i - 3], _sl.y - P[3 * i - 2], _sl.z - P[3 * i - 1]);
+      P[3 * i] = _sl.x; P[3 * i + 1] = _sl.y; P[3 * i + 2] = _sl.z; D[i] = acc;
+    }
+    posAttr.needsUpdate = true; distAttr.needsUpdate = true;
+    gPast.computeBoundingSphere(); gFut.boundingSphere = gPast.boundingSphere;
+  }
+  function setTip(line, ax, ay, az, b) {
+    const a = line.geometry.attributes.position;
+    a.setXYZ(0, ax, ay, az); a.setXYZ(1, b.x, b.y, b.z); a.needsUpdate = true;
+  }
+  function drawOrbit(it, s) {
+    const a = it.orbitLine.geometry.attributes.position, b = planetByName[it.track.orbit.c];
+    for (let i = 0; i < 160; i++) {
+      ellipseAt(s, (i / 160) * TAU, _sl);
+      localOffset(_sl, b, it.track.orbit.R, _sl);
+      a.setXYZ(i, _sl.x, _sl.y, _sl.z);
+    }
+    a.needsUpdate = true;
+  }
+  function placeMission(it, t, dt) {
+    const st = it.track.eval(t, _rel);
+    if (!st.mode) { it.lastT = null; return false; }
+    if (st.mode === 1) it.posAU.copy(_rel);
+    else it.posAU.copy(planetAU(st.c, t, _pa)).add(_rel);
+    const inOrbit = st.mode === 3;
+    if (!inOrbit) { it.pos.copy(auToScene(_a.copy(it.posAU))); pushLive(it.pos); }
+    else {
+      const b = planetByName[st.c], s = st.set;
+      b.group.getWorldPosition(_pc);
+      if (s.period < 1) {           // laps of hours (BepiColombo): own slowed clock, at most one lap per 4 s of real time
+        if (it.slowM === null || it.lastT === null) it.slowM = st.M;
+        else { const cap = TAU * dt / 4; it.slowM += Math.max(-cap, Math.min(cap, s.n * (t - it.lastT))); }
+        ellipseAt(s, solveE(it.slowM, s.e), _rel);
+      } else it.slowM = null;
+      localOffset(_rel, b, it.track.orbit.R, _q);
+      it.pos.copy(_pc).add(_q);
+      const f = t - it.track.orbit.t0;
+      if (f < 1) { _b.copy(auToScene(_a.copy(it.posAU))); pushLive(_b); it.pos.lerpVectors(_b, it.pos, smooth(f, 0, 1)); }
+      if (st.setIndex !== it.orbitSet) { it.orbitSet = st.setIndex; drawOrbit(it, s); }
+      it.orbitGroup.position.copy(_pc);
+    }
+    if (it.orbitLine) it.orbitLine.visible = inOrbit && orbitsOn();
+    it.lastT = t;
+    // flown path up to now (solid), the rest dashed; two short tips join them to the craft
+    const T = it.pathT, n = T.length, L = it.lines, P = L.posAttr.array;
+    if (t >= T[n - 1] || inOrbit) {
+      L.gPast.setDrawRange(0, n); L.gFut.setDrawRange(0, 0);
+      L.tipPast.visible = L.tipFut.visible = false;
+    } else {
+      let lo = 0, hi = n - 1;
+      while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (T[mid] <= t) lo = mid; else hi = mid - 1; }
+      L.gPast.setDrawRange(0, lo + 1); L.gFut.setDrawRange(lo + 1, n - lo - 1);
+      setTip(L.tipPast, P[3 * lo], P[3 * lo + 1], P[3 * lo + 2], it.pos);
+      setTip(L.tipFut, P[3 * lo + 3], P[3 * lo + 4], P[3 * lo + 5], it.pos);
+      L.tipPast.visible = L.tipFut.visible = orbitsOn();
+    }
+    return true;
+  }
+  // the Orbits checkbox sets line.visible on everything in orbitLines; the past path line carries its state
+  const orbitsOn = () => missions[0]?.trailWrap.children[0].visible !== false;
+  function missionLive(it, label, t) {
+    const m = it.mission, st = it.st;
+    if (label === 'Status') {
+      const ph = m.phases.find((p) => p[0] > t) || m.phases[m.phases.length - 1];
+      return st.mode === 3 && st.set ? `${ph[1]} · ${fmtPeriod(st.set.period)} orbit` : ph[1];
+    }
+    if (label === 'Distance') {
+      const r = it.posAU.length(), dE = _b.copy(it.posAU).sub(planetAU('Earth', t, _a)).length();
+      const fromE = dE < 0.02 ? `${fmtN(dE * AU_KM)} km` : `${dE.toFixed(2)} AU`;
+      return `${r.toFixed(2)} AU from Sun · ${fromE} from Earth · 📡 ${fmtLight(dE * LIGHT_SEC_PER_AU)} one way`;
+    }
+    // Next: the next milestone with a live countdown (or Juno's / Clipper's next close pass of Jupiter, if sooner)
+    const ms = m.milestones.find((x) => x[0] > t);
+    let txt = ms ? `${ms[1]} · ${fmtDate(ms[0])} · in ${fmtIn(ms[0] - t)}` : 'Mission complete';
+    if (m.perijove && st.mode === 3 && st.set && st.set.period >= 1) {
+      const toPeri = ((TAU - (((st.M % TAU) + TAU) % TAU)) % TAU) / st.set.n;
+      if (!ms || toPeri < ms[0] - t) txt = `Closest pass of Jupiter (perijove) in ${fmtIn(toPeri)}` + (ms ? ` · then ${ms[1].toLowerCase()}, ${fmtDate(ms[0])}` : '');
+    }
+    return txt;
+  }
+
   // ---- Moon landing sites ------------------------------------------------------------------------------------------
   SITES.forEach((s, k) => {
     const obj = new THREE.Group(); obj.name = s.name; obj.visible = false;
@@ -308,6 +496,7 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
   let open = null, openTitle = '', lastRefresh = 0, nowDays = 0;
   const fmtN = (x, d = 0) => x.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
   function liveValue(item, label, t) {
+    if (item.mission) return missionLive(item, label, t);
     if (item === parker) {
       const r = parker.posAU.length(), rKm = r * AU_KM, aKm = PARKER.el.a * AU_KM;
       if (label === 'Distance from Sun') return `${fmtN(rKm / 1e6, 1)} million km (${r.toFixed(3)} AU)`;
@@ -362,6 +551,7 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
   // ---- per-frame update ----------------------------------------------------------------------------------------------
   const _v = new THREE.Vector3(), _m = new THREE.Vector3(), _n = new THREE.Vector3(), _c = new THREE.Vector3();
   const occ = occluderBodies.map((b) => ({ b, c: new THREE.Vector3(), r: 0 }));
+  for (const o of occ) if (planets.includes(o.b)) planetOcc.push(o);
   const bodyRects = [], placed = [], cands = [];
   function occluded(p, cam, skip) {
     _v.subVectors(p, cam);
@@ -519,6 +709,7 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
     };
     for (const it of crafts) if (it.trailAU) setAll(it.trail, it.trailAU.map((p) => auToScene(p.clone())));
     setAll(parker.orbitLine, orbitPoints(PARKER.el, scaleDistance, 256));
+    for (const it of missions) { drawPath(it); it.orbitSet = -1; }
   }
 
   return {

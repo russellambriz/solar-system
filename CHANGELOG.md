@@ -1,5 +1,99 @@
 # Changelog
 
+## 2026-10-22: Active missions on real JPL trajectories (Space Model Coder)
+
+### Added
+- **Eight active missions**, next to Voyager 1 and 2, New Horizons, Parker and JWST. Each one is placed from real JPL Horizons vectors, so it passes through the planets on its real flyby days. Each has a small procedural model, a label with its one-way light time (e.g. `JUICE · 📡 1 min`) and a card.
+  - **Juno** (NASA/JPL, SwRI), in orbit at Jupiter since 5 Jul 2016. It is on its second extended mission (Oct 2025 – Sep 2028), and its trajectory runs from launch to 1 Sep 2028.
+  - **Europa Clipper** (NASA/JPL, APL), launched 14 Oct 2024. It flew past Mars on 1 Mar 2025 and passes Earth on 3 Dec 2026 at 3,238 km. It arrives at Jupiter on 11 Apr 2030 and is then shown on its planned tour orbit.
+  - **JUICE** (ESA), launched 14 Apr 2023. It made the first Moon-then-Earth double flyby (Aug 2024), passed Venus (31 Aug 2025) and Earth (28 Sep 2026, 8,648 km). Its last Earth flyby is 17 Jan 2029, and it reaches Jupiter in Jul 2031.
+  - **Psyche spacecraft** (NASA/JPL, ASU), launched 13 Oct 2023. It flew past Mars on 15 May 2026 at 4,611 km and arrives at asteroid 16 Psyche in summer 2029.
+  - **Lucy** (NASA/SwRI), launched 16 Oct 2021. It visited Dinkinesh (1 Nov 2023) and Donaldjohanson (20 Apr 2025), has made two Earth flybys, and reaches the Trojan Eurybates on 11 Aug 2027.
+  - **BepiColombo** (ESA/JAXA), launched 20 Oct 2018. It has made 9 flybys (1 Earth, 2 Venus, 6 Mercury). Mercury orbit insertion is 21 Nov 2026, and after that it is drawn on its real orbit around Mercury.
+  - **Hera** (ESA), launched 7 Oct 2024. It flew past Mars and Deimos on 12 Mar 2025 and is braking into the Didymos system now (arrival Nov 2026, a month early).
+  - **OSIRIS-APEX** (NASA, ex OSIRIS-REx), launched 8 Sep 2016. It delivered the Bennu sample on 24 Sep 2023. Its Earth flybys are 23 Sep 2025, 16 Mar 2027 and 13 Apr 2029, the last about an hour after Apophis's own close pass. It then follows Apophis from June 2029.
+- **Cards:**
+  - agency and launch
+  - **Status (live):** the mission phase for the shown date
+  - **Distance (live):** from the Sun and from Earth, plus the one-way radio light time
+  - **Next (live):** the next milestone with its UTC time and a countdown. Juno counts down to its next perijove.
+  - a 💡 fact
+  - Orbiters' cards say how the orbit is drawn.
+- **Paths:**
+  - The flown path is faint and solid; the path still to come is dashed and dimmer.
+  - Both follow the Orbits checkbox and join up with the craft.
+  - Orbit phases draw the current ellipse.
+- **Search** finds them automatically, e.g. `clipper`, `juice`, `psyche`, `lucy`, `bepi`, `hera`, `osiris`, `apex` and `juno`. `psyche` lists the asteroid and the spacecraft.
+- **13 new Events**, in date order: Juno at Jupiter, Lucy at Dinkinesh, JUICE's Moon–Earth flyby, BepiColombo's 6th Mercury flyby, Clipper at Mars, Hera at Mars, Psyche at Mars, JUICE at Earth, BepiColombo into Mercury orbit, Clipper at Earth, Lucy at Eurybates, OSIRIS-APEX's last Earth flyby, and Clipper at Jupiter.
+
+### How it's made
+- **Source:** JPL Horizons API vectors, **fetched 2026-10-22**: heliocentric ecliptic J2000 in km and km/s (TDB), daily for each craft from launch to the end of its data.
+  - The Horizons IDs are -61, -159, -28, -255, -49, -121, -91 and -64.
+  - Planet-centred vectors at 1-minute to 1-hour steps around every flyby and orbit.
+- **Compact storage** (`spacecraft/trajectories.js`, 123 KB): cubic Hermite knots, chosen greedily.
+  - A new knot is added only where the curve between two knots strays more than 500 km (heliocentric), or more than max(5 km, 0.3 % of the distance) close to a planet.
+  - That gives 2,433 knots in all, packed as base64 Int32 (time in s since J2000, km, mm/s).
+- **Flybys line up with the drawn planets:** inside a zone around each planet (Mercury 0.004 AU, Venus 0.008, Earth 0.01, Mars 0.006, Jupiter 0.3), the stored segment is planet-centred and is added to the sim's own planet position. Away from the planets, the heliocentric distance is mapped through `scaleDistance`.
+  - Near a planet, the craft is pushed out from the drawn globe the way the famous asteroids are (L + R₂·e^(−L/R₂), R₂ = 2 drawn radii), using only the nearest planet. Each flyby shows the craft skimming past just outside the planet.
+- **Orbits:** Juno, Europa Clipper (from JOI) and BepiColombo (from MOI) use two-body ellipses fitted to Horizons every few days. That is 205, 142 and 66 element sets.
+  - Each orbit is drawn with its distance from the planet compressed like the moons' (drawn radius × (r/R)^0.33).
+  - BepiColombo's 2.3-hour laps run on their own slowed clock, capped at one lap per 4 s.
+- **Before launch / after the data:** each craft is hidden before launch.
+  - Juno is hidden after 1 Sep 2028.
+  - Psyche (data ends 11 Feb 2029) is eased in to the asteroid by the planned arrival.
+  - Hera (data ends 4 Nov 2026) rides with Didymos to ~May 2027.
+  - BepiColombo is parked in its final orbit to May 2028.
+  - Clipper's and JUICE's data run past arrival (Clipper's tour, and JUICE to 19 Jul 2031).
+- No per-frame allocations: scratch vectors and result objects are reused, and paths are only redrawn when the date jumps or the scale changes.
+
+### Changed
+- `spacecraft/index.js`:
+  - imports `MISSIONS` and the trajectory evaluator
+  - mission placement, paths, orbit lines and live card rows
+  - mission paths are redrawn in `rebuild()`
+- `spacecraft/models.js`: eight new small procedural models (Juno, Europa Clipper, JUICE, Psyche, Lucy, BepiColombo, Hera, OSIRIS-APEX) and a `wing()` solar-array helper.
+- `ui/index.js`: the 13 events above.
+- New: `spacecraft/missions.js` (facts, phases, milestones and the Hermite/Kepler evaluator) and `spacecraft/trajectories.js` (the data).
+- `main.js`, `search/index.js` and `style.css` are untouched.
+
+### Notes
+- **Accuracy:** checked against fresh Horizons vectors. "Rel" is the distance from the planet, compared with Horizons' planet-centred value.
+
+  | Craft | Date (UTC) | Error |
+  |---|---|---|
+  | Psyche | 22 Oct 2026 · 1 Mar 2028 | 292 km · 469 km (helio) |
+  | Psyche at Mars | 15 May 2026 19:27 | rel 8,006 vs 7,992 km (15 km) |
+  | JUICE | 22 Oct 2026 · 1 Jun 2030 | 81 km · 31 km |
+  | JUICE at Earth | 28 Sep 2026 11:44 | rel 8 km |
+  | Europa Clipper | 22 Oct 2026 · 1 Jun 2028 | 434 km · 441 km |
+  | Europa Clipper at Earth | 3 Dec 2026 20:13 | rel 7 km |
+  | Lucy | 22 Oct 2026 · 11 Aug 2027 | 123 km · 429 km |
+  | Lucy at Earth | 13 Dec 2024 | rel 23 km |
+  | Hera | 22 Oct 2026 · at Mars 12 Mar 2025 | 41 km · rel 14 km |
+  | OSIRIS-APEX | 22 Oct 2026 · at Earth 13 Apr 2029 23:05 | 257 km · rel 10 km |
+  | BepiColombo | 8 Jan 2025 (Mercury flyby) · 22 Oct 2026 | rel 1 km · rel 252 km |
+  | Juno | 1 Jun 2014 · Earth flyby 9 Oct 2013 | 462 km · rel 10 km |
+  | Juno in orbit | 22 Oct 2026 | 71,282 km of 5.34 million km (1.3 %); Kepler-set median 1.2 % |
+
+  The craft's own position is checked; the drawn planets come from the Standish elements and can be off by up to ~70,000 km (Mars), which is why flybys are stored planet-relative.
+- **Flybys as stored** (closest approach, height above the surface): Psyche–Mars 4,611 km (NASA: 4,609), JUICE–Earth 8,648 km (ESA: 8,640), Clipper–Earth 3,238 km (NASA: ~3,200), Clipper–Mars 885 km, Hera–Mars 5,670 km, OSIRIS-APEX–Earth 2029 1,155 km.
+- **What changed versus older plans (checked by web search on 2026-10-22):**
+  - Juno was due to end in Sept 2025 with a plunge into Jupiter (Horizons' header still says so). Instead it is on a second extended mission to Sep 2028.
+  - Hera is arriving at Didymos in Nov 2026, a month earlier than the long-planned Dec 2026. Its braking burns were on 15 and 22 Oct.
+  - BepiColombo's transfer module separated on 3 Sep 2026. Orbit insertion is 21 Nov 2026, Mio separates 9–10 Dec, the MPO reaches its final orbit on 10 Mar 2027, and science starts in Apr 2027.
+  - Psyche's arrival is summer 2029. NASA says August, while the Horizons file ends 465,000 km short on 11 Feb 2029.
+  - OSIRIS-APEX picked up an extra Earth flyby on 16 Mar 2027. Its last one, on 13 Apr 2029, is about an hour after Apophis's.
+- **Synthetic parts:**
+  - Psyche's approach after 11 Feb 2029, Hera riding with Didymos after 4 Nov 2026, and BepiColombo parked after 10 Apr 2027 are not Horizons data.
+  - Psyche's trajectory file has a 1.6-million-km step at 1 Feb 2027 (a new reference trajectory). It is smoothed over the 60 days before.
+  - Hera's label can sit on Didymos's at this scale, because it really is there.
+- **Tested** headless (Chromium) at 1440×900 and on iPad Pro 11 portrait with touch: zero console errors.
+  - All eight craft are in `window.solar.spacecraft`.
+  - Search finds each one.
+  - Picking a search result flies there and opens the card.
+  - Tapping a label opens the card on iPad. Labels are 25 px tall with a ≥ 44 px tap area.
+  - New `screenshot-missions.png`; `screenshot-ipad.png` refreshed.
+
 ## 2026-10-22: Selecting a constellation turns the view to face it and zooms in (ScaleBot)
 
 - On `constellation-select` the camera stays put; over 1.6 s (ease-in-out) the look target swings toward the figure and the FOV narrows so it fills ~70% of the smaller screen side (horizontal FOV on portrait), clamped 8-60 deg.
