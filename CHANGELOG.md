@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-22: Selecting a constellation turns the view to face it and zooms in (ScaleBot)
+
+- On `constellation-select` the camera stays put; over 1.6 s (ease-in-out) the look target swings toward the figure and the FOV narrows so it fills ~70% of the smaller screen side (horizontal FOV on portrait), clamped 8-60 deg.
+- `constellation-clear` or zooming out eases FOV and target back; any flyTo/focusOn/galaxy transition restores FOV instantly.
+- Test hook: `window.solar.getConstView()`.
+- FOV desktop/iPad portrait: Orion 48.5/60, UMa 60/60 (overfills), Cru 9.8/14.1, Sge 8.7/12.5.
+
 ## 2026-10-22: Constellations you can pick and learn about: highlight + info cards for all 88 (Constellations)
 
 ### Added

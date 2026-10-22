@@ -1138,6 +1138,67 @@ controls.addEventListener('start', stopDrift);
 renderer.domElement.addEventListener('wheel', stopDrift, { passive: true });
 renderer.domElement.addEventListener('pointerdown', stopDrift);
 
+// ScaleBot: constellation turn-and-zoom. On constellation-select the camera stays put; the orbit target swings to face the
+// figure (camera.position + centerDir * orbit distance) and the FOV narrows so the figure (2 * radiusDeg) fills ~70% of the
+// smaller screen side, eased over CONST_VIEW_SEC. On constellation-clear or a user zoom-out, both ease back. Saved target is
+// kept as an offset from the camera so it stays valid while the follow loop shifts camera + target with a focused body.
+// Any fly/focus/galaxy transition restores the FOV instantly and cancels.
+const CONST_VIEW_SEC = 1.6, CONST_FILL = 0.7, CONST_FOV_MIN = 8, CONST_FOV_MAX = 60;
+let constView = null;   // { phase: 'in'|'held'|'out', t, savedOff, savedFov, fromDir, toDir, fromFov, toFov, dist, abbr }
+const _cvA = new THREE.Vector3(), _cvB = new THREE.Vector3();
+function constFovFor(radiusDeg) {
+  const tanR = Math.tan(THREE.MathUtils.degToRad(Math.min(radiusDeg, 80))) / CONST_FILL;
+  // landscape: smaller side is the height -> vertical FOV; portrait: smaller side is the width -> horizontal FOV, converted
+  const tanV = camera.aspect >= 1 ? tanR : tanR / camera.aspect;
+  return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(tanV)), CONST_FOV_MIN, CONST_FOV_MAX);
+}
+function setFov(f) { if (camera.fov !== f) { camera.fov = f; camera.updateProjectionMatrix(); } }
+function constTurnTo(target) {
+  if (mode !== 'solar' || transition || !target || !target.centerDir) return;
+  stopDrift();
+  const dist = Math.max(controls.getDistance(), 1e-6);
+  const curDir = _cvA.subVectors(controls.target, camera.position).normalize().clone();
+  if (!constView || constView.phase === 'out') {
+    const saved = constView ? { savedOff: constView.savedOff, savedFov: constView.savedFov }
+      : { savedOff: _cvB.subVectors(controls.target, camera.position).clone(), savedFov: camera.fov };
+    constView = { ...saved };
+  }
+  Object.assign(constView, { phase: 'in', t: 0, abbr: target.abbr, dist, fromDir: curDir, toDir: target.centerDir.clone().normalize(),
+    fromFov: camera.fov, toFov: constFovFor(target.radiusDeg) });
+}
+function constRestore() {
+  if (!constView || constView.phase === 'out') return;
+  const dist = Math.max(controls.getDistance(), 1e-6);
+  Object.assign(constView, { phase: 'out', t: 0, dist, fromDir: _cvA.subVectors(controls.target, camera.position).normalize().clone(),
+    toDir: constView.savedOff.clone().normalize(), fromFov: camera.fov, toFov: constView.savedFov });
+  constView.restoreDist = constView.savedOff.length();
+}
+function constCancel() { if (!constView) return; setFov(constView.savedFov); constView = null; }
+function updateConstView(dt) {
+  if (!constView) return;
+  if (transition || mode !== 'solar') { constCancel(); return; }
+  if (constView.phase === 'held') {
+    // user zoomed out (wheel or pinch) since the turn finished -> ease back
+    if (controls.getDistance() > constView.dist * 1.02) constRestore();
+    return;
+  }
+  constView.t = Math.min(1, constView.t + dt / CONST_VIEW_SEC);
+  const e = ease(constView.t);
+  const dir = _cvA.copy(constView.fromDir).lerp(constView.toDir, e);
+  if (dir.lengthSq() < 1e-8) dir.copy(constView.toDir);
+  dir.normalize();
+  const d = constView.phase === 'out' ? THREE.MathUtils.lerp(constView.dist, constView.restoreDist, e) : constView.dist;
+  controls.target.copy(camera.position).addScaledVector(dir, d);
+  setFov(THREE.MathUtils.lerp(constView.fromFov, constView.toFov, e));
+  if (constView.t >= 1) {
+    if (constView.phase === 'out') constView = null;
+    else { constView.phase = 'held'; constView.dist = controls.getDistance(); }
+  }
+}
+window.addEventListener('constellation-select', (e) => constTurnTo(e.detail));
+window.addEventListener('constellation-clear', () => constRestore());
+renderer.domElement.addEventListener('wheel', (e) => { if (e.deltaY > 0 && constView && constView.phase === 'in') constRestore(); }, { passive: true });
+
 function goOverview() {
   focused = null;
   drift = null;
@@ -1435,6 +1496,7 @@ const _flyQ = new THREE.Quaternion(), _flyQI = new THREE.Quaternion();
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 function updateCamera(dt) {
+  if (transition && constView) constCancel();   // ScaleBot: a fly/focus/galaxy move cancels the constellation view
   if (transition) {
     transition.t = Math.min(1, transition.t + dt / (transition.duration || 1.6));
     const e = ease(transition.t);
@@ -1485,6 +1547,7 @@ function updateCamera(dt) {
     // real-time drift angle (stops for good on any user interaction; plain follow from then on)
     if (drift && drift.body === focused) applyDrift(dt);
   }
+  updateConstView(dt);
 }
 
 // ---------------------------------------------------------------------------
@@ -1651,4 +1714,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations };
+window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };
