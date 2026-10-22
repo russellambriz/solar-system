@@ -8,7 +8,7 @@
 //    real orbits, the belts, dwarf planets, comets, famous asteroids and probes (anything past 50 AU sits on the rim), plus where the
 //    camera is and which way it looks. Tap a dot to fly there. It moves clear of open panels and hides in the galaxy view.
 //  • Events (Controls, under the date): a 1965–2065 timeline with markers, ◀ ▶ and a list of flybys, comet visits and
-//    landings, asteroid missions and Apophis's 2029 flyby. Picking one jumps to that day, pauses, and flies to the object.
+//    landings, asteroid and comet missions, comet perihelia (famous.js) and Apophis's 2029 flyby. Picking one jumps to that day, pauses, and flies to the object.
 //  • Motion trails (Layers → Trails): each planet and dwarf planet trails the last eighth of its orbit, with dots at
 //    equal time steps; they spread out near the Sun, where it moves fastest (Kepler's second law).
 //  • Signal delay on the probes' labels while Layers → Distances is on (spacecraft.setSignalDelay).
@@ -27,6 +27,7 @@ const TL_FROM = Date.UTC(1965, 0, 1), TL_TO = Date.UTC(2065, 0, 1);
 // [date, what happened, object to fly to (a search name), kind, card to open on arrival]. Planets are drawn ~1,000× too big, so
 // at a flyby the probe sits inside the drawn planet: fly to the planet and open the probe's card (its path runs into it).
 const EVENTS = [
+  ['1966-11-17', 'Leonid meteor storm: Earth runs through comet Tempel-Tuttle\'s fresh dust', '55P/Tempel-Tuttle', 'comet'],
   ['1969-07-20', 'Apollo 11 lands on the Moon', 'Apollo 11', 'moon'],
   ['1972-12-11', 'Apollo 17: the last crewed Moon landing so far', 'Apollo 17', 'moon'],
   ['1979-03-05', 'Voyager 1 flies past Jupiter', 'Jupiter', 'craft', 'Voyager 1'],
@@ -37,24 +38,41 @@ const EVENTS = [
   ['1986-02-09', "Halley's Comet rounds the Sun", "Halley's Comet", 'comet'],
   ['1989-08-25', 'Voyager 2 flies past Neptune', 'Neptune', 'craft', 'Voyager 2'],
   ['1990-02-14', 'Voyager 1 takes the "Pale Blue Dot" photo of Earth', 'Voyager 1', 'craft'],
+  ['1992-12-12', 'Comet Swift-Tuttle, parent of the Perseids, rounds the Sun', '109P/Swift-Tuttle', 'comet'],
   ['1997-04-01', 'Comet Hale-Bopp rounds the Sun', 'Comet Hale-Bopp', 'comet'],
+  ['1998-02-28', 'Comet Tempel-Tuttle, parent of the Leonids, rounds the Sun', '55P/Tempel-Tuttle', 'comet'],
   ['2001-02-12', 'NEAR Shoemaker lands on asteroid Eros', '433 Eros', 'asteroid'],
+  ['2004-01-02', 'Stardust flies through comet Wild 2\'s coma and catches its dust', '81P/Wild 2', 'comet'],
+  ['2005-07-04', 'Deep Impact fires an impactor into comet Tempel 1', '9P/Tempel 1', 'comet'],
   ['2006-08-24', 'Pluto is reclassified as a dwarf planet', 'Pluto', 'body'],
   ['2012-08-25', 'Voyager 1 reaches interstellar space', 'Voyager 1', 'craft'],
+  ['2014-11-12', 'Philae, from Rosetta, lands on comet 67P', '67P/Churyumov-Gerasimenko', 'comet'],
   ['2015-07-14', 'New Horizons flies past Pluto', 'Pluto', 'craft', 'New Horizons'],
   ['2017-09-09', "'Oumuamua, the first known interstellar object, rounds the Sun", "1I/'Oumuamua", 'visitor'],
   ['2018-06-27', 'Hayabusa2 arrives at asteroid Ryugu', '162173 Ryugu', 'asteroid'],
   ['2018-11-05', 'Voyager 2 reaches interstellar space', 'Voyager 2', 'craft'],
   ['2019-12-08', 'Interstellar comet 2I/Borisov rounds the Sun', '2I/Borisov', 'visitor'],
+  ['2020-07-03', 'Comet NEOWISE rounds the Sun: the great comet of 2020', 'Comet NEOWISE (C/2020 F3)', 'comet'],
   ['2020-10-20', 'OSIRIS-REx grabs a sample of asteroid Bennu', '101955 Bennu', 'asteroid'],
+  ['2021-11-02', 'Comet 67P rounds the Sun', '67P/Churyumov-Gerasimenko', 'comet'],
   ['2022-01-24', 'JWST arrives at Sun–Earth L2', 'James Webb Space Telescope', 'craft'],
+  ['2022-03-04', 'Comet Tempel 1 rounds the Sun', '9P/Tempel 1', 'comet'],
   ['2022-09-26', 'DART crashes into Dimorphos, moonlet of Didymos', '65803 Didymos', 'asteroid'],
+  ['2022-12-15', 'Comet Wild 2 rounds the Sun', '81P/Wild 2', 'comet'],
+  ['2023-10-22', 'Comet Encke, parent of the Taurids, rounds the Sun', '2P/Encke', 'comet'],
+  ['2024-09-27', 'Comet Tsuchinshan-ATLAS rounds the Sun: the great comet of 2024', 'Comet Tsuchinshan-ATLAS (C/2023 A3)', 'comet'],
   ['2024-12-24', "Parker Solar Probe's record close pass of the Sun", 'Parker Solar Probe', 'craft'],
   ['2025-10-29', 'Interstellar comet 3I/ATLAS rounds the Sun', '3I/ATLAS', 'visitor'],
+  ['2027-02-10', 'Comet Encke returns', '2P/Encke', 'comet'],
+  ['2028-02-13', 'Comet Tempel 1 returns, on a wider orbit after passing Jupiter', '9P/Tempel 1', 'comet'],
+  ['2028-04-08', 'Comet 67P returns', '67P/Churyumov-Gerasimenko', 'comet'],
   ['2029-04-13', 'Apophis passes closer to Earth than geostationary satellites', '99942 Apophis', 'asteroid'],
+  ['2029-05-14', 'Comet Wild 2 returns', '81P/Wild 2', 'comet'],
+  ['2031-05-20', 'Comet Tempel-Tuttle returns: Leonid storms may follow', '55P/Tempel-Tuttle', 'comet'],
   ['2032-12-22', 'Asteroid 2024 YR4 misses the Moon by ~21,000 km', '2024 YR4', 'asteroid'],
   ['2061-07-28', "Halley's Comet returns", "Halley's Comet", 'comet'],
-].map(([date, title, target, kind, card]) => ({ date, title, target, kind, card, ms: Date.parse(date + 'T12:00:00Z') }));
+].map(([date, title, target, kind, card]) => ({ date, title, target, kind, card, ms: Date.parse(date + 'T12:00:00Z') }))
+  .sort((a, b) => a.ms - b.ms);
 const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', visitor: '#e98cff', body: '#d9b99a', asteroid: '#ffb48a' };
 
 export function createUI(o) {

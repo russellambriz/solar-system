@@ -8,6 +8,17 @@
 | `desktop/earth_night_4k.jpg`, `desktop/earth_night.jpg`, `mobile/earth_night.jpg` | NASA Earth Observatory — *Black Marble 2016* (VIIRS Day/Night Band), 3 km colour composite: <https://eoimages.gsfc.nasa.gov/images/imagerecords/144000/144898/BlackMarble_2016_3km.jpg> (record page: <https://visibleearth.nasa.gov/images/144898>) | 13500×6750 JPEG, 8.1 MB |
 | (reference, not shipped) | NASA *Earth at Night 2012* (Black Marble 2012): <https://eoimages.gsfc.nasa.gov/images/imagerecords/79000/79765/dnb_land_ocean_ice.2012.13500x6750.jpg> | 13500×6750 JPEG — downloaded for comparison; 2016 used (newer, cleaner city cores) |
 
+### Seasonal partner: July day map (`earth_day_jul*.jpg`, all tiers)
+
+| File(s) | Source (exact URL) | Original |
+|---|---|---|
+| `desktop/earth_day_jul_4k.jpg` (1.52 MB), `desktop/earth_day_jul.jpg` (363 KB), `mobile/earth_day_jul.jpg` (99 KB) | NASA Visible Earth — *Blue Marble Next Generation w/ Topography and Bathymetry*, July 2004: <https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73751/world.topo.bathy.200407.3x5400x2700.jpg> (record page: <https://visibleearth.nasa.gov/images/73751>) | 5400×2700 JPEG, 2.31 MB |
+
+Same product, projection and colour processing as the December map, so the two line up pixel for pixel and need no
+level matching. Resampled in linear light (Lanczos, Python/Pillow) to 4096×2048 (q92), 2048×1024 (q88) and
+1024×512 (q86), progressive, 4:2:0. The shader (earth/earthMaterial.js) blends December ↔ July by the simulated
+date: snow cover and sea ice advance/retreat with latitude, the tropics cross-fade evenly.
+
 **Licence:** NASA imagery is not subject to copyright in the United States and is used here as public domain
 (NASA media usage guidelines: <https://www.nasa.gov/nasa-brand-center/images-and-media/>). Credit requested:
 *"Blue Marble: NASA Earth Observatory / Reto Stöckli (NASA GSFC); Black Marble: NASA Earth Observatory / Joshua

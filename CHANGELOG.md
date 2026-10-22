@@ -68,6 +68,139 @@
 
 ### Testing
 - New far-side check (`moon-shots/seam.js`): it pauses at a date when the Sun is low over longitude 180° and shoots it close up, from orbit and toward the north, on desktop and iPad. The seam is gone in both. `moon-shots/shoot.js` still passes with no console errors.
+## 2026-10-22: Constellations you can pick and learn about: highlight + info cards for all 88 (Constellations)
+
+### Added
+- **Select a constellation** by clicking/tapping its name, tapping near its stick figure (8 px mouse / 22 px touch slop), or searching its name, IAU abbreviation or English meaning (e.g. "Orion", "Ori", "Hunter") in the search box. There is also a new "✦ Constellations" group in the object list. The figure's lines and stars light up gold and its label brightens. Close with the card's ✕, Esc, or by tapping empty sky. Tapping a planet still focuses the planet and closes the card. This works on iPad touch too.
+- **Info card for each of the 88** (`constellations/info.js`): name, English meaning, abbreviation, a short myth or story, brightest star(s) with apparent magnitude, notable deep-sky objects, area rank (1–88) and area in square degrees (IAU/Delporte boundaries), and best months to see it from Boise, Idaho (43.6° N). Best months are computed from the figure's right ascension, using the month when it is highest at about 9 pm. Visibility is computed from its declination range: circumpolar, fully visible, low in the south, partly visible, or "never rises" (17 never rise, e.g. Crux and Octans).
+- Overlapped (hidden) constellation labels can't be clicked.
+
+### API for camera code (ScaleBot)
+The constellation module doesn't move the camera or change the FOV. Turn-to-face and zoom are left to the camera owner:
+- `window.solar.constellations.getTarget(abbr)` returns `{ abbr, name, centerDir, radiusDeg }`. `centerDir` is a unit `THREE.Vector3` in world space, pointing from the camera toward the figure's centre (the sky sphere is at infinity). `radiusDeg` is the angular radius that holds every star in the figure (Orion ≈ 17.5°).
+- `window` events: `constellation-select` (`detail` = `getTarget(abbr)`) when one is picked; `constellation-clear` (`detail` = `{ abbr }`) when it is closed. Restore the previous view on clear.
+- Also `select(abbr)`, `clear()`, `selected`, `pickAt(clientX, clientY, camera, slopPx)`, `info`.
+- Hooks in `main.js`: a tap that hits no body calls `constellations.pickAt`, and `constellations` is passed to `createSearch`. Camera functions are unchanged.
+
+## 2026-10-21: Moon phase readout says "as seen from Earth"
+
+### Changed
+- The Moon's phase readout on the Moon info card and in the Controls panel now ends with ", as seen from Earth" (e.g. "Full Moon · 99% lit, as seen from Earth"). The longer text wraps on narrow screens instead of overflowing (`main.js`).
+
+## 2026-10-21: Famous comets on real JPL orbits: 67P, Encke, Tempel 1, Wild 2, Swift-Tuttle, Tempel-Tuttle, NEOWISE and Tsuchinshan-ATLAS (Space Model Coder)
+
+### Added
+- **Eight famous comets**, next to Halley, Hale-Bopp and the three interstellar visitors. Each has its orbit line, a nucleus, a coma, a straight blue ion tail pointing away from the Sun and a curved cream dust tail. The tails grow towards perihelion and vanish far out, using the same tails as Halley.
+  - **67P/Churyumov-Gerasimenko**: the Rosetta and Philae comet. It has a two-lobed "rubber duck" nucleus, a new `duckGeometry()` in `comets/index.js`.
+  - **2P/Encke**: the shortest orbit of any bright comet (3.3 years), parent of the Taurids.
+  - **9P/Tempel 1**: hit by Deep Impact.
+  - **81P/Wild 2**: Stardust brought its dust back to Earth.
+  - **109P/Swift-Tuttle**: parent of the Perseids.
+  - **55P/Tempel-Tuttle**: parent of the Leonids.
+  - **The great comets NEOWISE (C/2020 F3) and Tsuchinshan-ATLAS (C/2023 A3).** Near the Sun, Tsuchinshan-ATLAS's orbit is just open (e = 1.0001). It uses the hyperbolic path code but is marked `interstellar: false`, so it isn't called an interstellar visitor. Its path is drawn in its own pale colour, and its card says it is falling in from, or heading back to, the Oort cloud.
+- **Cards with real facts.**
+  - **Orbit:** the period, and the size and tilt of the orbit.
+  - **Distance from Sun (live):** how far out it is, and how long the tails are right now.
+  - **Closest to Sun:** the last and next perihelion dates.
+  - **Mission or meteor shower:** "Visited by" (Rosetta/Philae, Deep Impact/Stardust-NExT, Stardust), "Meteor shower" (Taurids, Perseids, Leonids) or "Seen" (the 2020 and 2024 naked-eye shows).
+  - Each card also has a 💡 fact paragraph.
+- **Search** finds them by name, designation and by what they're known for. For example, `67p`, `rosetta`, `philae`, `taurids`, `deep impact`, `stardust`, `perseids`, `leonids`, `neowise` and `tsuchinshan` all work. Results show a short tag, e.g. `Rosetta & Philae comet` or `Parent of the Perseids`.
+- **Mini-map dots and labels** come automatically, through the existing comet hooks.
+- **17 new Events**, last and next perihelia plus the missions:
+  - Leonid storm 1966
+  - Swift-Tuttle 1992
+  - Tempel-Tuttle 1998 and 2031
+  - Stardust at Wild 2 (2 Jan 2004)
+  - Deep Impact (4 Jul 2005)
+  - Philae lands (12 Nov 2014)
+  - NEOWISE 2020
+  - 67P 2021 and 2028
+  - Tempel 1 2022 and 2028
+  - Wild 2 2022 and 2029
+  - Encke 2023 and 2027
+  - Tsuchinshan-ATLAS 2024
+
+  `EVENTS` is now sorted by date after it is built.
+
+### How the orbits are made
+- **Source:** JPL Small-Body Database API (`https://ssd-api.jpl.nasa.gov/sbdb.api?sstr=…&full-prec=1`), **fetched 2026-10-21**. The solution IDs, epochs and non-gravitational parameters are listed at the top of `comets/famous.js`, and the raw SBDB elements are kept there as `SBDB`.
+- **Why one set of elements isn't enough:** Jupiter keeps reshaping the short-period orbits.
+  - From SBDB's 2015 elements alone, 67P's 2021 perihelion would come out 80 days late. Its 0.37 AU pass by Jupiter in Nov 2018 tilted its orbit from 7.0° to 3.9°.
+  - Tempel 1's 0.55 AU Jupiter pass in May 2024 pushes its perihelion from 1.54 to 1.77 AU, and its period from 5.6 to 6.0 years.
+- **The fix:** each periodic comet carries `sets`, one osculating ellipse per perihelion passage from 1955 to 2075 (19 for 67P, 36 for Encke, 21 for Tempel 1, 16 for Wild 2, 4 for Tempel-Tuttle).
+  - They come from integrating the SBDB orbit, with its A1/A2/A3 non-gravitational terms (Marsden 1973 g(r)), under the Sun and all eight planets (Standish elements, as in `ephemeris/planets.js`), using RK4 both ways from the SBDB epoch.
+  - `useSet()` in `comets/index.js` picks the set for the sim date. It switches at the aphelion between two perihelia and only redraws that orbit line when the set changes, so there is no per-frame cost.
+- **Edge cases:**
+  - Swift-Tuttle uses one ellipse, with its period set from JPL's 1992 and 2126 perihelia, as Halley's is.
+  - NEOWISE and Tsuchinshan-ATLAS use their single SBDB solution.
+  - Wild 2 starts at its 1978 ellipse. The 1974 Jupiter pass (0.006 AU) can't be integrated reliably, so dates before Sept 1974 show the post-1974 orbit. Its card explains that pass.
+- **Far-out comets:** NEOWISE's ~720 AU aphelion, Swift-Tuttle's 51 AU and Tsuchinshan-ATLAS's 80 AU drawn path go through main.js's radial compression like Hale-Bopp's. Positions stay finite from 1000-01-01 to 2999-12-31.
+
+### Changed
+- `comets/index.js`:
+  - imports `FAMOUS` (new `comets/famous.js`)
+  - `orbitSamples()` and `useSet()`
+  - the duck nucleus
+  - the tails text in the distance row (`tailsInline`)
+  - the `interstellar: false` wording
+  - `stats()` now reports `posAU` (and `set`) for every comet
+- `search/index.js`: comet entries also take `aliases` and `sub` from the comet data (2 lines).
+- `ui/index.js`: the new events, sorted by date.
+- `README.md`: comet line and file list.
+- **No changes** to `main.js`, `galaxy.js`, `deepspace.js`, `earth/`, `moon/`, `planets/`, `scale/` or any fly-to code.
+
+### Notes
+- **JPL Horizons was unreachable from the box all day.** `ssd.jpl.nasa.gov` reset every TLS connection; `ssd-api.jpl.nasa.gov` worked. So the positions were checked against **JPL's Small-Body Identification API** (`ssd-api.jpl.nasa.gov/sb_ident.api`, two-pass, which uses JPL's own n-body ephemeris). It returns geocentric astrometric RA/Dec.
+  - sb_ident lists 81P, 55P and 109P but not 67P, 2P, 9P, NEOWISE or Tsuchinshan-ATLAS.
+  - Those five were checked against the same n-body integration. That integration reproduces sb_ident for 81P and 55P to 0.000–0.002° (2004, 2022, 2026), against 0.04–0.31° for plain two-body motion from the SBDB elements.
+- **Sim vs JPL**, angle between the sim's geocentric direction and JPL's (light time included, 12:00 UT):
+
+  | Comet | Date | Error |
+  |---|---|---|
+  | 81P/Wild 2 | 2004-01-02 (Stardust) | 0.020° |
+  | 81P/Wild 2 | 2021-11-02 | 0.006° |
+  | 81P/Wild 2 | 2026-10-21 | 0.028° |
+  | 81P/Wild 2 | 2028-04-08 | 0.003° |
+  | 55P/Tempel-Tuttle | 1966-11-17 | 0.009° |
+  | 55P/Tempel-Tuttle | 1998-02-28 | 0.001° |
+  | 55P/Tempel-Tuttle | 2026-10-21 | 0.12° |
+  | 109P/Swift-Tuttle | 1992-12-12 | 0.003° |
+  | 109P/Swift-Tuttle | 2026-10-21 | 0.031° |
+
+  - Worst cases: 81P 0.028° (1978–2050), 55P 0.43° (Nov 2014, near aphelion, just before the set changes), 109P 0.21° (1966).
+  - Swift-Tuttle's distance from the Sun runs ~0.7% long far out (43.34 vs 43.05 AU on 2026-10-21). That is the cost of making its period hit the 2126 return.
+- **Sim vs n-body**, heliocentric direction and distance:
+
+  | Comet | Date | Direction | Distance |
+  |---|---|---|---|
+  | 67P | 2014-11-12 (Philae) | 0.002° | 0.03 million km |
+  | 67P | 2021-11-02 | 0.000° | 0.00 million km |
+  | 67P | 2026-10-21 | 0.009° | 0.13 million km |
+  | 67P | worst (1992) | 0.05° | 0.97 million km |
+  | 2P/Encke | 2026-10-21 | 0.001° | 0.00 million km |
+  | 2P/Encke | worst, all dates | ≤ 0.04° | ≤ 0.8 million km |
+  | 9P | 2005-07-04 (Deep Impact) | 0.002° | 0.01 million km |
+  | 9P | 2026-10-21 | 0.014° | 0.31 million km |
+  | 9P | 2024-10-12 (worst) | 0.21° | 10 million km |
+  | NEOWISE | 2020-07-15 | 0.004° | 0.01 million km |
+  | NEOWISE | 2026-10-21 | 0.025° | 1.5 million km |
+  | Tsuchinshan-ATLAS | 2024-10-12 | 0.010° | 0.01 million km |
+  | Tsuchinshan-ATLAS | 2026-10-21 | 0.006° | 0.24 million km |
+
+  Tempel 1's worst case is in the middle of its Jupiter pass, which one ellipse per orbit can't follow.
+- **Dates vs JPL:**
+  - **Perihelion times:** the n-body times match SBDB's own tp: 67P 2015-08-13 02:04 vs 02:07 UT, Encke 2023-10-22 12:40 vs 12:41, Tempel-Tuttle 1998-02-28 02:19 vs 02:20, Tempel 1 2016-08-02 (17 min apart), Wild 2 2022-12-15 (4 h apart), Swift-Tuttle 1992-12-12 (8 h apart).
+  - **Known dates:** 67P on 2021-11-01 17 h (2 Nov), Tempel 1 on 2005-07-05 and 2022-03-04, Wild 2 on 2016-07-20, Tempel-Tuttle on 2031-05-21 (JPL: 20 May).
+  - **Closest to Earth:** NEOWISE 0.6918 AU on 2020-07-23 and Tsuchinshan-ATLAS 0.4724 AU on 2024-10-12, matching the published 103 and 71 million km.
+- **Tested** headless (Chrome + SwiftShader) on desktop 1280×800 and iPad Pro 11 portrait and landscape (touch):
+  - **Zero console errors**, warnings or failed requests.
+  - **Search:** all eight searches open the right card on desktop; `67p`, `neowise` and `tsuchinshan` were checked on both iPads.
+  - **Events:** Philae, NEOWISE and Deep Impact jump to the date and open the comet's card.
+  - **Labels:** clicking (desktop) or tapping (iPad) the 67P label in the overview opens its card. The touch tap area is 41×25 px plus the existing ≥ 44 px padding.
+  - **Mini-map:** it lists all eight comets.
+- **Performance:** eight more line loops (720 points), sprites and labels, plus 16 tail ribbons (28 points, updated only while a tail shows). That means eight small Kepler solves a frame. The perf guard needed no change (these aren't particle clouds).
+- **Screenshots:** `screenshot-comets.png` (new, 1280×800) shows Comet Tsuchinshan-ATLAS on 9 Oct 2024, three days before its closest pass to Earth. Its blue ion tail and curved dust tail stream past the Moon, the labels of other comets (Encke, Wild 2) are in the background, and its card is open. `screenshot.png` and the iPad screenshots are unchanged, since the default view barely changes.
+
 ## 2026-10-20: Real positions for Saturn's, Uranus's and Neptune's moons (Space Model Coder)
 
 > Built on 2026-10-19; that run stopped before committing. **Verified and shipped 2026-10-20** on top of EarthBot's cloud silver-lining commit (`3acf17f`). The re-test found no bugs, so the feature code is unchanged from 10-19. On 2026-10-20 the Saturn card reads `Titan 3.3′ E · Iapetus 2.4′ SW`.

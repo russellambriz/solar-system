@@ -1,7 +1,7 @@
 // earth/textures.js — loads the real Earth texture set (see textures/earth/SOURCES.md).
 //
 // Three tiers live in textures/earth/:
-//   mobile/   1024×512  day, night lights, water mask, clouds (no normal map; iPad/phones)
+//   mobile/   1024×512  day (December + July), night lights, water mask, clouds (no normal map; iPad/phones)
 //   desktop/  2048×1024 day, night lights, water mask, clouds + a normal map   (first paint / fallback)
 //   desktop/  4096×2048 earth_{day,night,water,clouds,normal}_4k.jpg          (progressive upgrade)
 //
@@ -21,6 +21,7 @@ const BASE = new URL('../textures/earth/', import.meta.url);
 const HI_RES = {
   day:    { file: 'earth_day_4k.jpg',    srgb: true  },
   night:  { file: 'earth_night_4k.jpg',  srgb: true  },
+  dayJul: { file: 'earth_day_jul_4k.jpg', srgb: true },   // July 2004 Blue Marble (seasonal blend, earthMaterial.js)
   water:  { file: 'earth_water_4k.jpg',  srgb: false },
   clouds: { file: 'earth_clouds_4k.jpg', srgb: false },
   normal: { file: 'earth_normal_4k.jpg', srgb: false },   // land relief (tangent space: R east, G north)
@@ -49,7 +50,7 @@ export function canUseHiRes(renderer, isMobile) {
  * @param {object}   opts
  * @param {boolean}  opts.isMobile      use the 1024-wide set and skip the normal map
  * @param {THREE.WebGLRenderer} [opts.renderer]  anisotropy, 4K capability check and pre-upload
- * @param {Function} opts.onLoad        (key: 'day'|'night'|'water'|'clouds'|'normal', texture, tier) => void
+ * @param {Function} opts.onLoad        (key: 'day'|'dayJul'|'night'|'water'|'clouds'|'normal', texture, tier) => void
  * @returns {{hasNormal: boolean, info: object}}  info is live: { set, hiResCapable, tier: {day, night, ...},
  *          hiResState: 'off'|'pending'|'loading'|'done'|'failed', hiResMs }
  */
@@ -65,6 +66,7 @@ export function loadEarthTextures({ isMobile, renderer = null, onLoad }) {
   const files = {
     day:    { file: 'earth_day.jpg',    srgb: true  },   // colour → sRGB
     night:  { file: 'earth_night.jpg',  srgb: true  },   // colour → sRGB
+    dayJul: { file: 'earth_day_jul.jpg', srgb: true },   // July day map: the seasonal partner of the December one
     water:  { file: 'earth_water.jpg',  srgb: false },   // data mask (white = ocean)
     clouds: { file: 'earth_clouds.jpg', srgb: false },   // data mask (white = cloud)
   };
