@@ -162,6 +162,14 @@ The constellation module doesn't move the camera or change the FOV. Turn-to-face
 - `window` events: `constellation-select` (`detail` = `getTarget(abbr)`) when one is picked; `constellation-clear` (`detail` = `{ abbr }`) when it is closed. Restore the previous view on clear.
 - Also `select(abbr)`, `clear()`, `selected`, `pickAt(clientX, clientY, camera, slopPx)`, `info`.
 - Hooks in `main.js`: a tap that hits no body calls `constellations.pickAt`, and `constellations` is passed to `createSearch`. Camera functions are unchanged.
+## 2026-10-22: Antennae Galaxies (NGC 4038/4039) (Galaxy Builder)
+
+### Added
+- **Antennae Galaxies** in the galaxy view, in the new `antennae.js` (created from `galaxy.js`, no `main.js` change). They sit at their true distance, ~45 million ly (450,000 units), toward l = 287.3°, b = +42.3° in Corvus. That is the same galactic frame as Andromeda and the Sombrero.
+- Two overlapping, warped spiral disks (~56,000 ly each) with yellow-white cores, dark dust in the overlap region, pink/magenta H II knots and blue young clusters around the collision zone, and two long curved tidal tails (~2,000 units each) with a gentle GPU drift. Additive points, about 64k on desktop and 27k on touch devices. No bloom or tone mapping.
+- An "Antennae Galaxies" label (44px tap target) and a fixed-size beacon when far away. A dashed distance line with "≈ 45 million light-years · in Corvus" shows in the far view. Tap the label to fly there and open the info card.
+- **Keyboard: N** flies to the Antennae (A is already Andromeda). Press N again there to reopen the info card.
+- While you orbit the Antennae, the Local Group target glide is paused through `window.solar.setGlide`, so zooming out shows the tails instead of pulling you home.
 
 ## 2026-10-21: Moon phase readout says "as seen from Earth"
 
