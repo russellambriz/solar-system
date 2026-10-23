@@ -139,6 +139,8 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uShadow: { value: 1.0 },
     // Limb profile: LOLA heights displace the geometry, exaggerated 2x (the relief maps use 2.5-3x). 0 = smooth sphere.
     uRelief: { value: RELIEF },
+    // Mare colour: blue high-titanium vs brownish low-titanium lava, amplified from the LROC mosaic's own colour. 1 = map as is.
+    uMareTint: { value: 3.0 },
   };
   // iPad: three size bands (down to ~3 km craters); desktop adds a fourth (~1.3 km) for the closest views.
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG,

@@ -77,6 +77,7 @@ uniform float uMapTexel;      // arc of one colour/relief texel at the equator (
 uniform sampler2D uHeightMap; // LOLA elevation, 10-bit in red (high byte) + green (low byte), see SOURCES.md
 uniform float uHeightTexel;   // arc of one height texel (radians = 2*pi / map width)
 uniform float uShadow;        // 0 = the old smooth terminator, 1 = terrain shadows from the height map
+uniform float uMareTint;      // gain on the map's own blue-red mare colour (1 = the LROC mosaic as is)
 varying vec2 vUv;
 varying vec3 vObjN;
 varying vec3 vWorldPos;
@@ -221,6 +222,26 @@ void main() {
 
   mat3 m = mat3(modelMatrix);
   vec3 albedo = texture2D(uMap, vUv).rgb;   // sRGB texture -> linear on fetch
+
+  // Mare colour. Lava flows differ in titanium: high-Ti basalts (Tranquillitatis, much of Procellarum, western
+  // Imbrium) are slightly blue, low-Ti ones (Serenitatis's rim, eastern Imbrium, the Aristarchus plateau's orange
+  // glass) are brownish. The LROC colour mosaic has those ratios but very muted, so the disc read as plain grey.
+  // Here the mosaic's own colour ratio, taken from a coarse mip (~256 px around, so JPEG chroma noise and single
+  // craters drop out), is pushed away from the average (highland) colour, mostly on the dark maria. Brightness is
+  // unchanged: only the hue shifts.
+  if (uMareTint != 1.0) {
+    float mareLod = max(log2(float(textureSize(uMap, 0).x) / 256.0), 0.0);
+    vec3 cLow = textureLod(uMap, vUv, mareLod).rgb;
+    float lLow = dot(cLow, vec3(0.2126, 0.7152, 0.0722));
+    vec3 ratio = cLow / max(lLow, 1e-4) / vec3(1.026, 1.0, 0.920);   // relative to the map's mean colour
+    // Only the blue-red axis is real here (the titanium signal); green-magenta is mosaic noise and is left alone.
+    float blue = 0.5 * (ratio.b - ratio.r);
+    float mare = 1.0 - smoothstep(0.06, 0.2, lLow);
+    float d = clamp((uMareTint - 1.0) * mix(0.15, 1.0, mare) * blue, -0.25, 0.25);
+    vec3 tint = vec3(1.0 - d, 1.0 - 0.1 * d, 1.0 + d);
+    tint /= dot(cLow * tint, vec3(0.2126, 0.7152, 0.0722)) / max(lLow, 1e-4);   // keep brightness
+    albedo *= tint;
+  }
 
   // Close-up crater field (see craterBand). pixArc = Moon radii covered by one screen pixel here.
   float crShade = 1.0, crBright = 0.0;

@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-22: Mare colour: blue and brown lava plains (MoonBot)
+
+### Changed
+- The maria now show their real colour differences. Lava rich in titanium (Mare Tranquillitatis, much of Oceanus
+  Procellarum, western Imbrium) is faintly blue; low-titanium lava (the rim of Mare Serenitatis, eastern Imbrium) and the
+  Aristarchus plateau's orange volcanic glass are brownish. The LROC colour map already holds these hues, but so faintly
+  that the disc looked plain grey. The shader now reads the map's own colour from a coarse mip level (about 256 px around,
+  so JPEG colour noise and single craters drop out) and strengthens only its blue-red part, mostly on the dark maria.
+  Highlands stay almost neutral and brightness is unchanged, so only the hue moves (`moon/shaders.js`, uniform `uMareTint`:
+  3 by default, 1 = the map as is). No new textures; desktop and iPad get the same tint.
+
+### Testing
+- New check `moon-shots/maretint.js` shoots the whole disc, Serenitatis/Tranquillitatis and Imbrium/Aristarchus at full
+  Moon with the tint on and off, on desktop and iPad.
+
 ## 2026-10-21: Sharper mountain and crater shadows up close (MoonBot)
 
 ### Changed
@@ -68,6 +83,7 @@
 
 ### Testing
 - New far-side check (`moon-shots/seam.js`): it pauses at a date when the Sun is low over longitude 180° and shoots it close up, from orbit and toward the north, on desktop and iPad. The seam is gone in both. `moon-shots/shoot.js` still passes with no console errors.
+
 ## 2026-10-22: Constellations you can pick and learn about: highlight + info cards for all 88 (Constellations)
 
 ### Added

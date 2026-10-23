@@ -30,3 +30,6 @@ Sharper terrain shadows (2026-10-21):
 - `moon_height_4k.png` (4096x2048, desktop close-up set, streamed with the 4K colour and normal maps): the kit's
   `ldem_16_uint.tif` (16 px/deg, stored as half-metres above -10 km) box-resampled to 4096x2048, same 10-bit R/G encoding
   as the other height maps. About 2.7 km per texel at the equator, half the old 2K map's step. Never loaded on iPad.
+
+Mare colour (2026-10-22): no new files. The shader strengthens the blue-red colour ratio already in the LROC colour
+mosaic (read from a coarse mip level), so high-titanium maria read slightly blue and low-titanium ones brownish.
