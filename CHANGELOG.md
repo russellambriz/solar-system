@@ -1,5 +1,53 @@
 # Changelog
 
+## 2026-10-23: Meteor showers tied to their parent comets (Space Model Coder)
+
+### Added
+- **Eleven major meteor showers**, each linked to the comet or asteroid that sheds it:
+  - Quadrantids (2003 EH1), Lyrids (C/1861 G1 Thatcher), Eta Aquariids and Orionids (both 1P/Halley), Perseids (109P/Swift-Tuttle), Draconids (21P/Giacobini-Zinner), Southern and Northern Taurids (2P/Encke), Leonids (55P/Tempel-Tuttle), Geminids (3200 Phaethon) and Ursids (8P/Tuttle).
+- **Debris streams:** each shower is a faint particle ribbon along its parent's orbit, densest where Earth runs through it. A glowing marker on Earth's orbit shows the crossing: it sits where the sim's Earth is on the peak date.
+- **Active showers:** while the date is inside a shower's activity dates:
+  - its stream brightens and its crossing marker pulses
+  - a starburst **radiant marker** appears on the sky at the real radiant (RA/Dec), with a label
+  - **meteor streaks** rain onto Earth from the radiant's direction (zoom in on Earth to see them). How many depends on the shower's ZHR and how close the date is to the peak.
+- **Cards** (tap a shower's label or its radiant):
+  - parent body
+  - peak date and time, a live countdown to the next peak from the shown date, and the activity dates
+  - ZHR at the peak and roughly on the shown date, plus entry speed
+  - **From Boise (43.6°N):** the radiant's constellation, how high it climbs, about when it is highest (MDT/MST) and the best time to watch
+  - a 💡 fact
+  - buttons to fly to the parent comet (Halley, Swift-Tuttle, Encke, Tempel-Tuttle) and to highlight the radiant's constellation
+- **Parent comets' cards** (Halley, 2P/Encke, 109P/Swift-Tuttle, 55P/Tempel-Tuttle) get a button that opens their shower(s).
+- **Search:** `perseids`, `orionids`, `geminids`, `leonids`, `taurids`, `eta aquariids`, `quadrantids`, the IAU codes (`per`, `gem`…), and `meteor` or `shooting stars` for all of them. They also have their own "✷ Meteor showers" group in the list. Picking one flies to the stream's crossing on Earth's orbit and opens the card.
+- **Events:** the next twelve months of peaks, from the Southern Taurids (5 Nov 2026) to the Orionids (22 Oct 2027).
+- **Layers → Meteor showers** checkbox.
+
+### How it's made
+- **Shower data:** IMO Meteor Shower Calendar 2026 (Rendtel, IMO INFO(3-25)), Table 5, the Working List of Visual Meteor Showers. That gives the activity dates, peak solar longitude λ☉ (J2000), radiant α/δ, V∞ and ZHR. The IAU MDC codes are listed too.
+- **Peak dates** are worked out from λ☉ for any year: the Almanac's low-precision solar longitude, minus precession to J2000. They match the IMO's 2026 dates.
+- **Parent orbits:** JPL Small-Body Database API, fetched 2026-10-23. They are only used to draw the streams.
+- **The stream meets Earth:** near the crossing, the drawn stream is eased onto Earth's position at the peak. Real streams are wide, and the parents' orbits pass up to ~0.1 AU from Earth's.
+- **Draw calls:** all streams are one Points draw (6,600 points on desktop, 2,860 on touch). Per-shower brightness is a uniform. On desktop the cloud is big enough for the perf/ frame-rate guard to thin it with the other particle clouds.
+- **Streaks:** at most 72 (36 on touch), one LineSegments draw with reused buffers. They only run when the camera is near Earth.
+- **Radiants:** placed with constellations/' `raDecToScene` at "infinity", like the star sphere.
+- **Labels:** keep clear of the planet labels and of each other, with ≥ 44 px tap targets on touch.
+
+### Changed
+- New: `meteors/index.js` and `meteors/data.js`.
+- `main.js`: import, create, update, and hand `meteors` to search and `window.solar` (5 hook lines).
+- `search/index.js`:
+  - shower entries and their list group
+  - an exact match on an object's own name now beats an alias, so `perseids` lists the shower before comet Swift-Tuttle
+- `ui/index.js`: the peak events.
+- `index.html`: the Layers checkbox.
+- `style.css`: label and button styles.
+- Not touched: constellations/, comets/, the camera code, earth/, moon/, planets/ and the galaxy files.
+
+### Notes
+- **Activity curve:** the IMO gives each shower's peak ZHR, not its shape. The rate between the activity dates uses a rough bell (sharp for the Quadrantids and Draconids, broad for the Taurids).
+- **Streak size:** streaks are drawn around the enlarged globe. Real meteors burn up 80–120 km high.
+- **Times:** the "highest about…" times from Boise ignore the equation of time (±16 min).
+
 ## 2026-10-22: Active missions on real JPL trajectories (Space Model Coder)
 
 ### Added

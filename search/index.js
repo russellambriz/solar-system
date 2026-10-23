@@ -43,7 +43,7 @@ const KIND = {
   dwarf: { icon: '○', tag: 'Dwarf planet' }, asteroid: { icon: '◇', tag: 'Asteroid' }, neo: { icon: '◇', tag: 'Near-Earth asteroid' }, craft: { icon: '🛰', tag: 'Spacecraft' },
   site: { icon: '⚑', tag: 'Moon landing site' }, comet: { icon: '☄', tag: 'Comet' }, galaxy: { icon: '🌌', tag: 'Galaxy' },
   blackhole: { icon: '⚫', tag: 'Black hole' }, quasar: { icon: '✴', tag: 'Quasar' }, nebula: { icon: '✺', tag: 'Nebula' },
-  cluster: { icon: '✧', tag: 'Star cluster' }, constellation: { icon: '✦', tag: 'Constellation', color: '#9fb4e0' },
+  cluster: { icon: '✧', tag: 'Star cluster' }, meteor: { icon: '✷', tag: 'Meteor shower', color: '#ffe9a0' }, constellation: { icon: '✦', tag: 'Constellation', color: '#9fb4e0' },
 };
 const DEEP_KIND = { nebula: ['nebula', 'Emission nebula'], snr: ['nebula', 'Supernova remnant'], open: ['cluster', 'Open star cluster'], globular: ['cluster', 'Globular cluster'] };
 const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’'`]/g, '').replace(/[^a-z0-9*/+]+/g, ' ').trim();
@@ -101,6 +101,14 @@ export function createSearch(api) {
     add({ name: it.info.name, kind: it.info.kind, color: it.info.color, aliases: it.info.aliases, track: it, sub: it.info.sub, notable: true,
       go: () => goTracked(it, () => asteroids.framing(it).dist, () => asteroids.showInfo(it.info.name, true),
         { minDist: Math.max(0.12, it.size * 2.5), dir: () => asteroids.framing(it).dir, offset: () => asteroids.framing(it).offset }) });
+  }
+  // meteors/: fly to where Earth crosses the shower's stream (on Earth's orbit), then open the shower's card
+  const meteors = api.meteors;
+  for (const it of meteors?.items || []) {
+    const s = it.info, d = new Date(Date.UTC(2000, 0, 1, 12) + it.peak26 * 86400000);
+    add({ name: s.name, kind: 'meteor', color: s.color, aliases: s.aliases, track: it,
+      sub: `Meteor shower · peaks ~${d.getUTCDate()} ${d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })} · ${s.parent.name.replace(/ \(.*\)$/, '')}`,
+      go: () => goTracked(it, it.viewDist, () => meteors.showInfo(s.name)) });
   }
   const galaxyGo = (fn) => () => {
     if (getMode() === 'solar') { endTrip(); enterGalaxy(fn); } else if (getMode() === 'galaxy') fn();
@@ -315,6 +323,7 @@ export function createSearch(api) {
       else if (k.includes(q)) best = Math.max(best, 40);
     }
     if (best && (e.kind === 'planet' || e.kind === 'star')) best += 5;
+    if (e.keys[0] === q) best += 3;          // its own name beats an alias ("perseids": the shower before comet Swift-Tuttle)
     return best;
   }
   function find(text, n = 8) {
@@ -364,7 +373,7 @@ export function createSearch(api) {
     const top = document.createElement('div'); top.className = 'list-header'; top.textContent = '☀ Sun & planets';
     list.insertBefore(top, list.firstChild);
     const groups = [
-      ['craft', '🛰 Spacecraft'], ['comet', '☄ Comets'], [(e) => e.notable, '◇ Famous asteroids'], ['site', '⚑ Moon landings'],
+      ['craft', '🛰 Spacecraft'], ['comet', '☄ Comets'], ['meteor', '✷ Meteor showers'], [(e) => e.notable, '◇ Famous asteroids'], ['site', '⚑ Moon landings'],
       [['galaxy', 'blackhole', 'quasar'], '🌌 Galaxies & black holes'], [['nebula', 'cluster'], '✺ Nebulae & star clusters'], ['constellation', '✦ Constellations'],
     ];
     for (const [kinds, title] of groups) {

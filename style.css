@@ -414,3 +414,14 @@ body.touch .label.const-label::before { inset: 0; }
 #const-card .const-close { position: absolute; top: 8px; right: 8px; width: var(--btn-h); padding: 0; }
 body.clean-view #const-card { display: none !important; }
 @media (max-width: 600px) { #const-card { width: calc(100% - 2 * var(--gap) - var(--sal) - var(--sar)); max-height: 45vh; } }
+/* meteor showers (meteors/) */
+.meteor-wrap { pointer-events: none; }
+.label.meteor-label { transform: translateY(16px); color: #fff1c4; border-color: rgba(255, 220, 140, 0.45); background: rgba(30, 22, 6, 0.6); }
+.label.meteor-label.active { border-color: #ffd27a; color: #ffd27a; }
+.label.meteor-label.radiant-label { transform: translateY(-22px); background: rgba(30, 22, 6, 0.45); }
+body.touch .label.meteor-label { font-size: 12px; }
+body.touch .label.meteor-label::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
+.meteor-extra { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.meteor-extra.hidden { display: none; }
+.meteor-btn { min-height: 32px; padding: 4px 10px; font-size: 12.5px; }
+body.touch .meteor-btn { min-height: 44px; }

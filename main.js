@@ -25,6 +25,7 @@ import { createPerfGuard } from './perf/index.js';
 import { createScaleTools } from './scale/index.js';
 import { createUI } from './ui/index.js';
 import { createConstellations } from './constellations/index.js';
+import { createMeteors } from './meteors/index.js';
 import { orientTilt } from './axes/index.js';
 
 // ---------------------------------------------------------------------------
@@ -595,6 +596,8 @@ const constellations = createConstellations({ scene, renderer, isTouch: IS_TOUCH
 const spacecraft = createSpacecraft({ scene, bodies, renderer, isTouch: IS_TOUCH, scaleDistance, orbitLines });
 // comets/: Halley's Comet and Hale-Bopp on their real orbits, with ion + dust tails that grow near the Sun
 const comets = createComets({ scene, bodies, renderer, isTouch: IS_TOUCH, scaleDistance, orbitLines });
+// meteors/: meteor showers: parent comets' debris streams, radiants and streaks while a shower is active
+const meteors = createMeteors({ scene, bodies, isTouch: IS_TOUCH, scaleDistance });
 
 // Galaxy view lives in its own scene with its own units (1 unit = 100 ly) → no float/depth precision issues
 const galaxy = createGalaxy({ isTouch: IS_TOUCH });
@@ -1657,6 +1660,7 @@ function animate() {
     sunFX.update(dt, camera, sunGroup.position, true);
     spacecraft.update(days, camera, dt);
     comets.update(days, camera, dt);
+    meteors.update(days, camera, dt);
     const nearSun = sunFX.stats().near;
     // fade the glow sprites out when the Sun is far off-axis or behind: a sprite near the screen edge projects to a huge straight-edged band
     camera.getWorldDirection(_camFwd);
@@ -1693,7 +1697,7 @@ window.addEventListener('resize', onResize);
 window.addEventListener('orientationchange', () => setTimeout(onResize, 250)); // iOS reports new size a bit late
 
 // search/: find any object by name and fly there (cinematic past the orbits/belts on long trips); grouped, filterable list
-const search = createSearch({ constellations, bodies, spacecraft, comets, localGroup, galaxy, camera, controls, focusOn, flyTo, flyToFixed, galaxyFly,
+const search = createSearch({ constellations, meteors, bodies, spacecraft, comets, localGroup, galaxy, camera, controls, focusOn, flyTo, flyToFixed, galaxyFly,
   enterGalaxy, exitGalaxy, getMode: () => mode, getGalaxyFocus: () => galaxyFocus, isTransitioning: () => !!transition, flyToAndromeda,
   flyToMilkyWay, flyToSombrero, flyToSgrA, flyToTon618, flyToLocalGroup, showGalaxyInfo, scaleDistance, scene, isCompact, setPanelCollapsed,
   releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
@@ -1714,4 +1718,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };
+window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, meteors, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };
