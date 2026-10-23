@@ -147,4 +147,105 @@ function iss() {
   return { group: k.build('ISS'), ref: 109 };
 }
 
-export const MODELS = { voyager, newHorizons, parker, jwst, iss };
+// ---- active interplanetary missions (spacecraft/missions.js) -------------------------------------------------------
+// solar-array wing along +X/-X (or rotated by `yaw`) at height y: a thin box of panels on a short yoke
+function wing(k, m, len, wid, yaw, y = 0, root = 1.2, mat = m.panel) {
+  const c = Math.cos(yaw), s = Math.sin(yaw), mid = root + len / 2;
+  k.add(mat, new THREE.BoxGeometry(len, 0.06, wid), [c * mid, y, -s * mid], [0, yaw, 0]);
+  k.add(m.grey, rod(0.04, root, 5), [c * root / 2, y, -s * root / 2], [0, yaw, HALF_PI]);
+}
+// Juno: hexagonal bus, three 9 m arrays 120° apart (one shorter, carrying the magnetometer boom), 2.5 m dish (+Y)
+function juno() {
+  const m = materials(), k = new Kit();
+  k.add(m.dark, new THREE.CylinderGeometry(1.75, 1.75, 1.5, 6), [0, -0.9, 0]);
+  k.add(m.gold, new THREE.CylinderGeometry(0.8, 0.8, 0.9, 12), [0, -2.0, 0]);                 // radiation vault
+  k.add(m.dish, dish(1.25, 0.35), [0, -0.1, 0]);
+  for (let i = 0; i < 3; i++) wing(k, m, i === 2 ? 7.0 : 8.9, 2.6, i * Math.PI * 2 / 3, -0.9, 1.4);
+  k.add(m.grey, new THREE.BoxGeometry(1.2, 0.5, 0.5), [Math.cos(4 * Math.PI / 3) * 9.4, -0.9, -Math.sin(4 * Math.PI / 3) * 9.4]);
+  return { group: k.build('Juno'), ref: 20 };
+}
+// Europa Clipper: tall bus with its 3 m dish on top (+Y), two 14 m arrays, radar antennas and the magnetometer boom
+function clipper() {
+  const m = materials(), k = new Kit();
+  k.add(m.white, new THREE.CylinderGeometry(0.75, 0.75, 4.2, 12), [0, -2.4, 0]);
+  k.add(m.gold, new THREE.BoxGeometry(1.4, 1.2, 1.4), [0, -1.4, 0]);                           // electronics vault
+  k.add(m.dish, dish(1.5, 0.45), [0, -0.2, 0]);
+  wing(k, m, 14.2, 4.1, 0, -2.6, 1.0);
+  wing(k, m, 14.2, 4.1, Math.PI, -2.6, 1.0);
+  k.add(m.grey, rod(0.03, 17.6, 4), [0, -3.6, 0.9], [HALF_PI, 0, 0]);                          // REASON radar antennas
+  k.add(m.grey, rod(0.04, 8.5, 5), [0, -4.4, -4.6], [HALF_PI, 0, 0]);                          // magnetometer boom
+  return { group: k.build('Europa Clipper'), ref: 30.5 };
+}
+// JUICE: box bus, 2.5 m dish (+Y), two five-panel cross-shaped arrays (85 m²), 16 m radar antenna, 10.6 m boom
+function juice() {
+  const m = materials(), k = new Kit();
+  k.add(m.gold, new THREE.BoxGeometry(2.6, 2.4, 2.4), [0, -1.4, 0]);
+  k.add(m.dish, dish(1.25, 0.35), [0, -0.15, 0]);
+  for (const side of [0, Math.PI]) {
+    wing(k, m, 11, 2.5, side, -1.4, 1.4);
+    const c = Math.cos(side);
+    k.add(m.panel, new THREE.BoxGeometry(2.5, 0.06, 7.6), [c * 7.0, -1.4, 0]);                  // the cross bar of each array
+  }
+  k.add(m.grey, rod(0.03, 16, 4), [0, -2.7, 0], [HALF_PI, 0, 0]);
+  k.add(m.grey, rod(0.04, 10.6, 5), [0, -0.6, -6.5], [HALF_PI, 0, 0]);
+  return { group: k.build('JUICE'), ref: 27 };
+}
+// Psyche: box bus, 2 m dish (+Y), two five-panel cross-shaped arrays (24.8 m tip to tip), instrument boom
+function psyche() {
+  const m = materials(), k = new Kit();
+  k.add(m.gold, new THREE.BoxGeometry(2.4, 2.2, 3.1), [0, -1.3, 0]);
+  k.add(m.dish, dish(1.0, 0.3), [0, -0.1, 0]);
+  for (const side of [0, Math.PI]) {
+    wing(k, m, 9.6, 2.2, side, -1.3, 1.6);
+    k.add(m.panel, new THREE.BoxGeometry(2.2, 0.06, 6.6), [Math.cos(side) * 6.4, -1.3, 0]);
+  }
+  k.add(m.grey, rod(0.04, 2.2, 5), [0, -1.8, 2.6], [HALF_PI, 0, 0]);
+  return { group: k.build('Psyche'), ref: 24.8 };
+}
+// Lucy: two 7.3 m round fan-fold arrays, small bus, 2 m dish (+Y), instrument platform
+function lucy() {
+  const m = materials(), k = new Kit();
+  k.add(m.gold, new THREE.BoxGeometry(1.8, 2.0, 1.8), [0, -1.2, 0]);
+  k.add(m.dish, dish(1.0, 0.3), [0, -0.15, 0]);
+  for (const sx of [-1, 1]) {
+    k.add(m.panel, new THREE.CylinderGeometry(3.65, 3.65, 0.06, 20), [sx * 5.3, -1.2, 0]);
+    k.add(m.grey, rod(0.05, 1.6, 5), [sx * 1.7, -1.2, 0], [0, 0, HALF_PI]);
+  }
+  k.add(m.dark, new THREE.BoxGeometry(0.8, 0.7, 0.9), [0, -1.2, 1.3]);
+  return { group: k.build('Lucy'), ref: 14.25 };
+}
+// BepiColombo cruise stack: transfer module (MTM) with two long arrays, MPO with its one-sided array and radiator, Mio
+// (octagonal drum) under its sunshield. The 1 m dish is on +Y.
+function bepi() {
+  const m = materials(), k = new Kit();
+  k.add(m.white, new THREE.BoxGeometry(3.6, 1.6, 2.2), [0, -1.0, 0]);                            // MPO
+  k.add(m.shield, new THREE.CylinderGeometry(1.2, 1.4, 1.6, 12), [0, -2.6, 0]);                  // Mio sunshield (MOSIF)
+  k.add(m.grey, new THREE.CylinderGeometry(1.5, 1.5, 1.6, 8), [0, -4.2, 0]);                     // MTM
+  k.add(m.dish, dish(0.55, 0.16), [0.9, -0.15, 0]);
+  wing(k, m, 7.5, 1.4, Math.PI / 2, -1.0, 1.0, m.array);                                         // MPO array
+  wing(k, m, 12, 1.9, 0, -4.2, 1.6);
+  wing(k, m, 12, 1.9, Math.PI, -4.2, 1.6);
+  return { group: k.build('BepiColombo'), ref: 30 };
+}
+// Hera: 1.6 m box, 1.1 m dish (+Y), two three-panel arrays (11 m span)
+function hera() {
+  const m = materials(), k = new Kit();
+  k.add(m.gold, new THREE.BoxGeometry(1.6, 1.7, 1.6), [0, -1.0, 0]);
+  k.add(m.dish, dish(0.56, 0.17), [0, -0.1, 0]);
+  wing(k, m, 4.4, 1.4, 0, -1.0, 1.0);
+  wing(k, m, 4.4, 1.4, Math.PI, -1.0, 1.0);
+  return { group: k.build('Hera'), ref: 11 };
+}
+// OSIRIS-APEX (ex OSIRIS-REx): box bus, 2 m dish (+Y), two arrays, TAGSAM arm, the empty sample-capsule deck
+function osiris() {
+  const m = materials(), k = new Kit();
+  k.add(m.gold, new THREE.BoxGeometry(2.4, 2.4, 2.4), [0, -1.4, 0]);
+  k.add(m.dish, dish(1.0, 0.3), [0, -0.15, 0]);
+  wing(k, m, 2.6, 1.8, 0, -1.4, 1.4);
+  wing(k, m, 2.6, 1.8, Math.PI, -1.4, 1.4);
+  k.add(m.grey, rod(0.05, 3.4, 5), [0, -3.0, 1.0], [0.5, 0, 0]);                                   // TAGSAM arm
+  k.add(m.white, new THREE.CylinderGeometry(0.3, 0.3, 0.2, 12), [0, -4.5, 1.8]);
+  return { group: k.build('OSIRIS-APEX'), ref: 6.2 };
+}
+
+export const MODELS = { voyager, newHorizons, parker, jwst, iss, juno, clipper, juice, psyche, lucy, bepi, hera, osiris };

@@ -73,6 +73,8 @@ const DEFAULTS = {
   cloudSilverG: 0.6,       //   Henyey–Greenstein asymmetry of that lobe
   cloudShadow: 0.45,
   nightGain: 1.7,          // city lights (warm); night side is otherwise near-black
+  cityLights: 1.0,         // richer city lights (earthMaterial.js): dim towns/suburbs, metro glow halo, sodium-orange
+                           // edges vs whiter cores, cloud-diffused glow; 0 = previous look (bright cores only)
   specular: 0.15,         // glint strength (calm-sea peak ≈ 0.5 × sun before the knee → stays peaked)
   glintCap: 0.5,           // max glint radiance relative to the sun colour (desktop) — never a white disc
   glintCapMobile: 0.32,    // lower on the iPad tier (1K water mask, bigger blurrier hotspot)
@@ -133,6 +135,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uCloudSilver:   { value: P.cloudSilver },
     uCloudSilverG:  { value: P.cloudSilverG },
     uNightGain:     { value: P.nightGain },
+    uCityLights:    { value: P.cityLights },
     uSpecular:      { value: P.specular },
     uGlintCap:      { value: isMobile ? P.glintCapMobile : P.glintCap },
     uGlintShininess:{ value: P.glintShininess },
@@ -239,6 +242,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
       U.uAuroraTime.value = (U.uAuroraTime.value + Math.min((now - (auroraClock.t || now)) / 1000, 0.1) * P.auroraSpeed) % 1000;
       auroraClock.t = now;
       U.uAurora.value = P.aurora;
+      U.uCityLights.value = P.cityLights;
     }
     // Cloud deck: locked to the ground frame. main.js still writes clouds.rotation.y = spin × 1.15 every frame
     // (updateBodies); that solid-body spin-up is overridden here, right before drawing, and replaced by the

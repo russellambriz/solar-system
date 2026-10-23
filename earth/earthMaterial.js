@@ -12,6 +12,9 @@
 //     anti-sun side
 //   • city lights switch on at dusk in clusters: each spot has its own noise threshold on "how far past the
 //     terminator" it must be before it lights up
+//   • richer city lights (uCityLights): faint towns / suburbs below the old core threshold, a soft metro glow halo
+//     (light scattered by low haze, read from coarse mips of the night map), whiter cores fading to sodium-orange
+//     edges, and under cloud the sharp cores give way to a blurred, dimmer glow (cloud diffuses the light)
 //   • level of detail: uDetail (from Earth's on-screen size, see index.js) fades the cloud shadows and widens /
 //     dims the glint at overview distances, where the tight lobe and the offset shadow lookup would shimmer
 //   • seasons: the December 2004 and July 2004 Blue Marble maps are blended by the date (uSeasonW, from the
@@ -68,6 +71,7 @@ uniform mat3  uGroundToCloud;   // ground object space → cloud object space (c
 uniform float uCloudsReady;     // 0 until the cloud texture has loaded
 uniform float uCloudShadow;     // max darkening under full cloud (0..1)
 uniform float uNightGain;       // city-light brightness
+uniform float uCityLights;      // richer city lights (dim towns, glow halo, colour, cloud diffusion); 0 = cores only
 uniform float uSpecular;        // ocean glint strength
 uniform float uGlintShininess;  // Blinn-Phong exponent of the calmest sea
 uniform float uNormalStrength;  // land relief strength (desktop only)
@@ -210,7 +214,29 @@ void main() {
   // ---- night lights -------------------------------------------------------------------------------------------
   // The source map has a faint blue base layer; keep only the bright city cores and warm them up a little.
   vec3 night = texture2D(uNightMap, vUv).rgb;
-  float lights = smoothstep(0.06, 0.55, max(night.r, night.g));
+  float nm = max(night.r, night.g);
+  float lights = smoothstep(0.06, 0.55, nm);
+  vec3 lightCol = vec3(1.0, 0.74, 0.42);
+  if (uCityLights > 0.001) {
+    // Metro glow: the night map read at fixed coarse mips (~80 km and ~160 km around, the same on the 1K, 2K and
+    // 4K maps), so big conurbations sit in a soft pool of scattered light and roads between towns merge.
+    float lwN = log2(max(float(textureSize(uNightMap, 0).x), 1.0));
+    vec3 b1 = textureLod(uNightMap, vUv, max(lwN - 9.0, 0.0)).rgb;
+    vec3 b2 = textureLod(uNightMap, vUv, max(lwN - 8.0, 0.0)).rgb;
+    float g1 = max(b1.r, b1.g), g2 = max(b2.r, b2.g);
+    float glow = smoothstep(0.0, 0.22, g1) * 0.30 + smoothstep(0.0, 0.14, g2) * 0.16;
+    // faint towns / suburbs that the old 0.06 threshold dropped (~2× the lit area of the cores alone)
+    float dim = smoothstep(0.012, 0.09, nm) * 0.30;
+    float rich = max(lights, dim) + glow * (1.0 - lights);
+    // under cloud, the sharp pattern is diffused into a broader, dimmer glow
+    float cl = smoothstep(0.15, 0.8, overhead);
+    float diffused = (smoothstep(0.0, 0.2, g2) * 0.45 + smoothstep(0.0, 0.25, g1) * 0.25);
+    rich = mix(rich, diffused, cl * 0.75);
+    // colour: bright cores whiter (mixed LED / high-pressure sodium), dim edges and glow deeper sodium orange
+    vec3 richCol = mix(vec3(1.0, 0.58, 0.26), vec3(1.0, 0.86, 0.62), smoothstep(0.25, 0.9, lights));
+    lights = mix(lights, rich, uCityLights);
+    lightCol = mix(lightCol, richCol, uCityLights);
+  }
   // Dusk switch-on: "darkness" goes 0 → 1 from just past the terminator to ~12° into the night. Each place gets
   // its own threshold from two octaves of value noise (town-sized clusters + finer grain), so as the terminator
   // sweeps over, cities come on in patches instead of one uniform fade. At overview distances the threshold
@@ -219,7 +245,7 @@ void main() {
   float thr  = vnoise(vObjDir * 38.0) * 0.65 + vnoise(vObjDir * 140.0) * 0.35;
   thr = mix(0.5, clamp((thr - 0.22) / 0.56, 0.0, 1.0), uDetail) * 0.86 + 0.07;
   float on = smoothstep(thr - 0.05, thr + 0.05, dark);
-  col += vec3(1.0, 0.74, 0.42) * lights * on * mix(0.55, 1.0, dark) * (1.0 - 0.6 * overhead) * uNightGain;
+  col += lightCol * lights * on * mix(0.55, 1.0, dark) * (1.0 - mix(0.6, 0.35, uCityLights) * overhead) * uNightGain;
 
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
