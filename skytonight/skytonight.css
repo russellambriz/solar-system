@@ -1,0 +1,58 @@
+/* skytonight/: "Tonight's sky from Boise" panel (same look as the other panels; 44px targets on touch) */
+.sky-open-btn { width: 100%; margin: 6px 0 2px; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13.5px; }
+.sky-open-btn .ico { font-size: 16px; }
+#sky-tonight { left: calc(var(--gap) + var(--sal)); bottom: calc(var(--gap) + var(--sab) + 34px); width: 380px; z-index: 11;
+  display: flex; flex-direction: column; max-height: 70vh; padding: 8px 10px 8px 12px; }
+#sky-tonight.hidden { display: none !important; }
+#sky-tonight h2 { color: #ffd27a; font-size: 15.5px; white-space: nowrap; }
+.sky-head-btns { display: flex; gap: 6px; }
+.sky-close { width: var(--btn-h); min-width: var(--btn-h); padding: 0; }
+#sky-tonight .sky-body { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y;
+  display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+.sky-when { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b8c4e0; }
+.sky-when .sky-date { flex: 1; line-height: 1.3; }
+.sky-now { flex: 0 0 auto; font-size: 12.5px; padding: 3px 9px; }
+.sky-running { font-size: 11.5px; color: #ffe2a8; line-height: 1.35; }
+.sky-sun { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: #cfd8ee; padding: 5px 7px; border-radius: 8px; background: rgba(255, 190, 90, 0.08); }
+.sky-sun b, .sky-r2 b { color: #fff; font-weight: 600; }
+.sky-moon { font-size: 12.5px; color: #cfd8ee; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+.sky-moon b { color: #ffd27a; font-weight: 600; }
+.sky-moon-emoji { font-size: 17px; line-height: 1; }
+.sky-moon-next { color: #8fa0c8; margin-left: auto; }
+.sky-list { display: flex; flex-direction: column; gap: 4px; }
+.sky-row { display: block; width: 100%; text-align: left; padding: 5px 8px; min-height: 44px; border-radius: 9px; line-height: 1.3; font-size: 12.5px; }
+.sky-row.down { opacity: 0.66; }
+.sky-row .sky-r1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sky-row .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 5px rgba(255, 255, 255, 0.3); }
+.sky-row .nm { font-size: 13.5px; color: #fff; }
+.sky-mag, .sky-con { color: #9fb7ff; font-size: 11.5px; }
+.sky-badge { margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 8px; white-space: nowrap; }
+.sky-badge.ok { background: rgba(120, 255, 160, 0.16); color: #9dffb0; border: 1px solid rgba(120, 255, 160, 0.4); }
+.sky-badge.scope { background: rgba(140, 200, 255, 0.14); color: #a9d6ff; border: 1px solid rgba(140, 200, 255, 0.4); }
+.sky-badge.no { color: #8fa0c8; border: 1px solid rgba(143, 160, 200, 0.3); }
+.sky-row .sky-r2 { display: flex; flex-wrap: wrap; gap: 0 10px; color: #b8c4e0; font-size: 12px; margin-top: 1px; }
+.sky-row .sky-r3 { color: #dfe6f5; font-size: 12px; margin-top: 1px; }
+.sky-row.down .sky-r3 { color: #9aa8c8; }
+.sky-mark { font-size: 12.5px; display: flex; align-items: center; gap: 6px; min-height: var(--btn-h); cursor: pointer; color: #cfd8ee; }
+.sky-mark input { width: 18px; height: 18px; }
+.sky-events summary { cursor: pointer; font-size: 13px; color: #9fb7ff; min-height: var(--btn-h); display: flex; align-items: center; list-style: none; }
+.sky-events summary::-webkit-details-marker { display: none; }
+.sky-events summary::after { content: "▾"; margin-left: auto; transition: transform 0.2s; }
+.sky-events:not([open]) summary::after { transform: rotate(-90deg); }
+.sky-ev-list { display: flex; flex-direction: column; gap: 3px; }
+.sky-ev { display: grid; grid-template-columns: 78px 1fr; gap: 0 8px; text-align: left; width: 100%; font-size: 12px; padding: 4px 8px; min-height: 36px; line-height: 1.3; }
+body.touch .sky-ev { min-height: 44px; }
+.sky-ev-d { color: #ffd27a; white-space: nowrap; }
+.sky-ev-h { grid-column: 2; color: #8fa0c8; font-size: 11px; }
+.sky-ev.opposition .sky-ev-d { color: #ffb48a; }
+.sky-ev.moon .sky-ev-d { color: #dfe6f5; }
+.sky-ev-none { font-size: 12px; color: #8fa0c8; }
+.sky-foot { margin: 2px 0 0; font-size: 10.5px; color: #8fa0c8; line-height: 1.35; }
+/* "up tonight" mark on the planet labels */
+.label.sky-up { border-color: rgba(120, 255, 160, 0.85) !important; box-shadow: 0 0 8px rgba(120, 255, 160, 0.55); }
+.label.sky-up::after { content: " 🔭"; font-size: 0.9em; }
+body.clean-view #sky-tonight { display: none !important; }
+@media (max-width: 600px) {
+  #sky-tonight { width: calc(100% - 2 * var(--gap) - var(--sal) - var(--sar)); }
+}
+@media (max-height: 560px) { #sky-tonight { bottom: calc(var(--gap) + var(--sab)); } }

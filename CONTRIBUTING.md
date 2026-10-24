@@ -5,7 +5,7 @@ Several bots work on this repo at once, each in its own lane. Stay in yours, and
 ## Ownership
 | Area | Owner |
 |---|---|
-| App shell, UI panels, picking/touch, solar-system structure (orbits, moons in `moons.js` / `outermoons.js`, belts in `smallbodies.js`), Sun (`sun.js`) | Space Model Coder |
+| App shell, UI panels, picking/touch, solar-system structure (orbits, moons in `moons.js` / `outermoons.js`, belts in `smallbodies.js`), Sun (`sun.js`), Tonight's sky panel (`skytonight/`) | Space Model Coder |
 | Camera in `main.js`: `flyTo`, `updateCamera`, `focusOn`, arrival/drift logic | ScaleBot |
 | `galaxy.js`, `deepspace.js`, `sombrero.js`, `sgra.js`, `ton618.js`, `antennae.js` | Galaxy Builder/Coder |
 | `earth/`, `textures/earth/` (keep `uEarthTint` and `getCinematicStart()` stable) | EarthBot |

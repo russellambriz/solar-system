@@ -26,6 +26,7 @@ import { createScaleTools } from './scale/index.js';
 import { createUI } from './ui/index.js';
 import { createConstellations } from './constellations/index.js';
 import { createMeteors } from './meteors/index.js';
+import { createSkyTonight } from './skytonight/index.js';
 import { orientTilt } from './axes/index.js';
 
 // ---------------------------------------------------------------------------
@@ -1748,6 +1749,9 @@ const scaleTools = createScaleTools({ DIST_SCALE, scaleDistance, bodies, smallBo
   getFocused: () => focused, galaxy, scene });
 const ui = createUI({ bodies, smallBodies, scene, camera, scaleDistance, realPositions, search, spacecraft, comets, getMode: () => mode,
   getFocused: () => focused, isPaused: () => paused || daysPerSecond === 0, togglePause, isTransitioning: () => !!transition, isTouch: IS_TOUCH, isCompact });
+// skytonight/: "Tonight's sky from Boise" panel (Controls button, search "tonight"); its planet events join ui/'s timeline
+const skyTonight = createSkyTonight({ bodies, search, constellations, focusOn, realPositions, getTime: () => simTime,
+  isPaused: () => paused || daysPerSecond === 0, togglePause, isCompact, setPanelCollapsed });
 const perfGuard = createPerfGuard({ scenes: [scene, galaxy.scene], exclude: [sunFX.group, sgra.group, ton618.group], isTouch: IS_TOUCH });
 
 updateBodies();
@@ -1759,3 +1763,4 @@ setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
 window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, antennae, flyToAntennae, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, meteors, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };
+window.solar.skyTonight = skyTonight;
