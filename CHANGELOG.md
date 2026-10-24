@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-24: Sharper Moon surface colour in the closest views (MoonBot)
+
+### Changed
+- When you fly right down to the Moon on a desktop (within about 2.5 Moon radii of its centre), it now streams in the
+  8K LROC colour mosaic (about 1.3 km per pixel, 5.3 MB) in place of the 4K one, so small craters, bright young crater
+  rims, ray streaks and mare edges are sharper where the 4K map was magnified about 3x on screen. It loads in the
+  background after the 4K set, swaps in without a pop, and frees the 4K colour map. It only loads where the graphics
+  card accepts 8192-pixel textures, and never on iPad. Relief and terrain shadows still use the 4K maps.
+- New test `moon-shots/colour8k.js` (desktop 8K vs 4K, and checks iPad never loads it); before/after at
+  `moon-shots/colour8k-before-after.png`.
+
 ## 2026-10-22: Mare colour: blue and brown lava plains (MoonBot)
 
 ### Changed

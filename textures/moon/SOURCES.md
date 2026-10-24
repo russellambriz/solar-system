@@ -33,3 +33,9 @@ Sharper terrain shadows (2026-10-21):
 
 Mare colour (2026-10-22): no new files. The shader strengthens the blue-red colour ratio already in the LROC colour
 mosaic (read from a coarse mip level), so high-titanium maria read slightly blue and low-titanium ones brownish.
+
+Closest-view colour (2026-10-24):
+- `moon_color_8k.jpg` (8192x4096, about 5.3 MB, JPEG quality 85): `lroc_color_poles_8k.tif` from the same CGI Moon Kit,
+  converted unchanged. About 1.3 km per texel at the equator. Desktop only, streamed after the 4K set once the camera is
+  within about 2.5 Moon radii of the centre, and only if the GPU accepts 8192-pixel textures; it then replaces the 4K
+  colour map. Never loaded on iPad.

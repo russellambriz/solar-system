@@ -94,6 +94,12 @@ export function surfaceHeightKm(latDeg, lonDeg) {
   return top * (1 - fy) + bot * fy;
 }
 
+// The renderer's texture size limit, recorded when the Moon first draws (onBeforeRender hands us the renderer).
+// 0 until then, which keeps the 8K map off.
+let _maxTex = 0;
+function maxTextureSize() { return _maxTex; }
+function noteRenderer(r) { if (!_maxTex && r && r.capabilities) _maxTex = r.capabilities.maxTextureSize || 0; }
+
 function loadHiRes(file, srgb) {
   const tex = wrapLon(new THREE.TextureLoader().load(new URL(file, BASE).href, () => tex.onReady && tex.onReady()));
   tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
@@ -151,7 +157,11 @@ export function createMoonMesh({ radius, isTouch = false }) {
   // ~40 km on iPad); it only draws within 3 base radii (about 5.5 Moon radii once the size easing has settled).
   const levels = isTouch ? [[288, 144, 0], [96, 64, 3], [48, 32, 8], [24, 16, 40]]
     : [[640, 320, 0], [160, 112, 3], [72, 48, 8], [24, 16, 40]];
-  for (const [w, h, d] of levels) lod.addLevel(new THREE.Mesh(new THREE.SphereGeometry(radius, w, h), material), d * radius);
+  for (const [w, h, d] of levels) {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, w, h), material);
+    mesh.onBeforeRender = noteRenderer;
+    lod.addLevel(mesh, d * radius);
+  }
   lod.userData.moonUniforms = uniforms;
   lod.userData.hiRes = isTouch ? 'never' : 'pending';   // desktop streams 4K maps in once you fly close
   loadHeightCpu('moon_height_1k.png');                  // CPU copy so latLonToWorld can stand markers on the ground
@@ -219,6 +229,18 @@ export function updateMoon(moonBody, camera, sunLight, days) {
       moonBody.mesh.userData.hiRes = 'loaded';
     }
     map.onReady = nrm.onReady = done;
+  }
+  // Closest views (desktop, within ~2.5 Moon radii of the centre): the 4K colour map is magnified ~3x on screen there,
+  // so swap in the 8K LROC colour mosaic (~1.3 km per texel) for sharper small craters, ray streaks and mare edges.
+  // Only after the 4K set is in, and only where the GPU takes 8192 px textures; the 4K map is freed once 8K is ready.
+  // Relief and shadows keep the 4K maps (uMapTexel unchanged, so the close-up crater field still fills in below 4K).
+  const ud = moonBody.mesh.userData;
+  if (ud.hiRes === 'loaded' && !ud.colour8k && camera.position.distanceTo(_moon) < 2.5 * base * s) {
+    ud.colour8k = maxTextureSize() >= 8192 ? 'loading' : 'never';
+    if (ud.colour8k === 'loading') {
+      const map8 = loadHiRes('moon_color_8k.jpg', true);
+      map8.onReady = () => { const old = u.uMap.value; u.uMap.value = map8; ud.colour8k = 'loaded'; old.dispose(); };
+    }
   }
   moonBody.group.scale.setScalar(s);                       // mesh, pick sphere and label offset all live in this group
   moonBody.radius = base * s;
