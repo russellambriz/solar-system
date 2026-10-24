@@ -269,6 +269,7 @@ export function addAntennae(galaxy, opts = {}) {
   }
   function flyTo() {
     const s = S_(); if (!s) return;
+    if (s.flyToAntennae) { s.flyToAntennae(); return; }   // ScaleBot: main.js scale-aware log-space fly-to when available
     const mode = s.getMode?.();
     if (mode === 'solar') { s.enterGalaxy?.(() => setTimeout(flyTo, 50)); return; }
     if (mode !== 'galaxy') return;
@@ -340,7 +341,7 @@ export function addAntennae(galaxy, opts = {}) {
     for (const el of labelEls) el.parentElement?.remove();
   }
   return {
-    group, update, setVisible, dispose, flyTo, showInfo, labelEls, POS, R: RD, dir, key: 'N',
+    group, update, setVisible, dispose, flyTo, showInfo, labelEls, viewEnd, markFocused: () => { focused = true; }, POS, R: RD, dir, key: 'N',
     get isFlying() { return !!fly; },
     info: { ...ANTENNAE_INFO, position: POS.clone(), distanceUnits: DIST, los: los.clone(),
       counts: { disk: disk.count, tails: tail.count, knots: knot.count, dust: dust.count, total: disk.count + tail.count + knot.count + dust.count } },

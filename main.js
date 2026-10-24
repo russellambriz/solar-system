@@ -1378,6 +1378,31 @@ function flyToSombrero() {
     showSombreroInfo();
   });
 }
+// ScaleBot: Antennae (NGC 4038/4039, ~45 Mly) through the same two-stage log-space galaxyFly as the Sombrero: out to a far
+// view framing the Milky Way and the Antennae, then in to antennae.js's own end view (both disks + tails), then its card.
+function antennaeFarView() {
+  const A = galaxy.antennae, a = A.POS.clone().sub(galaxy.SUN_POS), b = sombrero.POS.clone().sub(galaxy.SUN_POS);
+  const n = new THREE.Vector3().crossVectors(a, b).normalize(); if (n.y < 0) n.negate();
+  const mid = galaxy.SUN_POS.clone().lerp(A.POS, 0.5);
+  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2), half = a.length() * 0.5 / 0.72;
+  const dist = camera.aspect >= 1 ? half / tanH / camera.aspect : half / tanH;
+  return { cam: mid.clone().addScaledVector(n, dist), target: mid };
+}
+function flyToAntennae() {
+  const A = galaxy.antennae; if (!A) return;
+  if (mode === 'solar') { enterGalaxy(() => flyToAntennae()); return; }
+  if (galaxyFocus === 'sgra') { leaveSgrA(() => flyToAntennae()); return; }
+  if (galaxyFocus === 'ton618') { leaveTon618(() => flyToAntennae()); return; }
+  if (mode !== 'galaxy') return;
+  if (galaxyFocus === 'antennae') { A.showInfo(); return; }
+  const u = antennaeFarView(), e = A.viewEnd(camera);
+  galaxyFly(u.cam, u.target, e.cam, e.target, () => {
+    galaxyFocus = 'antennae';
+    controls.minDistance = M104_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST;
+    updateGalaxyButton();
+    A.markFocused(); A.showInfo();
+  });
+}
 // Local Group dwarfs (localgroup/): the Magellanic Clouds through a view of the Milky Way beside the Cloud, M33 through the
 // Antennae Galaxies (NGC 4038/4039): the camera tween lives in antennae.js (key N); main.js only tracks the focus.
 const antennae = galaxy.antennae;
@@ -1733,4 +1758,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, antennae, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, meteors, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };
+window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, antennae, flyToAntennae, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, meteors, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };

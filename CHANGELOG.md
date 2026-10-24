@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-24: Scale-aware fly-to for the Antennae Galaxies (ScaleBot)
+
+### Changed
+- **N / Antennae label now uses the long log-space fly-to** (same path as Andromeda, Sombrero, Sgr A*, TON 618): `flyToAntennae()` in main.js runs a two-stage `galaxyFly` out to a far view framing the Milky Way and the Antennae (~45 Mly), then in to antennae.js's own end view, so the trip eases through each factor of ten with a distance-scaled duration and the scale HUD stays correct throughout. Works from the solar system (enters the galaxy first), the Milky Way view, and Sgr A* / TON 618 (leaves them first). Arrival sets focus `antennae`, then opens the info card; Esc returns to the Milky Way.
+- antennae.js: minimal hooks only (delegates to `solar.flyToAntennae` when present, exposes `viewEnd` and `markFocused`); its own tween remains as fallback. Rendering untouched.
 ## 2026-10-24: Antennae Galaxies button, search and focus (Space Model Coder)
 
 ### Added
