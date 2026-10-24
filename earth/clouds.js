@@ -15,7 +15,7 @@
 // Sun) adds sunlight weighted towards mid-thickness cloud — optically thick cores stay put, edges and thin veils
 // glow. It only exists where the deck is sunlit, so the day disc seen with the Sun behind the camera is unchanged.
 import * as THREE from 'three';
-import { CLOUD_CURVE, CLOUD_FLOW } from './glsl.js';
+import { CLOUD_CURVE, CLOUD_FLOW, TWILIGHT } from './glsl.js';
 
 const vertexShader = /* glsl */ `
 varying vec2 vUv;
@@ -43,11 +43,13 @@ uniform float uCloudSlantMax;  // cap on the 1/μ slant factor
 uniform float uCloudLimbLift;  // max brightness lift of limb cloud tops (fraction)
 uniform float uCloudSilver;    // forward-scatter (silver lining) strength, × sunlight at the lobe peak
 uniform float uCloudSilverG;   // Henyey–Greenstein asymmetry of that lobe (0.5 broad … 0.8 tight)
+uniform float uTwilight;       // twilight band (glsl.js TWILIGHT); 0 = the pre-2026-10-24 look
 varying vec2 vUv;
 varying vec3 vNormalW;
 varying vec3 vWorldPos;
 ${CLOUD_CURVE}
 ${CLOUD_FLOW}
+${TWILIGHT}
 float hgPhase(float g, float c) { float d = 1.0 + g * g - 2.0 * g * c; return (1.0 - g * g) / (d * sqrt(d)); }
 void main() {
   float a = cloudFlow(vUv, dFdx(vUv), dFdy(vUv)) * uCloudsReady * uCloudOpacity;   // latitude drift, see glsl.js
@@ -60,7 +62,11 @@ void main() {
   // (only a few degrees of wrap past the terminator, so the night-side deck is essentially black)
   float diff = smoothstep(-0.06, 0.22, NdL) * clamp((NdL + 0.08) / 1.08, 0.0, 1.0);
   vec3 sunTint = mix(vec3(1.0, 0.55, 0.32), vec3(1.0), smoothstep(0.0, 0.35, NdL));
+  // twilight: cloud tops sit a few km up, so they see the Sun ~2° longer (μ + 0.035) and glow sunset orange/pink,
+  // then catch the scattered twilight sky a little past the ground's terminator (glsl.js TWILIGHT)
+  sunTint = mix(sunTint, twSunTint(NdL + 0.035), uTwilight);
   vec3 col = vec3(0.95) * (uSunColor * sunTint * diff + uAmbient * 0.12); // night side: faint ambient only
+  col += vec3(0.95) * uSunColor * twGlow(NdL + 0.035) * (0.22 * uTwilight);
   float mu = max(dot(N, V), 0.0);
   // thin clouds at the limb pick up a little sky blue
   float fres = pow(1.0 - mu, 3.0);

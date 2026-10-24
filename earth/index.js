@@ -91,6 +91,8 @@ const DEFAULTS = {
   season: 1.0,             // seasonal day map: blends the December and July Blue Marble maps by the Sun's position
                            // (snow line advancing/retreating with latitude); 0 = December map only (previous look)
   seasonWeight: null,      //   force the December-map weight 0..1 (testing); null = from the Sun's ecliptic longitude
+  twilight: 1.0,           // twilight band at the terminator (earthMaterial.js, clouds.js): air-mass reddened sunlight
+                           // (gold → orange → red) and dim orange-pink → blue-hour skylight just past it; 0 = previous look
   oceanColor: 1.0,         // true-colour ocean (earthMaterial.js): the Blue Marble "topo.bathy" maps paint the sea-floor
                            // relief (mid-ocean ridges, trenches) into the open ocean; deep water is drawn as uniform
                            // dark ocean blue instead, from a GEBCO depth map, shallow shelves keep the map's lighter
@@ -124,6 +126,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uDepthMap:      { value: black },
     uDepthReady:    { value: 0 },
     uOceanColor:    { value: P.oceanColor },
+    uTwilight:      { value: P.twilight },
     uNightMap:      { value: black },
     uWaterMap:      { value: black },
     uCloudMap:      { value: black },
@@ -252,6 +255,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
       U.uAurora.value = P.aurora;
       U.uCityLights.value = P.cityLights;
       U.uOceanColor.value = P.oceanColor;
+      U.uTwilight.value = P.twilight;
     }
     // Cloud deck: locked to the ground frame. main.js still writes clouds.rotation.y = spin × 1.15 every frame
     // (updateBodies); that solid-body spin-up is overridden here, right before drawing, and replaced by the
