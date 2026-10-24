@@ -34,7 +34,7 @@ const ALIASES = {
   'Parker Solar Probe': ['parker', 'psp'], "Halley's Comet": ['halley', '1p', '1p/halley'], 'Comet Hale-Bopp': ['hale bopp', 'c/1995 o1'],
   "1I/'Oumuamua": ['oumuamua', '1i', '1i oumuamua', 'a/2017 u1', '1i/2017 u1', 'interstellar'], '2I/Borisov': ['borisov', '2i', '2i borisov', 'c/2019 q4', 'interstellar'],
   '3I/ATLAS': ['3i', 'atlas', '3i atlas', 'c/2025 n1', 'interstellar'],
-  'Andromeda Galaxy (M31)': ['m31', 'andromeda'], 'Sombrero Galaxy (M104)': ['m104', 'sombrero'], 'Sagittarius A*': ['sgr a*', 'sgr a', 'black hole', 'galactic center'],
+  'Andromeda Galaxy (M31)': ['m31', 'andromeda'], 'Sombrero Galaxy (M104)': ['m104', 'sombrero'], 'Antennae Galaxies (NGC 4038/4039)': ['antennae', 'antennae galaxies', 'ngc 4038', 'ngc 4039', 'ngc4038', 'ngc4039', 'arp 244', 'arp244'], 'Sagittarius A*': ['sgr a*', 'sgr a', 'black hole', 'galactic center'],
   'TON 618': ['quasar', 'ton618'], 'Milky Way': ['our galaxy', 'galaxy'], 'Large Magellanic Cloud (LMC)': ['lmc', 'magellanic'],
   'Small Magellanic Cloud (SMC)': ['smc', 'magellanic'], 'Triangulum Galaxy (M33)': ['m33', 'triangulum'], 'Artemis landing area': ['artemis', 'south pole'],
 };
@@ -117,6 +117,9 @@ export function createSearch(api) {
     go: galaxyGo(() => (getGalaxyFocus() === 'mw' ? api.showGalaxyInfo() : api.flyToMilkyWay())) });
   add({ name: 'Andromeda Galaxy (M31)', kind: 'galaxy', color: '#ffd9a0', aliases: ALIASES['Andromeda Galaxy (M31)'], sub: '2.5 million ly', go: galaxyGo(() => api.flyToAndromeda()) });
   add({ name: 'Sombrero Galaxy (M104)', kind: 'galaxy', color: '#ffe6b0', aliases: ALIASES['Sombrero Galaxy (M104)'], sub: '31 million ly', go: galaxyGo(() => api.flyToSombrero()) });
+  add({ name: 'Antennae Galaxies (NGC 4038/4039)', kind: 'galaxy', color: '#cfe0ff', aliases: ALIASES['Antennae Galaxies (NGC 4038/4039)'], sub: '45 million ly',
+    go: galaxyGo(() => (getGalaxyFocus() === 'antennae' ? api.galaxy.antennae.showInfo()
+      : (typeof window.solar?.flyToAntennae === 'function' ? window.solar.flyToAntennae() : api.galaxy.antennae.flyTo()))) });
   add({ name: 'Sagittarius A*', kind: 'blackhole', color: '#ffb070', aliases: ALIASES['Sagittarius A*'], sub: 'Black hole at the galactic center', go: galaxyGo(() => api.flyToSgrA()) });
   add({ name: 'TON 618', kind: 'quasar', color: '#bcd0ff', aliases: ALIASES['TON 618'], sub: '10.8 billion ly', go: galaxyGo(() => api.flyToTon618()) });
   for (const key of localGroup?.keys || []) {

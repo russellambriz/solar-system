@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-24: Antennae Galaxies button, search and focus (Space Model Coder)
+
+### Added
+- **🦋 Antennae button** in the deep-space row, styled like the Sombrero button. It does the same thing as key **N** (calls `window.solar.flyToAntennae()` when it exists, otherwise `galaxy.antennae.flyTo()`). When you're already at the Antennae, the button becomes "Milky Way" and takes you home.
+- **Search:** "Antennae", "Antennae Galaxies", "NGC 4038", "NGC 4039" and "Arp 244" all find the Antennae Galaxies (NGC 4038/4039).
+- **`'antennae'` galaxy focus** in main.js. It's set when you arrive (from N, the button, search or the label) and replaces any earlier focus such as the Sombrero. **Esc** flies home, the same as from the Sombrero.
+
+### Changed
+- The Antennae focus no longer gets pulled back toward the Local Group when you zoom out. Antennae.js's `setGlide(false)` workaround isn't needed anymore, but `window.solar.setGlide` still works.
+
 ## 2026-10-23: Meteor showers tied to their parent comets (Space Model Coder)
 
 ### Added
