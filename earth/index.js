@@ -91,6 +91,10 @@ const DEFAULTS = {
   season: 1.0,             // seasonal day map: blends the December and July Blue Marble maps by the Sun's position
                            // (snow line advancing/retreating with latitude); 0 = December map only (previous look)
   seasonWeight: null,      //   force the December-map weight 0..1 (testing); null = from the Sun's ecliptic longitude
+  oceanColor: 1.0,         // true-colour ocean (earthMaterial.js): the Blue Marble "topo.bathy" maps paint the sea-floor
+                           // relief (mid-ocean ridges, trenches) into the open ocean; deep water is drawn as uniform
+                           // dark ocean blue instead, from a GEBCO depth map, shallow shelves keep the map's lighter
+                           // colour; 0 = previous look
   ambient: 0.015,          // a bit below the scene's MeshStandard ambient so city lights read on the night side
 };
 
@@ -117,6 +121,9 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uDayJulReady:   { value: 0 },
     uSeasonW:       { value: 1 },   // December-map weight (1 = northern winter … 0 = northern summer)
     uSeason:        { value: P.season },
+    uDepthMap:      { value: black },
+    uDepthReady:    { value: 0 },
+    uOceanColor:    { value: P.oceanColor },
     uNightMap:      { value: black },
     uWaterMap:      { value: black },
     uCloudMap:      { value: black },
@@ -173,11 +180,12 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     isMobile,
     renderer,
     onLoad(key, tex) {
-      const uni = { day: U.uDayMap, dayJul: U.uDayMapJul, night: U.uNightMap, water: U.uWaterMap, clouds: U.uCloudMap, normal: U.uNormalMap }[key];
+      const uni = { day: U.uDayMap, dayJul: U.uDayMapJul, night: U.uNightMap, water: U.uWaterMap, clouds: U.uCloudMap, depth: U.uDepthMap, normal: U.uNormalMap }[key];
       const old = uni.value;
       uni.value = tex;
       if (key === 'clouds') U.uCloudsReady.value = 1;
       if (key === 'dayJul') U.uDayJulReady.value = 1;
+      if (key === 'depth') U.uDepthReady.value = 1;
       if (old && old !== tex && old !== black) disposeTex(old);
     },
   });
@@ -243,6 +251,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
       auroraClock.t = now;
       U.uAurora.value = P.aurora;
       U.uCityLights.value = P.cityLights;
+      U.uOceanColor.value = P.oceanColor;
     }
     // Cloud deck: locked to the ground frame. main.js still writes clouds.rotation.y = spin × 1.15 every frame
     // (updateBodies); that solid-body spin-up is overridden here, right before drawing, and replaced by the

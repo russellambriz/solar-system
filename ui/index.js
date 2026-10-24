@@ -21,6 +21,7 @@ import * as THREE from 'three';
 import { keplerAU, scaleAU } from '../smallbodies.js';
 import { planetAU, planetOrbitAU, PLANET_NAMES } from '../ephemeris/planets.js';
 import { createSkyReadout } from './skyreadout.js';
+import { METEOR_EVENTS } from '../meteors/data.js';
 
 const J2000 = Date.UTC(2000, 0, 1, 12), DAY_MS = 86400000;
 const TL_FROM = Date.UTC(1965, 0, 1), TL_TO = Date.UTC(2065, 0, 1);
@@ -84,9 +85,10 @@ const EVENTS = [
   ['2031-05-20', 'Comet Tempel-Tuttle returns: Leonid storms may follow', '55P/Tempel-Tuttle', 'comet'],
   ['2032-12-22', 'Asteroid 2024 YR4 misses the Moon by ~21,000 km', '2024 YR4', 'asteroid'],
   ['2061-07-28', "Halley's Comet returns", "Halley's Comet", 'comet'],
+  ...METEOR_EVENTS,                       // meteors/: the next twelve months of shower peaks
 ].map(([date, title, target, kind, card]) => ({ date, title, target, kind, card, ms: Date.parse(date + 'T12:00:00Z') }))
   .sort((a, b) => a.ms - b.ms);
-const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', visitor: '#e98cff', body: '#d9b99a', asteroid: '#ffb48a' };
+const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', visitor: '#e98cff', body: '#d9b99a', asteroid: '#ffb48a', meteor: '#ffe9a0' };
 
 export function createUI(o) {
   const { bodies, camera, scaleDistance } = o;

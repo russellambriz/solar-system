@@ -22,6 +22,8 @@
 //     sweeps south across Canada / Siberia in autumn and back north in spring, with a noisy, uneven edge; the
 //     southern hemisphere runs the other way round (Patagonian snow, winter sea ice round Antarctica). The tropics
 //     cross-fade evenly (wet / dry season greening).
+//   • true-colour ocean (uOceanColor): the day maps' painted sea-floor relief is replaced past the shelf break by a
+//     uniform deep ocean blue (GEBCO depth map), shelves keep their lighter colour
 // The blue limb haze over the disc is no longer faked here: earth/atmosphere.js adds physically-based aerial
 // perspective (single scattering) on top of ground + clouds.
 //
@@ -61,6 +63,9 @@ uniform sampler2D uDayMapJul;     // July day map (seasonal partner of uDayMap =
 uniform float uDayJulReady;       // 0 until it has loaded
 uniform float uSeasonW;           // December-map weight for the current date (1 = northern winter, 0 = summer)
 uniform float uSeason;            // seasonal blend strength (0 = December map only)
+uniform sampler2D uDepthMap;      // sea-floor depth, sqrt(depth / 8 km), 0 on land (GEBCO_08, 2K / 1K)
+uniform float uDepthReady;        // 0 until it has loaded
+uniform float uOceanColor;        // true-colour ocean strength (0 = the day map's painted sea-floor relief)
 
 uniform vec3  uSunDir;          // world-space unit vector Earth → Sun (updated each frame)
 uniform vec3  uSunDirObj;       // same, in the ground mesh's object space (tilt + spin removed)
@@ -146,6 +151,30 @@ void main() {
     }
   }
   float water = texture2D(uWaterMap, vUv).r;
+  // ---- true-colour ocean -----------------------------------------------------------------------------------------
+  // The Blue Marble "topo.bathy" maps shade the sea floor into the ocean (mid-ocean ridges, fracture zones, trenches
+  // show as pale bands and streaks), which no camera in orbit sees: past the shelf, ~1 km of water absorbs every
+  // trace of the bottom. Beyond the shelf break the colour therefore becomes a uniform deep ocean blue (clear,
+  // violet-blue in the subtropical gyres; darker and a touch greener in the productive high-latitude and equatorial
+  // upwelling waters), while shallow shelves and lagoons keep the map's lighter turquoise. The continental slope
+  // (~100 m … ~900 m) is the cross-fade, so shelves keep their real outlines, toned down (the map's shelf tint is
+  // much brighter than in real photos). Sea ice and lakes (depth 0) untouched.
+  {
+    float k = uOceanColor * uDepthReady;
+    if (k > 0.001) {
+      float e = texture2D(uDepthMap, vUv).r;                       // sqrt(depth / 8 km)
+      float deep = smoothstep(0.11, 0.33, e);
+      float alat = abs(vUv.y - 0.5) * 180.0;
+      vec3 deepCol = mix(vec3(0.0014, 0.0050, 0.0215), vec3(0.0017, 0.0060, 0.0160), smoothstep(30.0, 55.0, alat));
+      deepCol = mix(deepCol, vec3(0.0017, 0.0060, 0.0160), 0.35 * exp(-alat * alat / 40.0));
+      deepCol *= 0.94 + 0.12 * vnoise(vObjDir * 4.0);               // very faint basin-scale variation
+      float ice0 = smoothstep(0.22, 0.45, min(day.r, min(day.g, day.b)));
+      // shelves: the map's shelf tint is atlas-bright, so it is pulled part-way to the deep colour too (more on
+      // the outer shelf, ~60-100 m, than in shallow coastal water / lagoons); lakes (depth 0) keep the map colour
+      float w = mix(0.3 + 0.35 * smoothstep(0.05, 0.11, e), 1.0, deep) * smoothstep(0.0, 0.03, e);
+      day = mix(day, deepCol, w * water * (1.0 - ice0) * k);
+    }
+  }
 
   // ---- relief (land only; oceans stay mirror-smooth) -------------------------------------------------
   vec3 Nb = N;

@@ -293,6 +293,7 @@ body.sgra-close .galaxy-label:not(.sgra-label):not(.sgra-note) { display: none; 
 .galaxy-label.ton-nep { color: #d8e6ff; background: rgba(0, 0, 0, 0.55); border-color: rgba(150, 190, 255, 0.35); transform: translate(calc(50% + 4px), 0); pointer-events: none !important; }
 body.touch .galaxy-label.ton-note::before, body.touch .galaxy-label.ton-nep::before, body.touch .galaxy-label.ton-home::before { display: none; }
 #sombrero-btn { background: rgba(200, 170, 90, 0.2); border-color: rgba(255, 225, 150, 0.35); }
+#antennae-btn { background: rgba(140, 170, 255, 0.2); border-color: rgba(190, 210, 255, 0.4); }
 #sgra-btn { background: rgba(200, 110, 50, 0.2); border-color: rgba(255, 170, 100, 0.35); }
 #ton618-btn { background: rgba(110, 150, 255, 0.2); border-color: rgba(170, 200, 255, 0.4); }
 body.galaxy-mode #galaxy-note { display: block; }
@@ -414,3 +415,14 @@ body.touch .label.const-label::before { inset: 0; }
 #const-card .const-close { position: absolute; top: 8px; right: 8px; width: var(--btn-h); padding: 0; }
 body.clean-view #const-card { display: none !important; }
 @media (max-width: 600px) { #const-card { width: calc(100% - 2 * var(--gap) - var(--sal) - var(--sar)); max-height: 45vh; } }
+/* meteor showers (meteors/) */
+.meteor-wrap { pointer-events: none; }
+.label.meteor-label { transform: translateY(16px); color: #fff1c4; border-color: rgba(255, 220, 140, 0.45); background: rgba(30, 22, 6, 0.6); }
+.label.meteor-label.active { border-color: #ffd27a; color: #ffd27a; }
+.label.meteor-label.radiant-label { transform: translateY(-22px); background: rgba(30, 22, 6, 0.45); }
+body.touch .label.meteor-label { font-size: 12px; }
+body.touch .label.meteor-label::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
+.meteor-extra { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.meteor-extra.hidden { display: none; }
+.meteor-btn { min-height: 32px; padding: 4px 10px; font-size: 12.5px; }
+body.touch .meteor-btn { min-height: 44px; }

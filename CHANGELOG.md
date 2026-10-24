@@ -120,6 +120,68 @@
 
 ### Testing
 - `moon-shots/shoot.js` pauses the sim and steps to the sim's next full Moon. It then shoots the near side and a Sun-side close-up of Tycho, with the rays on and off. No console errors on desktop or iPad.
+## 2026-10-24: Scale-aware fly-to for the Antennae Galaxies (ScaleBot)
+
+### Changed
+- **N / Antennae label now uses the long log-space fly-to** (same path as Andromeda, Sombrero, Sgr A*, TON 618): `flyToAntennae()` in main.js runs a two-stage `galaxyFly` out to a far view framing the Milky Way and the Antennae (~45 Mly), then in to antennae.js's own end view, so the trip eases through each factor of ten with a distance-scaled duration and the scale HUD stays correct throughout. Works from the solar system (enters the galaxy first), the Milky Way view, and Sgr A* / TON 618 (leaves them first). Arrival sets focus `antennae`, then opens the info card; Esc returns to the Milky Way.
+- antennae.js: minimal hooks only (delegates to `solar.flyToAntennae` when present, exposes `viewEnd` and `markFocused`); its own tween remains as fallback. Rendering untouched.
+## 2026-10-24: Antennae Galaxies button, search and focus (Space Model Coder)
+
+### Added
+- **🦋 Antennae button** in the deep-space row, styled like the Sombrero button. It does the same thing as key **N** (calls `window.solar.flyToAntennae()` when it exists, otherwise `galaxy.antennae.flyTo()`). When you're already at the Antennae, the button becomes "Milky Way" and takes you home.
+- **Search:** "Antennae", "Antennae Galaxies", "NGC 4038", "NGC 4039" and "Arp 244" all find the Antennae Galaxies (NGC 4038/4039).
+- **`'antennae'` galaxy focus** in main.js. It's set when you arrive (from N, the button, search or the label) and replaces any earlier focus such as the Sombrero. **Esc** flies home, the same as from the Sombrero.
+
+### Changed
+- The Antennae focus no longer gets pulled back toward the Local Group when you zoom out. Antennae.js's `setGlide(false)` workaround isn't needed anymore, but `window.solar.setGlide` still works.
+
+## 2026-10-23: Meteor showers tied to their parent comets (Space Model Coder)
+
+### Added
+- **Eleven major meteor showers**, each linked to the comet or asteroid that sheds it:
+  - Quadrantids (2003 EH1), Lyrids (C/1861 G1 Thatcher), Eta Aquariids and Orionids (both 1P/Halley), Perseids (109P/Swift-Tuttle), Draconids (21P/Giacobini-Zinner), Southern and Northern Taurids (2P/Encke), Leonids (55P/Tempel-Tuttle), Geminids (3200 Phaethon) and Ursids (8P/Tuttle).
+- **Debris streams:** each shower is a faint particle ribbon along its parent's orbit, densest where Earth runs through it. A glowing marker on Earth's orbit shows the crossing: it sits where the sim's Earth is on the peak date.
+- **Active showers:** while the date is inside a shower's activity dates:
+  - its stream brightens and its crossing marker pulses
+  - a starburst **radiant marker** appears on the sky at the real radiant (RA/Dec), with a label
+  - **meteor streaks** rain onto Earth from the radiant's direction (zoom in on Earth to see them). How many depends on the shower's ZHR and how close the date is to the peak.
+- **Cards** (tap a shower's label or its radiant):
+  - parent body
+  - peak date and time, a live countdown to the next peak from the shown date, and the activity dates
+  - ZHR at the peak and roughly on the shown date, plus entry speed
+  - **From Boise (43.6°N):** the radiant's constellation, how high it climbs, about when it is highest (MDT/MST) and the best time to watch
+  - a 💡 fact
+  - buttons to fly to the parent comet (Halley, Swift-Tuttle, Encke, Tempel-Tuttle) and to highlight the radiant's constellation
+- **Parent comets' cards** (Halley, 2P/Encke, 109P/Swift-Tuttle, 55P/Tempel-Tuttle) get a button that opens their shower(s).
+- **Search:** `perseids`, `orionids`, `geminids`, `leonids`, `taurids`, `eta aquariids`, `quadrantids`, the IAU codes (`per`, `gem`…), and `meteor` or `shooting stars` for all of them. They also have their own "✷ Meteor showers" group in the list. Picking one flies to the stream's crossing on Earth's orbit and opens the card.
+- **Events:** the next twelve months of peaks, from the Southern Taurids (5 Nov 2026) to the Orionids (22 Oct 2027).
+- **Layers → Meteor showers** checkbox.
+
+### How it's made
+- **Shower data:** IMO Meteor Shower Calendar 2026 (Rendtel, IMO INFO(3-25)), Table 5, the Working List of Visual Meteor Showers. That gives the activity dates, peak solar longitude λ☉ (J2000), radiant α/δ, V∞ and ZHR. The IAU MDC codes are listed too.
+- **Peak dates** are worked out from λ☉ for any year: the Almanac's low-precision solar longitude, minus precession to J2000. They match the IMO's 2026 dates.
+- **Parent orbits:** JPL Small-Body Database API, fetched 2026-10-23. They are only used to draw the streams.
+- **The stream meets Earth:** near the crossing, the drawn stream is eased onto Earth's position at the peak. Real streams are wide, and the parents' orbits pass up to ~0.1 AU from Earth's.
+- **Draw calls:** all streams are one Points draw (6,600 points on desktop, 2,860 on touch). Per-shower brightness is a uniform. On desktop the cloud is big enough for the perf/ frame-rate guard to thin it with the other particle clouds.
+- **Streaks:** at most 72 (36 on touch), one LineSegments draw with reused buffers. They only run when the camera is near Earth.
+- **Radiants:** placed with constellations/' `raDecToScene` at "infinity", like the star sphere.
+- **Labels:** keep clear of the planet labels and of each other, with ≥ 44 px tap targets on touch.
+
+### Changed
+- New: `meteors/index.js` and `meteors/data.js`.
+- `main.js`: import, create, update, and hand `meteors` to search and `window.solar` (5 hook lines).
+- `search/index.js`:
+  - shower entries and their list group
+  - an exact match on an object's own name now beats an alias, so `perseids` lists the shower before comet Swift-Tuttle
+- `ui/index.js`: the peak events.
+- `index.html`: the Layers checkbox.
+- `style.css`: label and button styles.
+- Not touched: constellations/, comets/, the camera code, earth/, moon/, planets/ and the galaxy files.
+
+### Notes
+- **Activity curve:** the IMO gives each shower's peak ZHR, not its shape. The rate between the activity dates uses a rough bell (sharp for the Quadrantids and Draconids, broad for the Taurids).
+- **Streak size:** streaks are drawn around the enlarged globe. Real meteors burn up 80–120 km high.
+- **Times:** the "highest about…" times from Boise ignore the equation of time (±16 min).
 
 ## 2026-10-22: Active missions on real JPL trajectories (Space Model Coder)
 
@@ -235,6 +297,14 @@ The constellation module doesn't move the camera or change the FOV. Turn-to-face
 - `window` events: `constellation-select` (`detail` = `getTarget(abbr)`) when one is picked; `constellation-clear` (`detail` = `{ abbr }`) when it is closed. Restore the previous view on clear.
 - Also `select(abbr)`, `clear()`, `selected`, `pickAt(clientX, clientY, camera, slopPx)`, `info`.
 - Hooks in `main.js`: a tap that hits no body calls `constellations.pickAt`, and `constellations` is passed to `createSearch`. Camera functions are unchanged.
+## 2026-10-22: Antennae Galaxies (NGC 4038/4039) (Galaxy Builder)
+
+### Added
+- **Antennae Galaxies** in the galaxy view, in the new `antennae.js` (created from `galaxy.js`, no `main.js` change). They sit at their true distance, ~45 million ly (450,000 units), toward l = 287.3°, b = +42.3° in Corvus. That is the same galactic frame as Andromeda and the Sombrero.
+- Two overlapping, warped spiral disks (~56,000 ly each) with yellow-white cores, dark dust in the overlap region, pink/magenta H II knots and blue young clusters around the collision zone, and two long curved tidal tails (~2,000 units each) with a gentle GPU drift. Additive points, about 64k on desktop and 27k on touch devices. No bloom or tone mapping.
+- An "Antennae Galaxies" label (44px tap target) and a fixed-size beacon when far away. A dashed distance line with "≈ 45 million light-years · in Corvus" shows in the far view. Tap the label to fly there and open the info card.
+- **Keyboard: N** flies to the Antennae (A is already Andromeda). Press N again there to reopen the info card.
+- While you orbit the Antennae, the Local Group target glide is paused through `window.solar.setGlide`, so zooming out shows the tails instead of pulling you home.
 
 ## 2026-10-21: Moon phase readout says "as seen from Earth"
 

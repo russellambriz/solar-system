@@ -156,6 +156,28 @@ upgrade (`earth/textures.js`, desktop only, `?earth4k=0|1`). iPad/mobile has no 
 The previous normal map (three.js `earth_normal_2048.jpg`, below) was replaced on 2026-10-15: it was softer and its
 green channel was the opposite (DirectX, +G = south) convention, so north/south-facing slopes were lit backwards.
 
+## Sea-floor depth maps (desktop 2K + mobile 1K, since 2026-10-23) — from NASA GEBCO_08 bathymetry (public domain)
+
+| File(s) | Source (exact URL) | Original |
+|---|---|---|
+| `desktop/earth_depth.jpg` (2048×1024, 292 KB), `mobile/earth_depth.jpg` (1024×512, 88 KB) | NASA Visible Earth — *Blue Marble Next Generation: Bathymetry* (GEBCO_08), the same file as the water mask: <https://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73963/gebco_08_rev_bath_21600x10800.png> (record page: <https://visibleearth.nasa.gov/images/73963>) | 21600×10800 8-bit PNG, 35 MB (255 = land, 0 = 8000 m or deeper, linear) |
+
+Used by the true-colour ocean (`earthMaterial.js`, `uOceanColor`): the "topo.bathy" day maps paint the sea-floor
+relief into the open ocean, so past the shelf break the shader replaces it with a uniform deep ocean colour.
+Built with `tools/make_depth.py` (Python 3, Pillow + numpy):
+
+```
+python3 textures/earth/tools/make_depth.py gebco_08_rev_bath_21600x10800.png /tmp/d
+cp /tmp/d/earth_depth.jpg    desktop/earth_depth.jpg
+cp /tmp/d/earth_depth_1k.jpg mobile/earth_depth.jpg
+```
+
+Depth in metres = (255 − value) × 8000 / 255 (checked: Wharton Basin ≈ 5.8 km, mid-Pacific ≈ 4.5 km, Ninety East
+Ridge crest ≈ 1.9 km, shelves 252–254), land = 0 m, box-averaged to 2048 / 1024, then stored as
+grey = √(depth / 8000 m) so the shelves keep enough 8-bit levels. Greyscale progressive JPEG q90. Land/sea agreement
+with `earth_water.jpg` is 99.1 % at 0 px offset (lower at ±1 px; the rest is inland lakes, which the bathymetry lacks).
+No 4K version: ocean colour varies slowly and the coastline itself comes from the water mask.
+
 ## Old clouds (2K/1K), old normal map, old water mask — three.js example textures (no longer shipped)
 
 These were downloaded from the three.js repository at tag **r160**:

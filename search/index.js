@@ -34,7 +34,7 @@ const ALIASES = {
   'Parker Solar Probe': ['parker', 'psp'], "Halley's Comet": ['halley', '1p', '1p/halley'], 'Comet Hale-Bopp': ['hale bopp', 'c/1995 o1'],
   "1I/'Oumuamua": ['oumuamua', '1i', '1i oumuamua', 'a/2017 u1', '1i/2017 u1', 'interstellar'], '2I/Borisov': ['borisov', '2i', '2i borisov', 'c/2019 q4', 'interstellar'],
   '3I/ATLAS': ['3i', 'atlas', '3i atlas', 'c/2025 n1', 'interstellar'],
-  'Andromeda Galaxy (M31)': ['m31', 'andromeda'], 'Sombrero Galaxy (M104)': ['m104', 'sombrero'], 'Sagittarius A*': ['sgr a*', 'sgr a', 'black hole', 'galactic center'],
+  'Andromeda Galaxy (M31)': ['m31', 'andromeda'], 'Sombrero Galaxy (M104)': ['m104', 'sombrero'], 'Antennae Galaxies (NGC 4038/4039)': ['antennae', 'antennae galaxies', 'ngc 4038', 'ngc 4039', 'ngc4038', 'ngc4039', 'arp 244', 'arp244'], 'Sagittarius A*': ['sgr a*', 'sgr a', 'black hole', 'galactic center'],
   'TON 618': ['quasar', 'ton618'], 'Milky Way': ['our galaxy', 'galaxy'], 'Large Magellanic Cloud (LMC)': ['lmc', 'magellanic'],
   'Small Magellanic Cloud (SMC)': ['smc', 'magellanic'], 'Triangulum Galaxy (M33)': ['m33', 'triangulum'], 'Artemis landing area': ['artemis', 'south pole'],
 };
@@ -43,7 +43,7 @@ const KIND = {
   dwarf: { icon: '○', tag: 'Dwarf planet' }, asteroid: { icon: '◇', tag: 'Asteroid' }, neo: { icon: '◇', tag: 'Near-Earth asteroid' }, craft: { icon: '🛰', tag: 'Spacecraft' },
   site: { icon: '⚑', tag: 'Moon landing site' }, comet: { icon: '☄', tag: 'Comet' }, galaxy: { icon: '🌌', tag: 'Galaxy' },
   blackhole: { icon: '⚫', tag: 'Black hole' }, quasar: { icon: '✴', tag: 'Quasar' }, nebula: { icon: '✺', tag: 'Nebula' },
-  cluster: { icon: '✧', tag: 'Star cluster' }, constellation: { icon: '✦', tag: 'Constellation', color: '#9fb4e0' },
+  cluster: { icon: '✧', tag: 'Star cluster' }, meteor: { icon: '✷', tag: 'Meteor shower', color: '#ffe9a0' }, constellation: { icon: '✦', tag: 'Constellation', color: '#9fb4e0' },
 };
 const DEEP_KIND = { nebula: ['nebula', 'Emission nebula'], snr: ['nebula', 'Supernova remnant'], open: ['cluster', 'Open star cluster'], globular: ['cluster', 'Globular cluster'] };
 const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’'`]/g, '').replace(/[^a-z0-9*/+]+/g, ' ').trim();
@@ -102,6 +102,14 @@ export function createSearch(api) {
       go: () => goTracked(it, () => asteroids.framing(it).dist, () => asteroids.showInfo(it.info.name, true),
         { minDist: Math.max(0.12, it.size * 2.5), dir: () => asteroids.framing(it).dir, offset: () => asteroids.framing(it).offset }) });
   }
+  // meteors/: fly to where Earth crosses the shower's stream (on Earth's orbit), then open the shower's card
+  const meteors = api.meteors;
+  for (const it of meteors?.items || []) {
+    const s = it.info, d = new Date(Date.UTC(2000, 0, 1, 12) + it.peak26 * 86400000);
+    add({ name: s.name, kind: 'meteor', color: s.color, aliases: s.aliases, track: it,
+      sub: `Meteor shower · peaks ~${d.getUTCDate()} ${d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })} · ${s.parent.name.replace(/ \(.*\)$/, '')}`,
+      go: () => goTracked(it, it.viewDist, () => meteors.showInfo(s.name)) });
+  }
   const galaxyGo = (fn) => () => {
     if (getMode() === 'solar') { endTrip(); enterGalaxy(fn); } else if (getMode() === 'galaxy') fn();
   };
@@ -109,6 +117,9 @@ export function createSearch(api) {
     go: galaxyGo(() => (getGalaxyFocus() === 'mw' ? api.showGalaxyInfo() : api.flyToMilkyWay())) });
   add({ name: 'Andromeda Galaxy (M31)', kind: 'galaxy', color: '#ffd9a0', aliases: ALIASES['Andromeda Galaxy (M31)'], sub: '2.5 million ly', go: galaxyGo(() => api.flyToAndromeda()) });
   add({ name: 'Sombrero Galaxy (M104)', kind: 'galaxy', color: '#ffe6b0', aliases: ALIASES['Sombrero Galaxy (M104)'], sub: '31 million ly', go: galaxyGo(() => api.flyToSombrero()) });
+  add({ name: 'Antennae Galaxies (NGC 4038/4039)', kind: 'galaxy', color: '#cfe0ff', aliases: ALIASES['Antennae Galaxies (NGC 4038/4039)'], sub: '45 million ly',
+    go: galaxyGo(() => (getGalaxyFocus() === 'antennae' ? api.galaxy.antennae.showInfo()
+      : (typeof window.solar?.flyToAntennae === 'function' ? window.solar.flyToAntennae() : api.galaxy.antennae.flyTo()))) });
   add({ name: 'Sagittarius A*', kind: 'blackhole', color: '#ffb070', aliases: ALIASES['Sagittarius A*'], sub: 'Black hole at the galactic center', go: galaxyGo(() => api.flyToSgrA()) });
   add({ name: 'TON 618', kind: 'quasar', color: '#bcd0ff', aliases: ALIASES['TON 618'], sub: '10.8 billion ly', go: galaxyGo(() => api.flyToTon618()) });
   for (const key of localGroup?.keys || []) {
@@ -315,6 +326,7 @@ export function createSearch(api) {
       else if (k.includes(q)) best = Math.max(best, 40);
     }
     if (best && (e.kind === 'planet' || e.kind === 'star')) best += 5;
+    if (e.keys[0] === q) best += 3;          // its own name beats an alias ("perseids": the shower before comet Swift-Tuttle)
     return best;
   }
   function find(text, n = 8) {
@@ -364,7 +376,7 @@ export function createSearch(api) {
     const top = document.createElement('div'); top.className = 'list-header'; top.textContent = '☀ Sun & planets';
     list.insertBefore(top, list.firstChild);
     const groups = [
-      ['craft', '🛰 Spacecraft'], ['comet', '☄ Comets'], [(e) => e.notable, '◇ Famous asteroids'], ['site', '⚑ Moon landings'],
+      ['craft', '🛰 Spacecraft'], ['comet', '☄ Comets'], ['meteor', '✷ Meteor showers'], [(e) => e.notable, '◇ Famous asteroids'], ['site', '⚑ Moon landings'],
       [['galaxy', 'blackhole', 'quasar'], '🌌 Galaxies & black holes'], [['nebula', 'cluster'], '✺ Nebulae & star clusters'], ['constellation', '✦ Constellations'],
     ];
     for (const [kinds, title] of groups) {

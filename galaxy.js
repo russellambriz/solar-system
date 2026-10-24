@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { addDeepSpace } from './deepspace.js';
+import { addAntennae } from './antennae.js';
 
 // ---------------------------------------------------------------------------
 // Galactic coordinate frame expressed in our scene's ecliptic frame.
@@ -484,6 +485,9 @@ export function createGalaxy({ isTouch = false } = {}) {
 
   // Screen-space label declutter for the galaxy scene. Runs from bg.onBeforeRender, i.e. inside renderer.render() after
   // every module's update() and the matrix update, right before main.js draws the CSS2D labels (no main.js hook needed).
+  // Antennae Galaxies (NGC 4038/4039) at their true distance (~45 Mly); owns its label, beacon, info card and N fly-to key
+  const antennae = addAntennae({ scene, SUN_POS, R, M31_POS, get spinning() { return spinning; } }, { isTouch, labels: true });
+
   const declutter = createLabelDeclutter(scene, marker, () => markerRingWorld);
   let markerRingWorld = 0;
   bg.onBeforeRender = (_r, _s, camera) => declutter(camera);
@@ -493,7 +497,7 @@ export function createGalaxy({ isTouch = false } = {}) {
   // cosmetic rotation rates (hugely sped up): Milky Way pattern one turn per ~10 min, Andromeda/Sombrero ~15 min
   const MW_OMEGA = (2 * Math.PI) / 600, M31_OMEGA = (2 * Math.PI) / 900;
   return {
-    scene, group, R, SUN_POS, marker, M31_POS, M31_R, m31Dir, m31Minor, m31Normal, andromeda, deep,
+    scene, group, R, SUN_POS, marker, M31_POS, M31_R, m31Dir, m31Minor, m31Normal, andromeda, deep, antennae,
     labelEls: [sunLabel.el, centerLabel.el, mwLabel.el],
     m31LabelEls: [m31Label.el, m32Label.el, m110Label.el],
     m31Counts: { stars: NA, dust: NAD },
@@ -520,6 +524,7 @@ export function createGalaxy({ isTouch = false } = {}) {
       const dMW = camera.position.length(), dM31 = camera.position.distanceTo(M31_POS);
       const far = dMW > 4500;
       sunLabel.el.classList.toggle('off', far);
+      antennae.update(camera, dt);
       deep.update(camera, dt);                            // deep-space labels appear only when the camera is near; nebula breathing
       if (far) for (const o of deep.objects) o.labelEl?.classList.add('off'); // keep the Local Group view uncluttered
       centerLabel.el.classList.toggle('off', far);
@@ -552,8 +557,8 @@ export function createGalaxy({ isTouch = false } = {}) {
 // are moved; any other visible label is treated as a fixed obstacle.
 // ---------------------------------------------------------------------------
 const LABEL_PRIO = [
-  ['sun-here', 100, false], ['mw-far', 95, true], ['m31-label', 90, true], ['sombrero-label', 85, true], ['sgra-label', 80, true],
-  ['deep-label', 30, true], ['sgra-note', 60, false], ['sombrero-dist', 12, true], ['dist-label', 12, true], ['small', 40, true],
+  ['sun-here', 100, false], ['mw-far', 95, true], ['m31-label', 90, true], ['sombrero-label', 85, true], ['antennae-label', 84, true], ['sgra-label', 80, true],
+  ['deep-label', 30, true], ['sgra-note', 60, false], ['sombrero-dist', 12, true], ['antennae-dist', 12, true], ['dist-label', 12, true], ['small', 40, true],
 ];
 function labelPrio(el) {
   if (/\bton-/.test(el.className)) return { p: 60, movable: false, mayHide: false };   // TON 618 places its own labels

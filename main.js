@@ -25,6 +25,7 @@ import { createPerfGuard } from './perf/index.js';
 import { createScaleTools } from './scale/index.js';
 import { createUI } from './ui/index.js';
 import { createConstellations } from './constellations/index.js';
+import { createMeteors } from './meteors/index.js';
 import { orientTilt } from './axes/index.js';
 
 // ---------------------------------------------------------------------------
@@ -595,6 +596,8 @@ const constellations = createConstellations({ scene, renderer, isTouch: IS_TOUCH
 const spacecraft = createSpacecraft({ scene, bodies, renderer, isTouch: IS_TOUCH, scaleDistance, orbitLines });
 // comets/: Halley's Comet and Hale-Bopp on their real orbits, with ion + dust tails that grow near the Sun
 const comets = createComets({ scene, bodies, renderer, isTouch: IS_TOUCH, scaleDistance, orbitLines });
+// meteors/: meteor showers: parent comets' debris streams, radiants and streaks while a shower is active
+const meteors = createMeteors({ scene, bodies, isTouch: IS_TOUCH, scaleDistance });
 
 // Galaxy view lives in its own scene with its own units (1 unit = 100 ly) → no float/depth precision issues
 const galaxy = createGalaxy({ isTouch: IS_TOUCH });
@@ -610,7 +613,7 @@ const GALAXY_POS = new THREE.Vector3(0, 620, 720);
 const GALAXY_MIN_DIST = 90, GALAXY_MAX_DIST = 700000;  // zooming far out reveals the Local Group, then the Sombrero (31 Mly)
 const GALAXY_FAR = 2000000;                             // galaxy-scene camera far plane (units of 100 ly); must exceed ~1.1 M to see M104 from the far view
 const M31_MIN_DIST = 160;
-let galaxyFocus = 'mw';              // what the galaxy-view camera orbits: 'mw' (Milky Way) | 'm31' (Andromeda) | 'm104' (Sombrero) | 'sgra' (Sgr A*) | 'ton618'
+let galaxyFocus = 'mw';              // what the galaxy-view camera orbits: 'mw' (Milky Way) | 'm31' (Andromeda) | 'm104' (Sombrero) | 'antennae' (NGC 4038/4039) | 'sgra' (Sgr A*) | 'ton618'
 const LG_MID = galaxy.SUN_POS.clone().lerp(galaxy.M31_POS, 0.5);
 let activeScene = scene;
 let mode = 'solar';                  // 'solar' | 'galaxy' | 'transit'
@@ -657,6 +660,9 @@ $('andromeda-btn').addEventListener('click', () => {
 $('sombrero-btn').addEventListener('click', () => {
   if (mode === 'solar') enterGalaxy(() => flyToSombrero());
   else if (mode === 'galaxy') (galaxyFocus === 'm104' ? flyToMilkyWay() : flyToSombrero());
+});
+$('antennae-btn').addEventListener('click', () => {   // same action as key N (antennae.js), or back home when already there
+  if (mode === 'galaxy' && galaxyFocus === 'antennae') flyToMilkyWay(); else goAntennae();
 });
 $('sgra-btn').addEventListener('click', () => {
   if (mode === 'solar') enterGalaxy(() => flyToSgrA());
@@ -1248,6 +1254,7 @@ function updateGalaxyButton() {
   // view row: compact icon + short label; the focused object's button turns into "back to the Milky Way"
   setDeepBtn('andromeda-btn', g && galaxyFocus === 'm31', '🔭', 'Andromeda');
   setDeepBtn('sombrero-btn', g && galaxyFocus === 'm104', '🎩', 'Sombrero');
+  setDeepBtn('antennae-btn', g && galaxyFocus === 'antennae', '🦋', 'Antennae');
   setDeepBtn('sgra-btn', g && galaxyFocus === 'sgra', '⚫', 'Sgr A*');
   setDeepBtn('ton618-btn', g && galaxyFocus === 'ton618', '✴', 'TON 618');
   document.body.classList.toggle('galaxy-mode', g);
@@ -1371,7 +1378,42 @@ function flyToSombrero() {
     showSombreroInfo();
   });
 }
+// ScaleBot: Antennae (NGC 4038/4039, ~45 Mly) through the same two-stage log-space galaxyFly as the Sombrero: out to a far
+// view framing the Milky Way and the Antennae, then in to antennae.js's own end view (both disks + tails), then its card.
+function antennaeFarView() {
+  const A = galaxy.antennae, a = A.POS.clone().sub(galaxy.SUN_POS), b = sombrero.POS.clone().sub(galaxy.SUN_POS);
+  const n = new THREE.Vector3().crossVectors(a, b).normalize(); if (n.y < 0) n.negate();
+  const mid = galaxy.SUN_POS.clone().lerp(A.POS, 0.5);
+  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2), half = a.length() * 0.5 / 0.72;
+  const dist = camera.aspect >= 1 ? half / tanH / camera.aspect : half / tanH;
+  return { cam: mid.clone().addScaledVector(n, dist), target: mid };
+}
+function flyToAntennae() {
+  const A = galaxy.antennae; if (!A) return;
+  if (mode === 'solar') { enterGalaxy(() => flyToAntennae()); return; }
+  if (galaxyFocus === 'sgra') { leaveSgrA(() => flyToAntennae()); return; }
+  if (galaxyFocus === 'ton618') { leaveTon618(() => flyToAntennae()); return; }
+  if (mode !== 'galaxy') return;
+  if (galaxyFocus === 'antennae') { A.showInfo(); return; }
+  const u = antennaeFarView(), e = A.viewEnd(camera);
+  galaxyFly(u.cam, u.target, e.cam, e.target, () => {
+    galaxyFocus = 'antennae';
+    controls.minDistance = M104_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST;
+    updateGalaxyButton();
+    A.markFocused(); A.showInfo();
+  });
+}
 // Local Group dwarfs (localgroup/): the Magellanic Clouds through a view of the Milky Way beside the Cloud, M33 through the
+// Antennae Galaxies (NGC 4038/4039): the camera tween lives in antennae.js (key N); main.js only tracks the focus.
+const antennae = galaxy.antennae;
+// same action as key N: ScaleBot's window.solar.flyToAntennae() when present, else antennae.js's own fly-to
+const goAntennae = () => (typeof window.solar?.flyToAntennae === 'function' ? window.solar.flyToAntennae() : antennae.flyTo());
+function trackAntennaeFocus() {
+  if (mode !== 'galaxy' || transition || antennae.isFlying) return;
+  const near = controls.target.distanceTo(antennae.POS) < 3000;
+  if (near && galaxyFocus !== 'antennae') { galaxyFocus = 'antennae'; controls.minDistance = GALAXY_MIN_DIST; controls.maxDistance = GALAXY_MAX_DIST; updateGalaxyButton(); }
+  else if (!near && galaxyFocus === 'antennae') { galaxyFocus = 'mw'; controls.minDistance = GALAXY_MIN_DIST; updateGalaxyButton(); }
+}
 // Local Group view (like Andromeda). Two flyTo() stages via galaxyFly, as for the Sombrero.
 function flyToLocalGroup(key) {
   if (galaxyFocus === 'sgra') { leaveSgrA(() => flyToLocalGroup(key)); return; }
@@ -1648,7 +1690,8 @@ function animate() {
     else if (mode === 'galaxy' && galaxyFocus === 'sgra' && controls.getDistance() > 1200) { galaxyFocus = 'mw'; controls.minDistance = GALAXY_MIN_DIST; updateGalaxyButton(); }
     else if (mode === 'galaxy' && localGroup.isNear(galaxyFocus) && controls.getDistance() > 2500) { galaxyFocus = 'mw'; controls.minDistance = GALAXY_MIN_DIST; updateGalaxyButton(); }
   }
-  if (mode === 'galaxy' && !transition && glideEnabled && galaxyFocus !== 'ton618') glideGalaxyTarget();
+  trackAntennaeFocus();
+  if (mode === 'galaxy' && !transition && glideEnabled && galaxyFocus !== 'ton618' && galaxyFocus !== 'antennae' && !antennae.isFlying) glideGalaxyTarget();
   if (activeScene === galaxy.scene) document.body.classList.toggle('lg-view', (galaxyFocus !== 'mw' && galaxyFocus !== 'sgra' && !localGroup.isNear(galaxyFocus)) || camera.position.length() > 4500);
   if (activeScene === scene) {
     const days = (simTime - J2000) / DAY_MS;
@@ -1657,6 +1700,7 @@ function animate() {
     sunFX.update(dt, camera, sunGroup.position, true);
     spacecraft.update(days, camera, dt);
     comets.update(days, camera, dt);
+    meteors.update(days, camera, dt);
     const nearSun = sunFX.stats().near;
     // fade the glow sprites out when the Sun is far off-axis or behind: a sprite near the screen edge projects to a huge straight-edged band
     camera.getWorldDirection(_camFwd);
@@ -1693,7 +1737,7 @@ window.addEventListener('resize', onResize);
 window.addEventListener('orientationchange', () => setTimeout(onResize, 250)); // iOS reports new size a bit late
 
 // search/: find any object by name and fly there (cinematic past the orbits/belts on long trips); grouped, filterable list
-const search = createSearch({ constellations, bodies, spacecraft, comets, localGroup, galaxy, camera, controls, focusOn, flyTo, flyToFixed, galaxyFly,
+const search = createSearch({ constellations, meteors, bodies, spacecraft, comets, localGroup, galaxy, camera, controls, focusOn, flyTo, flyToFixed, galaxyFly,
   enterGalaxy, exitGalaxy, getMode: () => mode, getGalaxyFocus: () => galaxyFocus, isTransitioning: () => !!transition, flyToAndromeda,
   flyToMilkyWay, flyToSombrero, flyToSgrA, flyToTon618, flyToLocalGroup, showGalaxyInfo, scaleDistance, scene, isCompact, setPanelCollapsed,
   releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
@@ -1714,4 +1758,4 @@ loading.style.opacity = '0';
 setTimeout(() => loading.remove(), 700);
 
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
-window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };
+window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, antennae, flyToAntennae, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, meteors, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };
