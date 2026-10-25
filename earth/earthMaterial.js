@@ -30,7 +30,7 @@
 // Lighting units follow MeshStandardMaterial under three r155+ physical lights: radiance = albedo · (I/π) · N·L,
 // so Earth matches the brightness of the other planets lit by the same PointLight.
 import * as THREE from 'three';
-import { DIR_TO_UV, CLOUD_CURVE, CLOUD_FLOW, VALUE_NOISE } from './glsl.js';
+import { DIR_TO_UV, CLOUD_CURVE, CLOUD_FLOW, VALUE_NOISE, TWILIGHT } from './glsl.js';
 
 const vertexShader = /* glsl */ `
 varying vec2 vUv;
@@ -65,6 +65,7 @@ uniform float uSeasonW;           // December-map weight for the current date (1
 uniform float uSeason;            // seasonal blend strength (0 = December map only)
 uniform sampler2D uDepthMap;      // sea-floor depth, sqrt(depth / 8 km), 0 on land (GEBCO_08, 2K / 1K)
 uniform float uDepthReady;        // 0 until it has loaded
+uniform float uTwilight;         // twilight band strength (sunset-coloured sunlight + skylight past the terminator; 0 = old look)
 uniform float uOceanColor;        // true-colour ocean strength (0 = the day map's painted sea-floor relief)
 
 uniform vec3  uSunDir;          // world-space unit vector Earth → Sun (updated each frame)
@@ -95,6 +96,7 @@ ${DIR_TO_UV}
 ${CLOUD_CURVE}
 ${CLOUD_FLOW}
 ${VALUE_NOISE}
+${TWILIGHT}
 
 // Cloud coverage above a ground direction (object space). textureGrad with the ground UV derivatives avoids
 // the mip-level glitch an atan()-generated UV would otherwise show along the date-line seam.
@@ -193,6 +195,9 @@ void main() {
   float diff = max(NdL, 0.0) * term;
   // sunlight reddens as it grazes through more air near the terminator
   vec3 sunTint = mix(vec3(1.0, 0.55, 0.32), vec3(1.0), smoothstep(0.0, 0.35, NdLgeo));
+  // twilight (glsl.js TWILIGHT): air-mass reddened sunlight through gold/orange/red, and a dim scattered-skylight
+  // band past the terminator (orange-pink → mauve → blue hour) instead of an abrupt cut to black
+  sunTint = mix(sunTint, twSunTint(NdLgeo), uTwilight);
 
   // ---- cloud shadows ----------------------------------------------------------------------------------------
   // The cloud deck sits ~2% of a radius up, so the cloud that shades a point lies slightly towards the Sun.
@@ -201,6 +206,7 @@ void main() {
 
   vec3 col = day * uSunColor * sunTint * diff * (1.0 - shadow);
   col += day * uAmbient * smoothstep(-0.3, 0.1, NdLgeo);   // no ambient fill deep on the night side
+  col += day * uSunColor * twGlow(NdLgeo) * (0.09 * uTwilight) * (1.0 - 0.6 * overhead);
 
   // ---- ocean glint ------------------------------------------------------------------------------------------
   // Energy-conserving (normalised) Blinn-Phong with Schlick Fresnel (water F0 ≈ 0.02). The exponent is high, so

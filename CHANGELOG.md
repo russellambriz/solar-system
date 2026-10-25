@@ -131,6 +131,91 @@
 
 ### Testing
 - `moon-shots/shoot.js` pauses the sim and steps to the sim's next full Moon. It then shoots the near side and a Sun-side close-up of Tycho, with the rays on and off. No console errors on desktop or iPad.
+## 2026-10-24: Tonight's sky from Boise (Space Model Coder)
+
+### Added
+- **🔭 Tonight's sky from Boise** button in Controls, under the Moon phase. It opens a panel for the night of the sim's date (local noon to the next local noon), as seen from Boise (43.615°N, 116.20°W). All times are America/Boise, labelled MDT or MST; on the night the clocks change, each time gets its own label.
+  - **Sun:** sunset, astronomical darkness (Sun 18° down) from dusk to dawn, and sunrise.
+  - **Moon:** phase name, % lit, and the dates of the next full and new Moon.
+  - **One row each** for the Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus (🔭 binoculars) and Neptune (🔭 telescope):
+    - rise, highest (transit time and altitude) and set
+    - magnitude and the constellation it's in
+    - ✓ Up tonight or Not tonight
+    - a plain-English line, e.g. "Before dawn, high in the SE: best around 7:00 AM (visible 2:10 AM–7:40 AM)", "All night; highest around 12:40 AM, high in the S", or "Too close to the Sun tonight (7° away), lost in the glare"
+  - **Tap a row** to fly to that planet or the Moon, using search's own fly-to (main.js `focusOn`). Its card opens as usual.
+  - **📍 Now** jumps the sim to the present and pauses, so "tonight" really is tonight. The sim runs at 10 days/s by default, so the panel says so when time is running.
+  - **Mark what's up tonight on the 3D labels** (off by default, remembered): the labels of whatever is visible tonight get a green ring and a 🔭.
+  - **📅 Coming up (next 12 months)** from the shown date:
+    - oppositions
+    - greatest elongations of Mercury and Venus
+    - planet pairs closer than 3°
+    - Moon–planet passes closer than 3°
+    
+    Each has its date and local time. Tapping one jumps to that day, pauses and flies to the planet.
+- **Events timeline:** the coming year's oppositions, elongations and planet pairs, plus the Moon's closest passes (≤ 1°), are added as green "Sky from Boise" events. That's 20 events today, e.g. Uranus at opposition (25 Nov 2026), Mars and Jupiter 1.2° apart (15 Nov 2026), Jupiter at opposition (10 Feb 2027), Mars at opposition (19 Feb 2027) and Venus and Saturn 36′ apart (7 May 2027). The panel lists all 36, including the wider Moon passes.
+- **Search:** `tonight`, `visible planets`, `what's up`, `up tonight`, `night sky`, `stargazing`, `sunset`, `sunrise`, `twilight`, `conjunction`, `opposition`… all find "Tonight's sky from Boise", which opens the panel.
+- **Layout:** the panel sits in the left column and folds (▾) or closes (✕). Opening it folds the planet list; unfolding the list folds the panel, so they never overlap. It has 44 px targets on touch and scrolls inside itself. On iPad portrait and landscape it stays clear of the info card. It's hidden in clean view.
+
+### How it's made
+- **Planets and Sun:** the project's own ephemeris (`ephemeris/planets.js`, JPL Keplerian elements). The Sun is the reverse of Earth's vector. Positions are light-time corrected, rotated to the J2000 equator, and precessed to the equinox of date (IAU 1976). Nutation and aberration (< 25″) are left out.
+- **Moon:** Meeus, *Astronomical Algorithms* ch. 47, the 44 largest longitude/distance terms and 20 latitude terms (≈ 1′). Its parallax goes into the rise/set altitude and the topocentric altitude.
+- **Sidereal time and time scale:** IAU 1982 GMST, and ΔT from the Espenak–Meeus polynomials.
+- **Rise and set** are when the centre reaches:
+  - −0.833° for the Sun
+  - −0.567° for planets (refraction only, the Astronomical Almanac/USNO convention for point-like discs)
+  - 0.7275·π − 0.567° for the Moon (≈ +0.125°)
+  
+  Times come from 10-minute samples, bisected to ~1 s, and are rounded to the nearest minute.
+- **Magnitudes:** Mallama & Hilton (2018) for all planets (Saturn includes the rings, using the ring tilt from Meeus ch. 45). The Moon uses Allen's phase law.
+- **Constellations:** N. G. Roman (1987) boundary table, CDS VI/42 (fetched 2026-10-24, `skytonight/bounds.js`), with the position precessed to B1875.0. Names come from constellations/' `NAMES`.
+- **"Visible tonight":** at some point between sunset and sunrise, the object is at least 5° up (10° if fainter than mag 1) while the Sun is far enough down for its brightness:
+  - −3° for Venus and the Moon
+  - −6° for mag < 1.5
+  - −12° for Uranus
+  - −15° for Neptune
+  
+  It must also be ≥ 8° from the Sun. The "best time" is when it's highest in a properly dark sky (Sun 12° down), or highest in twilight if it is only up then. These limits are rules of thumb.
+- **Events:** planets sampled daily and the Moon every 3 h, refined to about a minute.
+  - Oppositions: geocentric ecliptic longitude 180° from the Sun.
+  - Elongations: when the elongation peaks.
+  - Conjunctions: when the separation is smallest.
+  
+  Pairs within 12° of the Sun are skipped (lost in the glare).
+- **Cost:** one night is ~12 ms in headless Chrome. It's only recomputed when the sim's local date changes, at most every 300 ms while the panel is open, and every 2 s while it's closed with marks on. The 12-month list (~50 ms) is only worked out while it's unfolded. The timeline events are computed once at load.
+
+### Accuracy checks (2026-10-24)
+- **JPL Horizons API** (observer at 43.615°N, 116.20°W, sea level, refracted, 1-minute steps, `R_T_S_ONLY=TVH`). We checked every rise, transit and set of the Sun, Moon and all seven planets on three nights: 24 Oct 2026, 10 Jan 2027 and 21 Jun 2027. That's 81 times, all within **about 1 min** of Horizons (worst 1.01 min; Horizons prints whole minutes).
+  - Example, 24/25 Oct 2026, MDT: Sun sets 6:47 PM and rises 8:12 AM (Horizons 00:47 and 14:12 UT). The Moon rises 5:47 PM (23:48 UT). Saturn transits 12:10 AM (06:11 UT). Jupiter rises 2:14 AM (08:15 UT).
+  - Magnitudes are within 0.08 of Horizons for the planets (Saturn 0.45 vs 0.43; Venus −4.19 vs −4.19) and within 0.2 for the Moon.
+  - The constellation matched Horizons' on all 81 rows.
+- **astronomy-engine 2.1** (Don Cross; independent VSOP87/Moon theory), used as a second reference:
+  - 120 random nights from 2000 to 2050: every rise and set is within 1 min (worst: Saturn 0.9 min, Jupiter 0.8 min).
+  - Astronomical twilight: within 3 s.
+  - Next full Moon: 26 Oct 2026 04:12 UTC, within 0.3 min. That's Sun 25 Oct, 10:12 PM MDT.
+  - Moon illumination: 98.8% on both.
+  - The 2026–27 oppositions (Uranus within 1 min, Mars 5 min, Jupiter 44 min, Saturn 2 h) and greatest elongations (within 1 h) match. Its oppositions are heliocentric, ours geocentric.
+  - Every Moon–planet separation is within 0.02°.
+- **USNO's API** (aa.usno.navy.mil) could not be reached from the box (TLS failure, and the fetch service got a 504), so it wasn't used.
+
+### Changed
+- New: `skytonight/index.js` (panel, marks, search entry), `skytonight/astro.js` (the astronomy, no DOM), `skytonight/events.js` (12-month events and `SKY_EVENTS`), `skytonight/bounds.js` (Roman 1987 table) and `skytonight/skytonight.css` (loaded by the module).
+- `main.js`: import, create and `window.solar.skyTonight` (5 hook lines, comment included). The camera functions are only called, through search.
+- `ui/index.js`: `SKY_EVENTS` in the Events list, plus a `sky` marker colour (green).
+- `CONTRIBUTING.md`: `skytonight/` added to Space Model Coder's row.
+- Screenshots: `screenshot-tonight.png` (new) shows the panel open over the overview on 24 Oct 2026, with "Mark what's up tonight" on. `screenshot.png` was refreshed (Controls has the new button). `screenshot-ipad.png` was re-taken too, though the default iPad view is unchanged because Controls starts folded there.
+- Not touched: `search/index.js` (the panel adds its own entry to `search.entries`), `style.css`, `index.html`, `ephemeris/`, constellations/ (only its `NAMES` is imported), the camera code (`flyTo`/`updateCamera`/`focusOn`/arrival/drift), scale/, earth/, moon/, mars/, planets/ and the galaxy files.
+
+### Notes
+- **Moon–planet separations** are geocentric. Seen from Boise, the Moon can sit up to ~1° off, so a 0.5° pass may look like a near-miss or an occultation.
+- **Rise and set** are for a sea-level horizon. Boise's 820 m elevation and the foothills shift real times by a minute or two.
+- **The sim's Moon** (the 3D model and the Controls phase readout) still uses its own simpler model. The panel's Moon comes from the Meeus series. They agree on the phase to about a percent.
+- **Tests:** headless Chrome (SwiftShader) at desktop 1440×900 and iPad Pro 11 portrait 834×1194 and landscape 1194×834 (touch), with zero console errors. Each run checked:
+  - the panel, tap to fly (Jupiter's card opens and doesn't overlap the panel)
+  - the 12-month list and the DST night (31 Oct → 1 Nov: "8:14 PM MDT–5:44 AM MST")
+  - search ("tonight", "visible planets", "what's up")
+  - fold/close
+  - smoke tests of search → Perseids card, Juno, and the 🌌 Galaxy button
+
 ## 2026-10-24: Scale-aware fly-to for the Antennae Galaxies (ScaleBot)
 
 ### Changed

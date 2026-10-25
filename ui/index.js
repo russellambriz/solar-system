@@ -8,7 +8,7 @@
 //    real orbits, the belts, dwarf planets, comets, famous asteroids and probes (anything past 50 AU sits on the rim), plus where the
 //    camera is and which way it looks. Tap a dot to fly there. It moves clear of open panels and hides in the galaxy view.
 //  • Events (Controls, under the date): a 1965–2065 timeline with markers, ◀ ▶ and a list of flybys, comet visits and
-//    landings, asteroid and comet missions, comet perihelia (famous.js) and Apophis's 2029 flyby. Picking one jumps to that day, pauses, and flies to the object.
+//    landings, asteroid and comet missions, comet perihelia (famous.js), Apophis's 2029 flyby, meteor-shower peaks and the coming year's planet events (skytonight/). Picking one jumps to that day, pauses, and flies to the object.
 //  • Motion trails (Layers → Trails): each planet and dwarf planet trails the last eighth of its orbit, with dots at
 //    equal time steps; they spread out near the Sun, where it moves fastest (Kepler's second law).
 //  • Signal delay on the probes' labels while Layers → Distances is on (spacecraft.setSignalDelay).
@@ -22,6 +22,7 @@ import { keplerAU, scaleAU } from '../smallbodies.js';
 import { planetAU, planetOrbitAU, PLANET_NAMES } from '../ephemeris/planets.js';
 import { createSkyReadout } from './skyreadout.js';
 import { METEOR_EVENTS } from '../meteors/data.js';
+import { SKY_EVENTS } from '../skytonight/events.js';
 
 const J2000 = Date.UTC(2000, 0, 1, 12), DAY_MS = 86400000;
 const TL_FROM = Date.UTC(1965, 0, 1), TL_TO = Date.UTC(2065, 0, 1);
@@ -86,9 +87,10 @@ const EVENTS = [
   ['2032-12-22', 'Asteroid 2024 YR4 misses the Moon by ~21,000 km', '2024 YR4', 'asteroid'],
   ['2061-07-28', "Halley's Comet returns", "Halley's Comet", 'comet'],
   ...METEOR_EVENTS,                       // meteors/: the next twelve months of shower peaks
+  ...SKY_EVENTS,                          // skytonight/: oppositions, elongations, close conjunctions (next twelve months)
 ].map(([date, title, target, kind, card]) => ({ date, title, target, kind, card, ms: Date.parse(date + 'T12:00:00Z') }))
   .sort((a, b) => a.ms - b.ms);
-const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', visitor: '#e98cff', body: '#d9b99a', asteroid: '#ffb48a', meteor: '#ffe9a0' };
+const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', visitor: '#e98cff', body: '#d9b99a', asteroid: '#ffb48a', meteor: '#ffe9a0', sky: '#9dffb0' };
 
 export function createUI(o) {
   const { bodies, camera, scaleDistance } = o;

@@ -182,3 +182,32 @@ vec4 atmoScatter(vec3 roW, vec3 rd, out float hitGround, out float groundNdL, ou
   return vec4(col, dot(Tv, vec3(0.25, 0.5, 0.25)));
 }
 `;
+
+/**
+ * Twilight (uTwilight, 0 = the pre-2026-10-24 look). Shared by the ground and cloud shaders.
+ * twSunTint(mu): colour of direct sunlight at a place where the Sun stands at elevation asin(mu). The light crosses
+ *   an air mass m (Kasten & Young 1989) with vertical optical depth TW_TAU (Rayleigh + a little aerosol, R/G/B ≈
+ *   680/550/440 nm), so T = exp(−τ·m); the hue (T / T.r) runs white → gold → orange → deep red as the Sun sets.
+ *   It is pulled back to white from ~25° up, so the day disc is unchanged.
+ * twGlow(mu): skylight just past the terminator. The ground under a twilight sky (Sun up to ~12° below the
+ *   horizon) is still lit by sunlight scattered in the upper air: warm orange-pink near the terminator, fading
+ *   through mauve into the deep blue of nautical twilight. Returns colour × strength (fraction of full sunlight).
+ */
+export const TWILIGHT = /* glsl */ `
+const vec3 TW_TAU = vec3(0.075, 0.150, 0.300);
+vec3 twSunTint(float mu) {
+  float m0 = max(mu, 0.0);
+  float elev = degrees(asin(clamp(m0, 0.0, 1.0)));
+  float am = 1.0 / (m0 + 0.50572 * pow(elev + 6.07995, -1.6364));
+  vec3 T = exp(-TW_TAU * am);
+  vec3 hue = T / max(T.r, 1e-4);
+  return mix(hue, vec3(1.0), smoothstep(0.12, 0.42, mu));
+}
+vec3 twGlow(float mu) {
+  float d = clamp(-mu, -0.06, 0.25);                     // depth below the horizon (sine), a little day-side spill
+  float k = exp(-max(d, 0.0) / 0.035) * smoothstep(-0.06, 0.0, d) * (1.0 - smoothstep(0.08, 0.15, d));
+  vec3 c = mix(vec3(1.0, 0.46, 0.22), vec3(0.85, 0.36, 0.42), smoothstep(0.01, 0.05, d));
+  c = mix(c, vec3(0.25, 0.30, 0.66), smoothstep(0.05, 0.11, d));
+  return c * k;
+}
+`;
