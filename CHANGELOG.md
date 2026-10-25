@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-25: Lunar eclipses on the Moon (MoonBot)
+
+### Added
+- Earth's shadow now falls on the Moon during lunar eclipses, on their real dates. The shadow comes from the true Sun
+  and Moon positions (a truncated Meeus lunar theory, `moon/eclipse.js`), not the scene's compressed orbit, so it
+  matches published eclipses: the total eclipse of 3 March 2026 (umbral magnitude 1.15 here vs 1.153 published), the
+  deep partial of 28 August 2026 (0.94 vs 0.930) and the penumbral one of 20 February 2027 (penumbral 0.94 vs 0.928).
+- The umbra glows copper red (sunlight bent through Earth's atmosphere), brightest at its edge and darkest in the
+  middle, with a faint turquoise band just inside the edge; the penumbra only darkens noticeably close to the umbra.
+  The shadow sits at its real offset from the Moon's centre, so it sweeps across the right way during an eclipse.
+- `body.moon.getEclipse()` returns `{ type, umbralMag, penumbralMag, x, y, umbra, penumbra }` for the current sim time
+  (for an eclipse label or event marker); `uEclipse = 0` turns the shadow off. Ordinary full Moons are unaffected,
+  and the shader skips the work unless the Moon is in or near the penumbra.
+- New test `moon-shots/eclipse.js` (desktop and iPad); before/after at `moon-shots/eclipse-before-after.png`.
+
 ## 2026-10-24: Sharper Moon surface colour in the closest views (MoonBot)
 
 ### Changed

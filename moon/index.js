@@ -5,11 +5,12 @@
 //   const moonMesh = createMoonMesh({ radius: moonR, isTouch: IS_TOUCH });       // replaces the old Mesh(...)
 //   ...after the Moon body is built:  moonBody.baseRadius = moonR;
 // and in animate(), right after updateBodies():
-//   updateMoon(moonBody, camera, sunLight);
+//   updateMoon(moonBody, camera, sunLight, days);   // days since J2000 drives libration and lunar eclipses
 //
 // The mesh is a THREE.LOD, so main.js can keep using moonBody.mesh.rotation.y for tidal locking.
 import * as THREE from 'three';
 import { VERT, FRAG } from './shaders.js';
+import { earthShadow } from './eclipse.js';
 
 const BASE = new URL('../textures/moon/', import.meta.url);
 const REAL_RATIO = 0.273;           // real Moon radius / Earth radius
@@ -147,6 +148,12 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uRelief: { value: RELIEF },
     // Mare colour: blue high-titanium vs brownish low-titanium lava, amplified from the LROC mosaic's own colour. 1 = map as is.
     uMareTint: { value: 3.0 },
+    // Lunar eclipses: Earth's shadow from the real Sun and Moon (moon/eclipse.js), with a coppery umbra. 0 turns it off.
+    uEclipse: { value: 1.0 },
+    uEclipseOn: { value: 0.0 },                              // set per frame: 0 unless the Moon is in or near the penumbra
+    uShadowC: { value: new THREE.Vector3() },                // a point on the shadow's axis (world)
+    uShadowA: { value: new THREE.Vector3(1, 0, 0) },         // the axis direction, away from the Sun (world)
+    uShadowR: { value: new THREE.Vector3(2.7, 4.8, 1) },     // umbra and penumbra radii in Moon radii; Moon radius (world)
   };
   // iPad: three size bands (down to ~3 km craters); desktop adds a fourth (~1.3 km) for the closest views.
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG,
@@ -176,6 +183,10 @@ export function updateMoon(moonBody, camera, sunLight, days) {
     // Same as EarthBot's helper: a first argument with option keys but no offset/target/driftAxis is treated as options.
     getCinematicStart: (out, opts) => (isOptions(out) ? getCinematicStart(moonBody, sunLight, out) : getCinematicStart(moonBody, sunLight, opts, out)),
     latLonToWorld: (lat, lon, altitudeKm, out) => latLonToWorld(moonBody, lat, lon, altitudeKm, out),
+    // Earth's shadow on the Moon right now: { type: 'none'|'penumbral'|'partial'|'total', umbralMag, penumbralMag,
+    // x, y (Moon centre minus shadow centre, Moon radii, east/north), umbra, penumbra (radii, Moon radii) }.
+    getEclipse: () => moonBody.moon._eclipse,
+    _eclipse: { type: 'none', umbralMag: -9, penumbralMag: -9, x: 0, y: 0, umbra: 2.7, penumbra: 4.8 },
   };
 
   // Libration: the Moon spins at a constant rate but moves faster near perigee, so seen from Earth it rocks
@@ -244,6 +255,25 @@ export function updateMoon(moonBody, camera, sunLight, days) {
   }
   moonBody.group.scale.setScalar(s);                       // mesh, pick sphere and label offset all live in this group
   moonBody.radius = base * s;
+  if (days !== undefined) updateEclipse(moonBody, u, days, base * s);
+}
+
+// Lunar eclipse: place Earth's real shadow (moon/eclipse.js) on the drawn Moon. The shadow's offset from the Moon's
+// centre is measured on the sky in Moon radii, east = increasing ecliptic longitude and north = ecliptic north, so it
+// is laid out the same way around the scene's Moon (scene +y is ecliptic north), scaled by the Moon as drawn.
+const _Y = new THREE.Vector3(0, 1, 0), _eE = new THREE.Vector3(), _eN = new THREE.Vector3();
+function updateEclipse(moonBody, u, days, radiusWorld) {
+  const e = earthShadow(days, moonBody.moon._eclipse);
+  const on = u.uEclipse.value > 0 && e.penumbralMag > -0.05;
+  u.uEclipseOn.value = on ? u.uEclipse.value : 0;
+  if (!on) return;
+  const A = u.uShadowA.value.copy(_moon).sub(_sun).normalize();
+  _eE.crossVectors(_Y, A);
+  if (_eE.lengthSq() < 1e-8) _eE.set(1, 0, 0);
+  _eE.normalize();
+  _eN.crossVectors(A, _eE);
+  u.uShadowC.value.copy(_moon).addScaledVector(_eE, -e.x * radiusWorld).addScaledVector(_eN, -e.y * radiusWorld);
+  u.uShadowR.value.set(e.umbra, e.penumbra, radiusWorld);
 }
 
 /**

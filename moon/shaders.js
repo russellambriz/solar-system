@@ -77,6 +77,10 @@ uniform float uMapTexel;      // arc of one colour/relief texel at the equator (
 uniform sampler2D uHeightMap; // LOLA elevation, 10-bit in red (high byte) + green (low byte), see SOURCES.md
 uniform float uHeightTexel;   // arc of one height texel (radians = 2*pi / map width)
 uniform float uShadow;        // 0 = the old smooth terminator, 1 = terrain shadows from the height map
+uniform float uEclipseOn;     // 0 = no eclipse (skipped); else strength (see moon/eclipse.js)
+uniform vec3 uShadowC;        // point on Earth's shadow axis (world)
+uniform vec3 uShadowA;        // shadow axis, pointing away from the Sun
+uniform vec3 uShadowR;        // umbra radius, penumbra radius (Moon radii), Moon radius (world)
 uniform float uMareTint;      // gain on the map's own blue-red mare colour (1 = the LROC mosaic as is)
 varying vec2 vUv;
 varying vec3 vObjN;
@@ -210,6 +214,25 @@ float sunVisibility(vec3 n, vec3 sunT, float e, float pen) {
   return smoothstep(-pen, pen, e - atan(maxT));
 }
 
+// Light reaching the Moon inside Earth's shadow, r = distance from the shadow's axis in Moon radii.
+// Penumbra: the fraction of the Sun's disc still showing past Earth's limb (a straight edge across a disc), so the
+// outer penumbra is hardly noticeable and it only darkens strongly near the umbra, as seen at a real eclipse.
+// Umbra: no direct sunlight, only light bent through Earth's atmosphere, with the blue scattered out (every sunrise
+// and sunset on Earth at once), so it is copper red, brightest at the umbra's edge and darkest in the middle, with a
+// faint turquoise band just inside the edge where sunlight grazes the ozone layer.
+vec3 eclipseLight(float r) {
+  float Ru = uShadowR.x, Rp = uShadowR.y;
+  float f = clamp((r - Ru) / (Rp - Ru), 0.0, 1.0);
+  float x = 2.0 * f - 1.0;
+  float sunVis = clamp(0.5 + (x * sqrt(max(1.0 - x * x, 0.0)) + asin(x)) / 3.14159265, 0.0, 1.0);
+  sunVis = pow(sunVis, 0.55);   // the eye adapts to the bright part: the penumbra looks dusky only close to the umbra
+  float u = clamp(r / Ru, 0.0, 1.0);
+  vec3 copper = mix(vec3(0.9, 0.2, 0.07), vec3(1.0, 0.42, 0.2), u) * mix(0.04, 0.2, pow(u, 2.5));
+  float band = smoothstep(0.8, 0.95, u) * (1.0 - smoothstep(0.97, 1.0, u));
+  copper += vec3(0.0, 0.035, 0.045) * band;
+  return mix(copper, vec3(1.0), sunVis);
+}
+
 void main() {
   vec3 n = normalize(vObjN);
   // three.js SphereGeometry: +u runs east along cross(up, n), +v runs north.
@@ -331,6 +354,12 @@ void main() {
   photo *= term;
   photo *= mix(1.0, crShade, relief);                  // small-crater bowl shadows (1 unless close up at low Sun)
   vec3 color = albedo * photo * uSunIntensity;
+  // Lunar eclipse: Earth's shadow on the sunlit side (axis and offset from the real Sun and Moon, see moon/eclipse.js).
+  if (uEclipseOn > 0.0) {
+    vec3 sp = vWorldPos - uShadowC;
+    sp -= uShadowA * dot(sp, uShadowA);
+    color *= mix(vec3(1.0), eclipseLight(length(sp) / uShadowR.z), uEclipseOn);
+  }
 
   // Earthshine: sunlight bounced off Earth lights whatever the Sun doesn't reach (the night side and the terrain
   // shadows past the terminator), scaled by Earth's phase as seen from here (uEarthLit, see moon/index.js).
