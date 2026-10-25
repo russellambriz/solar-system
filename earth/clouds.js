@@ -14,15 +14,25 @@
 // cloud edges light up. A Henyey–Greenstein lobe (g = uCloudSilverG, normalised to 0 side-on … 1 straight into the
 // Sun) adds sunlight weighted towards mid-thickness cloud — optically thick cores stay put, edges and thin veils
 // glow. It only exists where the deck is sunlit, so the day disc seen with the Sun behind the camera is unchanged.
+//
+// Close-up detail (uCloudDetail, 0 = the pre-2026-10-25 look): even the 4K map is ~10 km a texel (25 km at 1K on
+// the iPad tier), so close up the deck turns into soft bilinear blobs. A procedural fBm (value noise, fixed
+// physical scales of ~45 → 6 km) breaks up the cloud *edges* and thin veils into wisps and adds a little cloud-top
+// relief shading to the cores. It never creates cloud where the map has none (gated by the map coverage, cores
+// and clear sky are untouched) and each octave fades out by its own on-screen footprint (fwidth) before it gets
+// under ~2.5 px, so it cannot shimmer and the overview look is exactly unchanged. The noise is advected with
+// the same two flow-map copies as the map (CLOUD_FLOW), so it drifts with the clouds instead of swimming.
 import * as THREE from 'three';
-import { CLOUD_CURVE, CLOUD_FLOW, TWILIGHT } from './glsl.js';
+import { CLOUD_CURVE, CLOUD_FLOW, TWILIGHT, VALUE_NOISE } from './glsl.js';
 
 const vertexShader = /* glsl */ `
 varying vec2 vUv;
 varying vec3 vNormalW;
 varying vec3 vWorldPos;
+varying vec3 vObjDir;
 void main() {
   vUv = uv;
+  vObjDir = normalize(position);
   vNormalW = normalize(mat3(modelMatrix) * normal);
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vWorldPos = wp.xyz;
@@ -44,16 +54,56 @@ uniform float uCloudLimbLift;  // max brightness lift of limb cloud tops (fracti
 uniform float uCloudSilver;    // forward-scatter (silver lining) strength, × sunlight at the lobe peak
 uniform float uCloudSilverG;   // Henyey–Greenstein asymmetry of that lobe (0.5 broad … 0.8 tight)
 uniform float uTwilight;       // twilight band (glsl.js TWILIGHT); 0 = the pre-2026-10-24 look
+uniform float uCloudDetail;    // close-up procedural detail strength (see header); 0 = the pre-2026-10-25 look
 varying vec2 vUv;
 varying vec3 vNormalW;
 varying vec3 vWorldPos;
+varying vec3 vObjDir;
 ${CLOUD_CURVE}
 ${CLOUD_FLOW}
 ${TWILIGHT}
+${VALUE_NOISE}
+// fBm of the deck direction d (unit sphere), octave i fading by its footprint fp·f (cycles per pixel); -0.5..0.5-ish
+float detailFbm(vec3 d, float fp) {
+  float n = 0.0, f = 140.0, amp = 0.5;
+  vec3 p = d;
+  for (int i = 0; i < DETAIL_OCTAVES; i++) {
+    float w = 1.0 - smoothstep(0.2, 0.4, fp * f);          // gone before its period shrinks under ~2.5 px
+    if (w <= 0.0) break;                                     // finer octaves are smaller still
+    n += (vnoise(p * f) - 0.5) * amp * w;
+    f *= 2.03; amp *= 0.55;
+    p = vec3(p.y * 0.8 + p.z * 0.6, p.z * 0.8 - p.y * 0.6, p.x);   // rotate between octaves: no grid alignment
+  }
+  return n;
+}
+// the noise follows the same two drifting copies as the map (CLOUD_FLOW): rotate d about the pole by each offset
+vec3 flowDir(vec3 d, float off) { float c = cos(off), s = sin(off); return vec3(d.x * c - d.z * s, d.y, d.z * c + d.x * s); }
+float cloudDetailNoise(vec3 d, vec2 uv, float fp) {
+  float rate = windRate((uv.y - 0.5) * 3.14159265) * uCloudFlowPeriod;
+  float p0 = uCloudPhase, p1 = fract(uCloudPhase + 0.5);
+  float w0 = abs(2.0 * p0 - 1.0);
+  float w = w0 * w0 * (3.0 - 2.0 * w0);                    // same S-curve crossfade weight as cloudFlow()
+  float nA = w < 0.999 ? detailFbm(flowDir(d, uCloudBase + rate * p0), fp) : 0.0;
+  float nB = w > 0.001 ? detailFbm(flowDir(d, uCloudBase + rate * p1), fp) : 0.0;
+  return mix(nA, nB, w);
+}
 float hgPhase(float g, float c) { float d = 1.0 + g * g - 2.0 * g * c; return (1.0 - g * g) / (d * sqrt(d)); }
 void main() {
   float a = cloudFlow(vUv, dFdx(vUv), dFdy(vUv)) * uCloudsReady * uCloudOpacity;   // latitude drift, see glsl.js
   if (a < 0.003) discard;
+  // close-up detail (see header): erode/break up edges and veils, keep cores and clear sky as the map has them
+  float nDet = 0.0;
+  float fp = length(fwidth(vObjDir));                        // footprint of one pixel on the unit deck
+  if (uCloudDetail > 0.001 && fp * 140.0 < 0.4) {
+    nDet = cloudDetailNoise(normalize(vObjDir), vUv, fp) * uCloudDetail;
+    float c = a / max(uCloudsReady * uCloudOpacity, 1e-3);
+    float edge = 4.0 * c * (1.0 - c);                        // 0 for clear sky / solid cores, 1 at mid coverage
+    float c2 = clamp(c + nDet * 1.25 * edge * (0.6 + 0.4 * c), 0.0, 1.0);
+    float sharp = min(uCloudDetail, 1.0) * (1.0 - smoothstep(0.1, 0.4, fp * 140.0));
+    c2 = mix(c2, smoothstep(0.04, 0.96, c2), 0.45 * sharp);    // crisper edges where the map is magnified
+    a *= c2 / max(c, 1e-3);
+    if (a < 0.003) discard;
+  }
   vec3 N = normalize(vNormalW);
   vec3 L = normalize(uSunDir);
   vec3 V = normalize(cameraPosition - vWorldPos);
@@ -66,6 +116,7 @@ void main() {
   // then catch the scattered twilight sky a little past the ground's terminator (glsl.js TWILIGHT)
   sunTint = mix(sunTint, twSunTint(NdL + 0.035), uTwilight);
   vec3 col = vec3(0.95) * (uSunColor * sunTint * diff + uAmbient * 0.12); // night side: faint ambient only
+  col *= 1.0 + nDet * 0.35;                                  // cloud-top relief: bright billows, shaded hollows
   col += vec3(0.95) * uSunColor * twGlow(NdL + 0.035) * (0.22 * uTwilight);
   float mu = max(dot(N, V), 0.0);
   // thin clouds at the limb pick up a little sky blue
@@ -92,9 +143,10 @@ void main() {
 }
 `;
 
-export function createCloudMesh(radius, uniforms, segments) {
+export function createCloudMesh(radius, uniforms, segments, { detailOctaves = 4 } = {}) {
   const mat = new THREE.ShaderMaterial({
     name: 'EarthClouds',
+    defines: { DETAIL_OCTAVES: detailOctaves },
     uniforms,
     vertexShader,
     fragmentShader,

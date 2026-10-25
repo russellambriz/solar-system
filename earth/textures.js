@@ -13,6 +13,12 @@
 // the 4K surface. The 4K cloud map is level-matched to the 2K one, so the swap does not change cloud density.
 // The 4K normal map (GEBCO_08 relief, same exaggeration as the 2K one) comes last.
 //
+// Touch devices (mobile tier) keep the 1K surface maps, but the cloud map is the texture that is most visibly soft
+// up close (it is white-on-dark, so every bilinear texel step shows). Once the 1K day + night maps are showing, a
+// sharper cloud map alone is fetched the same way: 4096×2048 on tablet-class devices (short side ≥ 744 CSS px, e.g.
+// any iPad; maxTextureSize ≥ 4096 and not a low-memory device), 2048×1024 on phones. One extra texture, ~45 MB of
+// GPU memory for the 4K one with mips. `?earthclouds=1k|2k|4k` in the page URL forces the size (testing).
+//
 // Paths are resolved relative to this module, so the site keeps working from a subpath
 // (e.g. https://user.github.io/solar-system/).
 import * as THREE from 'three';
@@ -45,6 +51,23 @@ export function canUseHiRes(renderer, isMobile) {
 }
 
 /**
+ * Cloud-map size for the mobile tier: '1k' (keep the base map), '2k' or '4k' (progressive upgrade, see header).
+ */
+export function mobileCloudTier(renderer) {
+  const force = new URLSearchParams(globalThis.location?.search || '').get('earthclouds');
+  const max = renderer?.capabilities.maxTextureSize ?? 0;
+  if (force === '1k' || !renderer) return '1k';
+  if (force === '4k') return max >= 4096 ? '4k' : (max >= 2048 ? '2k' : '1k');
+  if (force === '2k') return max >= 2048 ? '2k' : '1k';
+  const mem = globalThis.navigator?.deviceMemory;
+  if (mem && mem < 2) return '1k';
+  const sw = globalThis.screen?.width ?? 0, sh = globalThis.screen?.height ?? 0;
+  const tablet = Math.min(sw, sh) >= 744 && !(mem && mem < 4);
+  if (tablet && max >= 4096) return '4k';
+  return max >= 2048 ? '2k' : '1k';
+}
+
+/**
  * Start loading the Earth textures. `onLoad(key, tex, tier)` fires as each real image arrives (tier is
  * '1k' | '2k' | '4k'), so the caller can swap uniforms and flip "ready" flags.
  *
@@ -61,7 +84,8 @@ export function loadEarthTextures({ isMobile, renderer = null, onLoad }) {
   const maxAniso = renderer ? renderer.capabilities.getMaxAnisotropy() : 1;
   const anisotropy = Math.min(maxAniso, isMobile ? 4 : 16);
   const hiResCapable = !isMobile && canUseHiRes(renderer, isMobile);
-  const info = { set, hiResCapable, anisotropy, maxTextureSize: renderer?.capabilities.maxTextureSize, tier: {}, hiResState: hiResCapable ? 'pending' : 'off', hiResMs: 0 };
+  const cloudUp = isMobile ? mobileCloudTier(renderer) : '1k';   // mobile-tier cloud upgrade ('1k' = none)
+  const info = { set, hiResCapable, cloudUp, cloudUpState: cloudUp === '1k' ? 'off' : 'pending', anisotropy, maxTextureSize: renderer?.capabilities.maxTextureSize, tier: {}, hiResState: hiResCapable ? 'pending' : 'off', hiResMs: 0 };
 
   const loader = new THREE.TextureLoader();
   const files = {
@@ -85,47 +109,68 @@ export function loadEarthTextures({ isMobile, renderer = null, onLoad }) {
   let pendingBase = 2;                          // day + night must be showing before the 4K fetch starts
   for (const [key, { file, srgb }] of Object.entries(files)) {
     loader.load(new URL(`${set}/${file}`, BASE).href, (tex) => {
+      if (info.tier[key] && info.tier[key] !== baseTier) { tex.dispose(); return; }   // a sharper map won the race
       info.tier[key] = baseTier;
       onLoad(key, setup(tex, srgb), baseTier);
-      if ((key === 'day' || key === 'night') && --pendingBase === 0 && hiResCapable) scheduleHiRes();
+      if ((key === 'day' || key === 'night') && --pendingBase === 0) {
+        if (hiResCapable) scheduleHiRes();
+        else if (cloudUp !== '1k') scheduleIdle(loadMobileClouds);
+      }
     }, undefined, (err) => console.warn(`[earth] could not load ${file}`, err));
   }
 
-  function scheduleHiRes() {
-    // let the first frames with the 2K maps go out before spending bandwidth/decode time on 4K
-    const go = () => loadHiRes();
+  function scheduleIdle(go) {
+    // let the first frames with the base maps go out before spending bandwidth/decode time on bigger ones
     if (globalThis.requestIdleCallback) requestIdleCallback(go, { timeout: 1500 });
     else setTimeout(go, 300);
+  }
+  function scheduleHiRes() { scheduleIdle(loadHiRes); }
+
+  // decode off the main thread where possible, pre-upload, then hand over
+  const useBitmap = typeof createImageBitmap === 'function';
+  let bmLoader = null;
+  function loadBig(url, srgb, done, fail) {
+    const finish = (tex) => {
+      setup(tex, srgb);
+      if (renderer?.initTexture) renderer.initTexture(tex);   // upload (and build mips) now, not mid-frame later
+      done(tex);
+    };
+    if (useBitmap) {
+      bmLoader ||= new THREE.ImageBitmapLoader().setOptions({ imageOrientation: 'flipY' });
+      bmLoader.load(url, (bitmap) => {
+        const tex = new THREE.Texture(bitmap);
+        tex.flipY = false;                        // already flipped by createImageBitmap
+        tex.needsUpdate = true;
+        tex.userData.bitmap = true;
+        finish(tex);
+      }, undefined, fail);
+    } else {
+      loader.load(url, finish, undefined, fail);
+    }
   }
 
   function loadHiRes() {
     info.hiResState = 'loading';
     const t0 = performance.now();
-    const useBitmap = typeof createImageBitmap === 'function';
-    const bmLoader = useBitmap ? new THREE.ImageBitmapLoader().setOptions({ imageOrientation: 'flipY' }) : null;
     let remaining = Object.keys(HI_RES).length;
     for (const [key, { file, srgb }] of Object.entries(HI_RES)) {
-      const url = new URL(`desktop/${file}`, BASE).href;
-      const done = (tex) => {
-        setup(tex, srgb);
-        if (renderer?.initTexture) renderer.initTexture(tex);   // upload (and build mips) now, not mid-frame later
+      loadBig(new URL(`desktop/${file}`, BASE).href, srgb, (tex) => {
         info.tier[key] = '4k';
         onLoad(key, tex, '4k');
         if (--remaining === 0) { info.hiResState = 'done'; info.hiResMs = Math.round(performance.now() - t0); }
-      };
-      const fail = (err) => { info.hiResState = 'failed'; console.warn(`[earth] 4K ${file} unavailable, keeping 2K`, err); };
-      if (bmLoader) {
-        bmLoader.load(url, (bitmap) => {
-          const tex = new THREE.Texture(bitmap);
-          tex.flipY = false;                      // already flipped by createImageBitmap
-          tex.needsUpdate = true;
-          tex.userData.bitmap = true;
-          done(tex);
-        }, undefined, fail);
-      } else {
-        loader.load(url, done, undefined, fail);
-      }
+      }, (err) => { info.hiResState = 'failed'; console.warn(`[earth] 4K ${file} unavailable, keeping 2K`, err); });
     }
+  }
+
+  // mobile tier: sharper cloud map only (see header); the level-matched 2K/4K desktop files are reused
+  function loadMobileClouds() {
+    info.cloudUpState = 'loading';
+    const file = cloudUp === '4k' ? HI_RES.clouds.file : files.clouds.file;
+    loadBig(new URL(`desktop/${file}`, BASE).href, false, (tex) => {
+      info.tier.clouds = cloudUp;
+      onLoad('clouds', tex, cloudUp);
+      info.cloudUpState = 'done';
+    }, (err) => { info.cloudUpState = 'failed'; console.warn(`[earth] ${cloudUp} cloud map unavailable, keeping 1K`, err); });
   }
 
   return { hasNormal: !isMobile, info };
