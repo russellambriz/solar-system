@@ -72,6 +72,10 @@ const DEFAULTS = {
   cloudSilver: 1.2,        // forward-scattered "silver lining" on thin sunlit cloud when looking towards the Sun (clouds.js); 0 = previous look
   cloudSilverG: 0.6,       //   Henyey–Greenstein asymmetry of that lobe
   cloudShadow: 0.45,
+  cloudDetail: 1.0,        // close-up procedural cloud detail (clouds.js): wispy broken edges + cloud-top relief, fading
+                           // out by on-screen footprint (no change at overview distances); 0 = previous look
+  cloudDetailOctaves: 4,   //   fBm octaves (≈45 → 6 km); mobile: cloudDetailOctavesMobile (compile-time, set at creation)
+  cloudDetailOctavesMobile: 3,
   nightGain: 1.7,          // city lights (warm); night side is otherwise near-black
   cityLights: 1.0,         // richer city lights (earthMaterial.js): dim towns/suburbs, metro glow halo, sodium-orange
                            // edges vs whiter cores, cloud-diffused glow; 0 = previous look (bright cores only)
@@ -144,6 +148,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uCloudLimbLift: { value: P.cloudLimbLift },
     uCloudSilver:   { value: P.cloudSilver },
     uCloudSilverG:  { value: P.cloudSilverG },
+    uCloudDetail:   { value: P.cloudDetail },
     uNightGain:     { value: P.nightGain },
     uCityLights:    { value: P.cityLights },
     uSpecular:      { value: P.specular },
@@ -204,7 +209,8 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
   }
   surface.name ||= 'EarthSurface';
 
-  const clouds = createCloudMesh(radius * (1 + P.cloudAltitude), U, segs);
+  const clouds = createCloudMesh(radius * (1 + P.cloudAltitude), U, segs,
+    { detailOctaves: isMobile ? P.cloudDetailOctavesMobile : P.cloudDetailOctaves });
   const atmosphere = createAtmosphere(radius, U, P.atmoThickness, isMobile ? 48 : 64,
     isMobile ? P.atmoSamplesMobile : P.atmoSamples, isMobile ? P.auroraSamplesMobile : P.auroraSamples);
   group.add(clouds, atmosphere);
@@ -278,6 +284,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     U.uCloudLimbLift.value = P.cloudLimbLift;
     U.uCloudSilver.value = P.cloudSilver;
     U.uCloudSilverG.value = P.cloudSilverG;
+    U.uCloudDetail.value = P.cloudDetail;
     // match MeshStandardMaterial's response to the same light: colour × intensity / π
     U.uSunColor.value.copy(sunLight.color).multiplyScalar(sunLight.intensity / Math.PI);
     // Level of detail for the high-frequency terms (ocean glint, cloud shadows): from Earth's projected radius
