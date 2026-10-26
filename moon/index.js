@@ -287,13 +287,20 @@ function updateEclipse(moonBody, u, days, radiusWorld) {
  * Usage: const c = body.moon.getCinematicStart(); (or getCinematicStart(out, opts) to reuse an object) cam = moonCentre + c.offset * body.radius; each frame
  *   c.offset.applyAxisAngle(c.driftAxis, c.driftSpeed * dtReal). Call it when the fly-to ends (depends on the Sun).
  * @param {object} [opts] { distance = 2.6, sunAngleDeg = 80, elevationDeg = 10, driftSpeed = 0.015 }
+ *   (in a partial or total lunar eclipse the defaults become 3.0 (4.2 on a portrait screen), 14, 6, 0.006: the whole shadowed disc in view)
  */
 const _c = new THREE.Vector3(), _S = new THREE.Vector3(), _A = new THREE.Vector3(), _E = new THREE.Vector3(),
   _up = new THREE.Vector3(), _q = new THREE.Quaternion();
 /** body.moon.getCinematicStart(out?, opts?): pass an `out` object to reuse it every frame (no allocations); its
  *  offset/target/driftAxis vectors are filled in place and `out` is returned. Options are never read off `out`. */
 export function getCinematicStart(moonBody, sunLight, opts = {}, out = {}) {
-  const { distance = 2.6, sunAngleDeg = 80, elevationDeg = 10, driftSpeed = 0.015 } = opts || {};
+  // During a lunar eclipse (partial or total) the point is the whole copper disc, not crater shadows: default to a
+  // view from just off the Sun-Earth side, a little farther out, drifting slowly. Explicit opts still win.
+  const ecl = moonBody.moon && moonBody.moon._eclipse;
+  const inShadow = !!ecl && (ecl.type === 'partial' || ecl.type === 'total') && moonBody.mesh.userData.moonUniforms?.uEclipseOn.value > 0;
+  const portrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;   // narrow screens need more room for the disc
+  const { distance = inShadow ? (portrait ? 4.2 : 3.0) : 2.6, sunAngleDeg = inShadow ? 14 : 80, elevationDeg = inShadow ? 6 : 10,
+    driftSpeed = inShadow ? 0.006 : 0.015 } = opts || {};
   const offset = out.offset || (out.offset = new THREE.Vector3());
   const target = out.target || (out.target = new THREE.Vector3());
   const driftAxis = out.driftAxis || (out.driftAxis = new THREE.Vector3());

@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-26: Lunar eclipses in the Events timeline (MoonBot)
+
+### Added
+- Every partial and total lunar eclipse from a year before page load to ten years after (16 today, 2026 to 2036) is
+  now in Events, found from the same Sun and Moon theory that draws the shadow (`findLunarEclipses()` and
+  `LUNAR_ECLIPSE_EVENTS` in `moon/eclipse.js`). Times and depths match published eclipses: greatest eclipse of
+  3 March 2026 at 11:33 UTC (umbral magnitude 1.15), 26 June 2029 at 03:21 UTC (1.87, the deepest of the decade),
+  6 July 2028 partial 0.38.
+- Picking one jumps to the moment of greatest eclipse (not noon of that day, when the Moon would often be out of the
+  shadow again) and flies to the Moon. Events entries can now carry an exact time as an optional sixth field.
+- During a partial or total eclipse the Moon's fly-to ends on a view of the whole copper disc from near the Sun-Earth
+  side (a little farther out on portrait screens) instead of the usual low terminator view; other times are unchanged.
+- New test `moon-shots/eclipse-events.js` (desktop and iPad): lists the eclipse events, picks one from the menu and
+  checks the Moon is in Earth's shadow on arrival.
+
 ## 2026-10-25: Lunar eclipses on the Moon (MoonBot)
 
 ### Added

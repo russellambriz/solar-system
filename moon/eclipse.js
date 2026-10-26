@@ -49,3 +49,51 @@ export function earthShadow(days, out = {}) {
   out.type = out.umbralMag >= 1 ? 'total' : out.umbralMag > 0 ? 'partial' : out.penumbralMag > 0 ? 'penumbral' : 'none';
   return out;
 }
+
+/**
+ * Lunar eclipses between two dates (ms since 1970, UTC), for the Events timeline. Steps from full Moon to full Moon,
+ * finds greatest eclipse (closest approach of the Moon's centre to the shadow axis) and keeps the ones that reach the
+ * umbra (partial and total); penumbral ones are left out since most are too faint to notice.
+ * Returns [{ ms, type, umbralMag, penumbralMag }], greatest-eclipse time good to ~10 minutes.
+ */
+export function findLunarEclipses(fromMs, toMs, { penumbral = false } = {}) {
+  const J2000 = Date.UTC(2000, 0, 1, 12), DAY = 86400000, SYN = 29.530588853;
+  const tmp = {};
+  const sepAt = (d) => { earthShadow(d, tmp); return Math.hypot(tmp.x, tmp.y); };
+  // first full Moon on or after fromMs (mean phase is enough to start; the search below finds the true minimum)
+  const d0 = (fromMs - J2000) / DAY, d1 = (toMs - J2000) / DAY;
+  let k = Math.ceil((d0 - 5.259722 - 0.5 * SYN) / SYN - 1e-9);   // mean new Moon 2000-01-06 18:14 UTC = day 5.259722
+  const out = [];
+  for (let d = 5.259722 + (k + 0.5) * SYN; d < d1 + 1; d += SYN) {
+    // greatest eclipse: golden-section search for the smallest separation within ±1 day of mean full Moon
+    // (the true full Moon wanders up to ~14 h from the mean one)
+    let a = d - 1, b = d + 1;
+    const gr = 0.6180339887;
+    let c = b - gr * (b - a), e = a + gr * (b - a), fc = sepAt(c), fe = sepAt(e);
+    for (let i = 0; i < 40; i++) {
+      if (fc < fe) { b = e; e = c; fe = fc; c = b - gr * (b - a); fc = sepAt(c); }
+      else { a = c; c = e; fc = fe; e = a + gr * (b - a); fe = sepAt(e); }
+    }
+    const t = 0.5 * (a + b);
+    if (t < d0 || t > d1) continue;
+    const r = earthShadow(t, {});
+    if (r.type === 'none' || (r.type === 'penumbral' && !penumbral)) continue;
+    out.push({ ms: Math.round(J2000 + t * DAY), type: r.type, umbralMag: r.umbralMag, penumbralMag: r.penumbralMag });
+  }
+  return out;
+}
+
+// ui/index.js Events: umbral lunar eclipses (partial and total) from a year back to ten years ahead of page load,
+// as [date, title, target, kind, card, ms] with ms at greatest eclipse, so picking one lands mid-eclipse.
+export const LUNAR_ECLIPSE_EVENTS = (() => {
+  try {
+    const now = Date.now(), Y = 365.25 * 86400000;
+    return findLunarEclipses(now - Y, now + 10 * Y).map((e) => {
+      const hhmm = new Date(e.ms).toISOString().slice(11, 16);
+      const title = e.type === 'total'
+        ? `Total lunar eclipse: the Moon turns copper red in Earth's shadow (greatest ${hhmm} UTC)`
+        : `Partial lunar eclipse: ${Math.round(e.umbralMag * 100)}% of the Moon's width in Earth's shadow (greatest ${hhmm} UTC)`;
+      return [new Date(e.ms).toISOString().slice(0, 10), title, 'Moon', 'moon', undefined, e.ms];
+    });
+  } catch (err) { console.warn('moon: eclipse events', err); return []; }
+})();
