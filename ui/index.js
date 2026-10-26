@@ -23,6 +23,7 @@ import { planetAU, planetOrbitAU, PLANET_NAMES } from '../ephemeris/planets.js';
 import { createSkyReadout } from './skyreadout.js';
 import { METEOR_EVENTS } from '../meteors/data.js';
 import { SKY_EVENTS } from '../skytonight/events.js';
+import { LUNAR_ECLIPSE_EVENTS } from '../moon/eclipse.js';
 
 const J2000 = Date.UTC(2000, 0, 1, 12), DAY_MS = 86400000;
 const TL_FROM = Date.UTC(1965, 0, 1), TL_TO = Date.UTC(2065, 0, 1);
@@ -88,7 +89,8 @@ const EVENTS = [
   ['2061-07-28', "Halley's Comet returns", "Halley's Comet", 'comet'],
   ...METEOR_EVENTS,                       // meteors/: the next twelve months of shower peaks
   ...SKY_EVENTS,                          // skytonight/: oppositions, elongations, close conjunctions (next twelve months)
-].map(([date, title, target, kind, card]) => ({ date, title, target, kind, card, ms: Date.parse(date + 'T12:00:00Z') }))
+  ...LUNAR_ECLIPSE_EVENTS,                // moon/eclipse.js: partial and total lunar eclipses (a year back to ten ahead), at greatest eclipse
+].map(([date, title, target, kind, card, ms]) => ({ date, title, target, kind, card, ms: ms ?? Date.parse(date + 'T12:00:00Z') }))
   .sort((a, b) => a.ms - b.ms);
 const KIND_COLOR = { moon: '#ffd27a', craft: '#8fe3ff', comet: '#c9f2ff', visitor: '#e98cff', body: '#d9b99a', asteroid: '#ffb48a', meteor: '#ffe9a0', sky: '#9dffb0' };
 

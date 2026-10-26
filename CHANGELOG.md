@@ -1,5 +1,166 @@
 # Changelog
 
+## 2026-10-26: Lunar eclipses in the Events timeline (MoonBot)
+
+### Added
+- Every partial and total lunar eclipse from a year before page load to ten years after (16 today, 2026 to 2036) is
+  now in Events, found from the same Sun and Moon theory that draws the shadow (`findLunarEclipses()` and
+  `LUNAR_ECLIPSE_EVENTS` in `moon/eclipse.js`). Times and depths match published eclipses: greatest eclipse of
+  3 March 2026 at 11:33 UTC (umbral magnitude 1.15), 26 June 2029 at 03:21 UTC (1.87, the deepest of the decade),
+  6 July 2028 partial 0.38.
+- Picking one jumps to the moment of greatest eclipse (not noon of that day, when the Moon would often be out of the
+  shadow again) and flies to the Moon. Events entries can now carry an exact time as an optional sixth field.
+- During a partial or total eclipse the Moon's fly-to ends on a view of the whole copper disc from near the Sun-Earth
+  side (a little farther out on portrait screens) instead of the usual low terminator view; other times are unchanged.
+- New test `moon-shots/eclipse-events.js` (desktop and iPad): lists the eclipse events, picks one from the menu and
+  checks the Moon is in Earth's shadow on arrival.
+
+## 2026-10-25: Lunar eclipses on the Moon (MoonBot)
+
+### Added
+- Earth's shadow now falls on the Moon during lunar eclipses, on their real dates. The shadow comes from the true Sun
+  and Moon positions (a truncated Meeus lunar theory, `moon/eclipse.js`), not the scene's compressed orbit, so it
+  matches published eclipses: the total eclipse of 3 March 2026 (umbral magnitude 1.15 here vs 1.153 published), the
+  deep partial of 28 August 2026 (0.94 vs 0.930) and the penumbral one of 20 February 2027 (penumbral 0.94 vs 0.928).
+- The umbra glows copper red (sunlight bent through Earth's atmosphere), brightest at its edge and darkest in the
+  middle, with a faint turquoise band just inside the edge; the penumbra only darkens noticeably close to the umbra.
+  The shadow sits at its real offset from the Moon's centre, so it sweeps across the right way during an eclipse.
+- `body.moon.getEclipse()` returns `{ type, umbralMag, penumbralMag, x, y, umbra, penumbra }` for the current sim time
+  (for an eclipse label or event marker); `uEclipse = 0` turns the shadow off. Ordinary full Moons are unaffected,
+  and the shader skips the work unless the Moon is in or near the penumbra.
+- New test `moon-shots/eclipse.js` (desktop and iPad); before/after at `moon-shots/eclipse-before-after.png`.
+
+## 2026-10-24: Sharper Moon surface colour in the closest views (MoonBot)
+
+### Changed
+- When you fly right down to the Moon on a desktop (within about 2.5 Moon radii of its centre), it now streams in the
+  8K LROC colour mosaic (about 1.3 km per pixel, 5.3 MB) in place of the 4K one, so small craters, bright young crater
+  rims, ray streaks and mare edges are sharper where the 4K map was magnified about 3x on screen. It loads in the
+  background after the 4K set, swaps in without a pop, and frees the 4K colour map. It only loads where the graphics
+  card accepts 8192-pixel textures, and never on iPad. Relief and terrain shadows still use the 4K maps.
+- New test `moon-shots/colour8k.js` (desktop 8K vs 4K, and checks iPad never loads it); before/after at
+  `moon-shots/colour8k-before-after.png`.
+
+## 2026-10-22: Mare colour: blue and brown lava plains (MoonBot)
+
+### Changed
+- The maria now show their real colour differences. Lava rich in titanium (Mare Tranquillitatis, much of Oceanus
+  Procellarum, western Imbrium) is faintly blue; low-titanium lava (the rim of Mare Serenitatis, eastern Imbrium) and the
+  Aristarchus plateau's orange volcanic glass are brownish. The LROC colour map already holds these hues, but so faintly
+  that the disc looked plain grey. The shader now reads the map's own colour from a coarse mip level (about 256 px around,
+  so JPEG colour noise and single craters drop out) and strengthens only its blue-red part, mostly on the dark maria.
+  Highlands stay almost neutral and brightness is unchanged, so only the hue moves (`moon/shaders.js`, uniform `uMareTint`:
+  3 by default, 1 = the map as is). No new textures; desktop and iPad get the same tint.
+
+### Testing
+- New check `moon-shots/maretint.js` shoots the whole disc, Serenitatis/Tranquillitatis and Imbrium/Aristarchus at full
+  Moon with the tint on and off, on desktop and iPad.
+
+## 2026-10-21: Sharper mountain and crater shadows up close (MoonBot)
+
+### Changed
+- On desktop, the close-up map set the Moon streams in when you fly near it now includes a 4K LOLA elevation map
+  (`textures/moon/moon_height_4k.png`, from NASA's CGI Moon Kit) instead of the 2K one. Terrain shadows along the
+  terminator are traced on ~2.7 km steps instead of ~5.3 km, so shadow edges are crisper, small craters near the
+  terminator cast their own shadows, and sunlit rims and peaks stand out more cleanly. Desktop shadow march: 44 steps (was 40).
+- iPad is unchanged (it keeps the 1K maps and never downloads the 4K set).
+- New check `moon-shots/heights4k.js` shoots the Apennines, the southern highlands and Plato at first quarter with the 4K
+  and the old 2K elevation map.
+
+## 2026-10-20: Earthshine that behaves like real moonlight (MoonBot)
+
+### Changed
+- **The Moon's night side (the "ashen light") is now lit by Earth the same way sunlight lights the day side.** Earthshine uses the regolith's Lommel-Seeliger photometry instead of a plain Lambert falloff, so seen from near Earth the dark disc stays evenly lit right out to the limb (as it does through binoculars), and from an angle the craters and basin rims on the night side show their relief. Earth is about 2 degrees across from the Moon, so the edge of the earthlit area is soft.
+- Earthshine now fills everything the Sun doesn't reach, including the terrain shadows past the terminator, instead of only the smooth-sphere night side.
+- Earthshine brightness follows a Lambert sphere's phase law for Earth's phase as seen from the Moon, not the lit fraction: a half Earth now gives about 32% of a full Earth's light (it was 50%), and a thin crescent Earth almost none. Full Earth (new Moon) is unchanged.
+- `uEarthLS` uniform on the Moon material (`mesh.userData.moonUniforms.uEarthLS`, 1 by default, 0 goes back to the old earthshine).
+
+### Testing
+- New check `moon-shots/earthshine.js`: it steps to a thin crescent Moon and looks at the night side along the Earth-Moon line and 55 degrees off it, with `uEarthLS` on and off.
+
+## 2026-10-19: Real mountains on the Moon's edge (MoonBot)
+
+### Added
+- **Up close, the edge of the Moon is no longer a perfect circle.** NASA's LOLA elevation map (the same one the terrain shadows use) now pushes the Moon's surface in and out, so mountain ranges, basin rims and crater walls show in profile along the limb against black space, the way they do in close-up spacecraft photos and through a telescope at high magnification. Heights are exaggerated 2x (the relief maps use 2.5-3x), so the biggest peaks stand a few pixels proud at the closest zoom.
+  - A new, finer closest level of detail (640x320 segments on desktop, 288x144 on iPad) draws within ~5 Moon radii, so the profile changes every ~20 km along the limb on desktop (~40 km on iPad). Farther out the old levels are used, also displaced, so nothing pops when the levels switch.
+  - The vertices at each pole all read the same height, so the poles stay closed.
+- `body.moon.latLonToWorld(lat, lon, alt)` now measures altitude from the ground as drawn (LOLA height times the exaggeration), so the Apollo and Artemis markers stand on the surface instead of sinking into the higher ground (Apollo 16 and the south-pole rim). It uses a CPU copy of the 1K height map, loaded once in the background; until it arrives, heights are 0, as before. `surfaceHeightKm(lat, lon)` is exported from `moon/index.js`.
+- `uRelief` uniform on the Moon material (`mesh.userData.moonUniforms.uRelief`, 2 by default, 0 goes back to the smooth sphere).
+
+### Testing
+- New check `moon-shots/limb.js`: it aims the camera straight along the limb 1.55 radii from the centre, south and north of the subsolar point, and shoots it with the relief on and off. It also prints how high the Apollo 11, 16 and 17 markers sit (should be the LOLA height times 2).
+
+## 2026-10-18: Second-tier bright ray craters on the Moon (MoonBot)
+
+### Added
+- **More of the bright spots and rays you see on a real full Moon.** After the big four (Tycho, Copernicus, Kepler, Aristarchus), the next tier of young craters now gets analytic rays and bright ejecta on top of the LRO albedo: Proclus, Messier A, Anaxagoras, Thales, Glushko, Byrgius A, Stevinus A, Furnerius A and Censorinus. Like the big four, they stand out near full Moon and nearly vanish toward the terminator.
+  - **Proclus** has an asymmetric fan: it formed in a low-angle impact, so there's an arc with no ejecta to the southwest (where Palus Somni sits), and its rays run out across Mare Crisium and to the north.
+  - **Messier A** throws its two nearly straight rays west across Mare Fecunditatis (the "comet").
+  - **Stevinus A and Furnerius A** are the two bright points in the south-east highlands, and Censorinus adds one small, very bright spot.
+  - Positions and crater sizes come from the IAU names (via Wikipedia). Ray lengths use the published reach where there is one (Proclus 600+ km, Anaxagoras 900+ km, Thales 600+ km) and are rough visual estimates otherwise.
+- Rays narrower than about a screen pixel are now widened and dimmed to match (same brightness on average), so small craters' thin rays don't shimmer from far away. This applies to the big four too; they look the same up close.
+- `uRayMinor` uniform on the Moon material (`mesh.userData.moonUniforms.uRayMinor`, 1 by default, 0 turns the new tier off). The crater list is `MINOR_RAYS` in `moon/index.js`.
+
+### Testing
+- New check `moon-shots/rays2.js`: it steps to the next full Moon and shoots the whole near side plus the east (Proclus/Messier), north (Anaxagoras), south-east (Stevinus A/Furnerius A) and west limb (Glushko/Byrgius A), with the new tier on and off, on desktop and iPad. `moon-shots/shoot.js` still passes with no console errors.
+
+## 2026-10-17: Real terrain shadows along the Moon's terminator (MoonBot)
+
+### Added
+- **The terminator is ragged now, the way it looks through a telescope.** Near the line between day and night, each pixel looks toward the Sun across NASA's LOLA elevation map and finds its own horizon. Mountains and crater rims cast long black shadows, crater floors stay dark until the Sun clears the rim, and sunlit peaks and rims stand out as bright specks past the terminator (a peak 5 km up still sees the Sun after it has set about 4° away on the flat). Before, the day side faded smoothly into night along a clean curve.
+  - Shadow edges are softened by the Sun's real size (about half a degree across), or one screen pixel if that's wider, so they're sharp without aliasing.
+  - New elevation maps: `moon_height_1k.png` (all devices, ~0.56 MB) and `moon_height_2k.png` (desktop only, streamed in with the 4K close-up set). See `textures/moon/SOURCES.md`.
+  - Cost: only where the Sun is less than ~17° up or just below the horizon, up to 40 height lookups per pixel on desktop and 24 on iPad (`SHADOW_STEPS`). Everywhere else it's skipped.
+- `uShadow` uniform on the Moon material (`mesh.userData.moonUniforms.uShadow`, 1 by default, 0 goes back to the smooth terminator).
+
+### Testing
+- New check `moon-shots/terminator.js`: it pauses at a first-quarter date with the Sun 2° up at the centre of the near side and shoots the whole disc, the Apennines and the southern highlands with shadows on and off, on desktop and iPad. `moon-shots/shoot.js` still passes with no console errors.
+
+## 2026-10-16: No more seam down the Moon's far side (MoonBot)
+
+### Fixed
+- **The far side no longer has a vertical seam at longitude 180°.** The Moon's colour and relief maps wrap around in longitude, but they were filtered as if they stopped at the edge. Each side of the 180° meridian ended on its own edge texel with no blending, which drew a straight line from pole to pole with a step in the shading. It was worst on iPad, where the 1K maps are magnified most up close. The maps now repeat in longitude (`wrapS = RepeatWrapping`), so filtering blends across the wrap.
+- The relief maps' edge columns had been built with one-sided slopes, so they didn't quite match across the wrap either. They are now interpolated across it (1K, 2K and 4K; the rest of each map is unchanged). See `textures/moon/SOURCES.md`.
+
+### Testing
+- New far-side check (`moon-shots/seam.js`): it pauses at a date when the Sun is low over longitude 180° and shoots it close up, from orbit and toward the north, on desktop and iPad. The seam is gone in both. `moon-shots/shoot.js` still passes with no console errors.
+
+## 2026-10-15: Close-up crater detail on the Moon (MoonBot)
+
+### Added
+- **Small craters up close.** Fly in to the Moon and the surface no longer turns into a soft blur where the NASA maps run out of pixels. A procedural field of small simple craters (about 1 to 20 km across: bowls with raised rims) fades in only below the maps' resolution, so it never doubles a real crater and never shimmers at normal viewing distances.
+  - Low Sun near the terminator fills the bowls with sharp black shadows (computed analytically from the crater's depth and the Sun's height), and the far wall catches the light, as in Apollo and LRO photos.
+  - The bright highlands get more than twice the crater count of the younger, smoother maria. Most craters are old and shallow; a few are fresh, with bright ejecta.
+  - The biggest win is on iPad, where only the 1K maps load: the close-up view goes from mush to a cratered surface with no new downloads. Desktop gets it below the 4K maps' ~2.7 km texel.
+  - Cost: nothing at normal distances (skipped outright). Up close, up to 8 cell lookups per size band: 3 bands on iPad, 4 on desktop (`DETAIL_BANDS`).
+- `uDetail` uniform on the Moon material (`mesh.userData.moonUniforms.uDetail`, 1 by default, 0 turns it off).
+
+### Testing
+- `moon-shots/shoot.js` adds a closest-allowed close-up with the detail on and off, and `moon-shots/closeup.js` is a quick version of just that comparison. No console errors on desktop or iPad.
+
+## 2026-10-14: Clean full Moon, plus Kepler and Aristarchus rays (MoonBot)
+
+### Fixed
+- **No more black and white speckles on the full Moon.** Slopes turned away from the Sun were drawn as black dashes near full phase, and the disc's edge sparkled. On the real full Moon the eye looks straight down the sunbeam, so those slopes are hidden too and the disc looks flat. Relief contrast now grows with phase angle: a quarter of it at full Moon, all of it by about 35°. It also fades out right at the limb, where the relief map is squashed to a few pixels. Quarter and crescent crater shadows are unchanged.
+
+### Added
+- **Kepler** (8.1° N, 38.0° W) and **Aristarchus** (23.7° N, 47.5° W) ray systems, in the same analytic style as Tycho and Copernicus. Kepler's rays reach about 400 km and cross Copernicus's. Aristarchus, the brightest spot on the Moon, gets a short, tight fan. Both are strongest near full. No new textures.
+
+### Testing
+- `moon-shots/shoot.js` adds a Kepler/Aristarchus close-up and a full-Moon limb view. No console errors on desktop or iPad.
+
+## 2026-10-13: Bright ray craters on the Moon: Tycho and Copernicus (MoonBot)
+
+### Added
+- **Tycho's and Copernicus's ray systems** stand out at full Moon, the way they do through binoculars. They are drawn analytically in `moon/shaders.js` on top of the LRO colour map, with no new textures and no download cost on iPad.
+  - **Tycho** (43.3° S, 11.4° W): a bright ejecta halo and about 30 rays of mixed length, streaky and clumpy like real chains of secondary craters. The longest run more than 1,500 km. Its famous long ray crosses the near side past Bessel in Mare Serenitatis.
+  - **Copernicus** (9.6° N, 20.1° W): a denser, fainter, feathery fan out to about 800 km.
+  - Ray material is fresh, bright ejecta, so the rays depend on the phase angle. They are strongest near full, a faint trace at quarter and gone at crescent, where the terminator's shadows take over. Crescents and the earthshine side are unchanged.
+  - Cost: a few hash lookups per pixel, skipped entirely outside each crater's reach.
+- `uRayStrength` uniform on the Moon material (`mesh.userData.moonUniforms.uRayStrength`, 1 by default, 0 turns the rays off).
+
+### Testing
+- `moon-shots/shoot.js` pauses the sim and steps to the sim's next full Moon. It then shoots the near side and a Sun-side close-up of Tycho, with the rays on and off. No console errors on desktop or iPad.
 ## 2026-10-24: Tonight's sky from Boise (Space Model Coder)
 
 ### Added
