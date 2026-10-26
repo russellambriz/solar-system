@@ -72,6 +72,11 @@ const DEFAULTS = {
   cloudSilver: 1.2,        // forward-scattered "silver lining" on thin sunlit cloud when looking towards the Sun (clouds.js); 0 = previous look
   cloudSilverG: 0.6,       //   Henyey–Greenstein asymmetry of that lobe
   cloudShadow: 0.45,
+  cloudShadowSun: 1.0,     // sun-angle cloud shadows (earthMaterial.js): the shadow lookup is ray-cast along the Sun to the
+                           // deck, so shadows sit under their cloud at noon and stretch out (denser, softer) towards the
+                           // terminator; 0 = previous look (fixed small offset)
+  cloudShadowAlt: null,    //   deck altitude for that ray (fraction of a radius); null = cloudAltitude (lines up with the drawn deck)
+  cloudShadowSoft: 0.05,   //   penumbra: blur angle ≈ this × ray length to the deck
   cloudDetail: 1.0,        // close-up procedural cloud detail (clouds.js): wispy broken edges + cloud-top relief, fading
                            // out by on-screen footprint (no change at overview distances); 0 = previous look
   cloudDetailOctaves: 4,   //   fBm octaves (≈45 → 6 km); mobile: cloudDetailOctavesMobile (compile-time, set at creation)
@@ -142,6 +147,9 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uGroundToCloud: { value: new THREE.Matrix3() },
     uCloudsReady:   { value: 0 },
     uCloudShadow:   { value: P.cloudShadow },
+    uCloudShadowSun:{ value: P.cloudShadowSun },
+    uCloudShadowAlt:{ value: P.cloudShadowAlt ?? P.cloudAltitude },
+    uCloudShadowSoft:{ value: P.cloudShadowSoft },
     uCloudOpacity:  { value: P.cloudOpacity },
     uCloudLimb:     { value: P.cloudLimb * P.cloudLimbFar },
     uCloudSlantMax: { value: P.cloudSlantMax },
@@ -285,6 +293,10 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     U.uCloudSilver.value = P.cloudSilver;
     U.uCloudSilverG.value = P.cloudSilverG;
     U.uCloudDetail.value = P.cloudDetail;
+    U.uCloudShadow.value = P.cloudShadow;
+    U.uCloudShadowSun.value = P.cloudShadowSun;
+    U.uCloudShadowAlt.value = P.cloudShadowAlt ?? P.cloudAltitude;
+    U.uCloudShadowSoft.value = P.cloudShadowSoft;
     // match MeshStandardMaterial's response to the same light: colour × intensity / π
     U.uSunColor.value.copy(sunLight.color).multiplyScalar(sunLight.intensity / Math.PI);
     // Level of detail for the high-frequency terms (ocean glint, cloud shadows): from Earth's projected radius
