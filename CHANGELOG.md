@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-27: The heliosphere ships, and the Voyagers now cross on the real dates (Space Model Coder)
+
+### Shipped
+- **The heliosphere is live.** Yesterday's run built it (see the 2026-10-26 entry below) but stopped before pushing. Today it was put on top of the latest main (after EarthBot's cloud-shadow change, no conflicts) as one clean commit, re-tested and pushed.
+
+### Changed
+- **The Voyagers now reach the heliosphere's boundaries on the real dates.** Before, `spacecraft/` coasted each Voyager in one straight line at its average speed from its last flyby to its measured mid-2026 position, so it reached the boundaries 2–8 months late (Voyager 1 hit 94 AU in Aug 2005 instead of Dec 2004). Now the coast is split at measured checkpoints on the same line, so the path looks exactly the same but the timing is right:
+  - Voyager 1: 94.01 AU on 16 Dec 2004 (termination shock) and 121.6 AU on 25 Aug 2012 (heliopause).
+  - Voyager 2: 84.0 AU on 30 Aug 2007 (termination shock) and 119.0 AU on 5 Nov 2018 (heliopause).
+  - Checked in the browser: on each of those dates the probe sits within 0.02 AU of its crossing marker. The mid-2026 positions (171.0 and 143.2 AU) and the speed after that are unchanged, and New Horizons is not affected.
+- `heliosphere/`: each crossing marker is now placed on the piece of the coast that actually reaches that distance (same spot as before, since all pieces lie on one line), so its date matches too. The shells are unchanged (termination shock R0 = 85.6 AU, β = 0.143; heliopause R0 = 112.2 AU, β = 0.081).
+- `spacecraft/data.js`: a `checkpoints` list ([date, AU]) for each Voyager. `spacecraft/index.js`: 12 lines in `buildTrack()` that add those points to the coast.
+- The 2026-10-26 note about the Voyagers arriving late no longer applies.
+
+### Tested
+- Desktop (1440×900) and iPad Pro 11 emulation (portrait and landscape, touch on): the page loads with no console errors or uncaught exceptions. Layers → Heliosphere turns it off and on and is remembered. Typing `heliopause` in search flies out to the whole bubble and opens the Heliopause card. The default view is unchanged (the heliosphere stays hidden near the planets). Clicking or tapping the Heliopause label opens its card.
+
+### Screenshots
+- `screenshot-heliosphere.png` and `screenshot.png` re-taken today. `screenshot-ipad.png` is unchanged, since the default iPad view didn't change.
+
 ## 2026-10-26: The heliosphere and Voyager's boundary crossings (Space Model Coder)
 
 ### Added
