@@ -10,7 +10,8 @@ export const KMS_TO_AU_YR = 31557600 / 149597870.7;
 // Escaping probes: launch, planetary flybys (the probe sits on that planet at that date, using the same real planet
 // positions main.js draws (ephemeris/), so the trail passes through each planet), then a straight coast to a measured position:
 // distance from the Sun on EPOCH and the direction in the sky (RA/Dec, heavens-above.com "Spacecraft escaping the Solar
-// System", mid-2026). After EPOCH they keep coasting along the same line at today's speed.
+// System", mid-2026). After EPOCH they keep coasting along the same line at today's speed. Optional `checkpoints`
+// ([day, AU], in time order) split the coast so the probe is at that distance from the Sun on that day (same straight line).
 // ---------------------------------------------------------------------------------------------------------------------
 export const EPOCH = day(2026, 6, 15);
 
@@ -20,6 +21,8 @@ export const PROBES = [
     launch: day(1977, 9, 5, 12, 56),
     flybys: [['Jupiter', day(1979, 3, 5)], ['Saturn', day(1980, 11, 12)]],
     epochAU: 170.98, raH: 17 + 16 / 60, decDeg: 12 + 26 / 60, speedKms: 17.0,
+    // measured distances on the coast (termination shock, heliopause): the probe passes them on the real dates
+    checkpoints: [[day(2004, 12, 16), 94.01], [day(2012, 8, 25), 121.6]],
     rows: [
       ['Launched', '5 Sep 1977 (16 days after Voyager 2)'],
       ['Distance from Sun', 'live'],
@@ -36,6 +39,7 @@ export const PROBES = [
     launch: day(1977, 8, 20, 14, 29),
     flybys: [['Jupiter', day(1979, 7, 9)], ['Saturn', day(1981, 8, 26)], ['Uranus', day(1986, 1, 24)], ['Neptune', day(1989, 8, 25)]],
     epochAU: 143.15, raH: 20 + 10 / 60, decDeg: -(59 + 52 / 60), speedKms: 15.37,
+    checkpoints: [[day(2007, 8, 30), 84.0], [day(2018, 11, 5), 119.0]],
     rows: [
       ['Launched', '20 Aug 1977'],
       ['Distance from Sun', 'live'],

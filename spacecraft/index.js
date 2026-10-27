@@ -145,6 +145,18 @@ export function createSpacecraft({ scene, bodies, renderer, isTouch = false, sca
     for (const [planet, t] of pr.flybys) pts.push({ t, p: planetAU(planet, t, new THREE.Vector3()), arc: true });
     const last = pts[pts.length - 1];
     const end = { t: EPOCH, p: raDecToScene(pr.raH, pr.decDeg).multiplyScalar(pr.epochAU), arc: false };   // straight coast
+    // checkpoints: points on the same line at a measured distance on a measured date, so the coast keeps real timing
+    // (|last + s·(end − last)| = AU, solved for s in (0, 1)); skipped if out of order or not reachable on the line
+    const ab = end.p.clone().sub(last.p), A = ab.lengthSq(), B = 2 * last.p.dot(ab);
+    let prev = { t: last.t, s: 0 };
+    for (const [t, au] of pr.checkpoints || []) {
+      const C = last.p.lengthSq() - au * au, disc = B * B - 4 * A * C;
+      if (disc < 0) continue;
+      const s = (-B + Math.sqrt(disc)) / (2 * A);
+      if (!(s > prev.s && s < 1 && t > prev.t && t < EPOCH)) continue;
+      pts.push({ t, p: last.p.clone().addScaledVector(ab, s), arc: false });
+      prev = { t, s };
+    }
     pts.push(end);
     const vel = end.p.clone().sub(last.p).normalize().multiplyScalar(pr.speedKms * KMS_TO_AU_YR / 365.25);   // AU/day after EPOCH
     return { pts, vel, lastFlyby: last.t };

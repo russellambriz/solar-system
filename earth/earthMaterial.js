@@ -9,7 +9,8 @@
 //     a tight core lobe plus a broad wind-roughened sheen around it whose width follows that roughness
 //   • soft cloud shadows: the cloud texture is sampled a little "towards the Sun" from each point, in the cloud
 //     layer's frame with the same latitude drift (CLOUD_FLOW), so the shadows move with the clouds and fall on the
-//     anti-sun side
+//     anti-sun side; sun-angle shadows (uCloudShadowSun) ray-cast to the deck so they stretch out, deepen and
+//     soften as the Sun gets low (long shadows near the terminator, right under the clouds at noon)
 //   • city lights switch on at dusk in clusters: each spot has its own noise threshold on "how far past the
 //     terminator" it must be before it lights up
 //   • richer city lights (uCityLights): faint towns / suburbs below the old core threshold, a soft metro glow halo
@@ -76,6 +77,9 @@ uniform mat3  uGroundToCloud;   // ground object space → cloud object space (c
 
 uniform float uCloudsReady;     // 0 until the cloud texture has loaded
 uniform float uCloudShadow;     // max darkening under full cloud (0..1)
+uniform float uCloudShadowSun;  // sun-angle cloud shadows (ray cast to the deck, slant + penumbra); 0 = old fixed offset
+uniform float uCloudShadowAlt;  // deck altitude used for the shadow ray (fraction of a radius; = the drawn deck)
+uniform float uCloudShadowSoft; // penumbra growth: blur angle ≈ soft × ray length to the deck
 uniform float uNightGain;       // city-light brightness
 uniform float uCityLights;      // richer city lights (dim towns, glow halo, colour, cloud diffusion); 0 = cores only
 uniform float uSpecular;        // ocean glint strength
@@ -103,6 +107,31 @@ ${TWILIGHT}
 float cloudCover(vec3 groundDir) {
   vec2 uv = dirToUv(normalize(uGroundToCloud * groundDir));
   return cloudFlow(uv, dFdx(vUv), dFdy(vUv)) * uCloudsReady;      // same drift as the cloud deck → shadows follow
+}
+
+// Sun-angle cloud shadow (uCloudShadowSun). The point that shades a ground direction n is where the ray from the
+// ground towards the Sun pierces the deck (radius 1 + h): t = −μ + √(μ² + h(2 + h)), μ = n·L. With the Sun overhead
+// that is straight up (the shadow sits under its cloud); towards the terminator t grows to √(2h), so shadows
+// stretch out on the anti-sun side, as in low-sun photos from orbit. Low sun also crosses the deck on a slant, so
+// the same cloud blocks more light (optical depth × 1/cos z at the deck, capped), and the longer the ray the softer
+// the shadow edge (cloud-edge diffusion + the Sun's disc): the lookup is blurred by an angle ∝ t via textureGrad.
+float cloudShadowSun(vec3 n, vec3 Ls) {
+  float h = uCloudShadowAlt;
+  float mu = max(dot(n, Ls), -0.03);
+  float t = -mu + sqrt(mu * mu + h * (2.0 + h));
+  vec3 p = n + Ls * t;                                        // on the deck
+  float cz = (mu + t) / (1.0 + h);                            // cos(solar zenith) at the deck point
+  vec2 uv = dirToUv(normalize(uGroundToCloud * p));
+  // penumbra: blur angle (radians on the unit sphere) → UV derivatives; never sharper than the pixel footprint
+  float b = t * uCloudShadowSoft;
+  float cl = max(sqrt(max(1.0 - p.y * p.y / dot(p, p), 0.0)), 0.15);  // cos(latitude), floored near the poles
+  vec2 gx = dFdx(vUv), gy = dFdy(vUv);
+  float want = max(b * 0.15915494 / cl, b * 0.31830989);
+  float k = max(1.0, want / max(max(length(gx), length(gy)), 1e-7));
+  float c = cloudFlow(uv, gx * k, gy * k) * uCloudsReady;
+  float slant = min(1.0 / max(cz, 0.05), 3.0);
+  // denser and (a little) darker: low sun has less skylight fill under a thick deck → up to ×1.7 the noon darkening
+  return (1.0 - pow(1.0 - min(c, 0.98), slant)) * (1.0 + 0.35 * (slant - 1.0));
 }
 
 // Sea-state roughness (0 = glassy, 1 = rough), driving the glint exponent. Large-scale terms only use data we
@@ -202,7 +231,15 @@ void main() {
   // ---- cloud shadows ----------------------------------------------------------------------------------------
   // The cloud deck sits ~2% of a radius up, so the cloud that shades a point lies slightly towards the Sun.
   float overhead = cloudCover(vObjDir);
-  float shadow = uDetail > 0.001 ? cloudCover(vObjDir + normalize(uSunDirObj) * 0.03) * uCloudShadow * uDetail : 0.0;
+  // Sun-angle shadows (uCloudShadowSun, see cloudShadowSun): ray-cast to the deck, longer / denser / softer at low
+  // Sun. 0 = the pre-2026-10-26 fixed-offset lookup.
+  float shadow = 0.0;
+  if (uDetail > 0.001) {
+    vec3 Ls = normalize(uSunDirObj);
+    float sOld = uCloudShadowSun < 0.999 ? cloudCover(vObjDir + Ls * 0.03) : 0.0;
+    float sNew = uCloudShadowSun > 0.001 ? cloudShadowSun(normalize(vObjDir), Ls) : 0.0;
+    shadow = min(mix(sOld, sNew, clamp(uCloudShadowSun, 0.0, 1.0)) * uCloudShadow, 0.85) * uDetail;
+  }
 
   vec3 col = day * uSunColor * sunTint * diff * (1.0 - shadow);
   col += day * uAmbient * smoothstep(-0.3, 0.1, NdLgeo);   // no ambient fill deep on the night side
