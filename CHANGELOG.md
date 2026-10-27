@@ -1,5 +1,80 @@
 # Changelog
 
+## 2026-10-26: The heliosphere and Voyager's boundary crossings (Space Model Coder)
+
+### Added
+- **The heliosphere**, the bubble the solar wind blows in interstellar space, drawn at the sim's AU scale as three subtle see-through shells. They glow only at their edges, use additive blending, don't write depth, and are hidden until you zoom out past the termination shock, so the planets view is unchanged:
+  - **Termination shock** (amber): where the solar wind suddenly drops below the speed of sound.
+  - **Heliosheath** (faint violet, between the two): slow, hot, compressed solar wind.
+  - **Heliopause** (blue): the edge of the heliosphere, where interstellar space begins.
+- **Shape:** a blunt nose faces into the interstellar wind, which comes from ecliptic longitude 255.7°, latitude 5.1° (toward Ophiuchus). A comet-like heliotail stretches the other way. The bubble is squashed a little in the south, as the Voyagers found.
+- **Interstellar wind:** 18 streamlines flow around the nose, with dashes drifting downwind.
+- **Voyager 1 and 2 crossing markers:** small glowing dots on the shells where each probe crossed, placed on the probes' own outbound paths from `spacecraft/`. Each probe has one label with both dates:
+  - Voyager 1: shock 16 Dec 2004 (94 AU), heliopause 25 Aug 2012 (121.6 AU).
+  - Voyager 2: shock 30 Aug 2007 (84 AU), heliopause 5 Nov 2018 (119 AU).
+  
+  The label sits above the marker, or below it when the probe's own label is in the way.
+- **Labels:** Termination shock, Heliosheath, Heliopause, Heliotail and "Interstellar wind ➜". Tap or click any of them for an info card:
+  - **Heliosphere:** size, the interstellar wind (25.4 km/s, ~7,500 K), the layers from the Sun outward, and where both Voyagers are on the shown date (live). Also: why there's a gentle bow wave rather than a bow shock, and IBEX's ribbon.
+  - **Termination shock:** both crossings, the solar wind slowing from ~400 km/s (to ~300 km/s just before the shock) to ~130–150 km/s, and how the shock moves with the solar cycle.
+  - **Heliosheath:** how thick it is along each probe's path (~28 and ~35 AU), its 100–170 km/s flow, how long each probe spent inside, the stagnation region and the magnetic barrier.
+  - **Heliopause:** both crossings, plasma ~20× denser outside (~0.002 → ~0.04 per cm³), cosmic rays, and 30,000–50,000 K interstellar plasma.
+  
+  Every card has buttons for 🛰 Voyager 1, 🛰 Voyager 2, the other three cards and "🔭 View the whole bubble".
+- **Search:** `heliosphere`, `heliopause`, `termination shock`, `heliosheath`, `interstellar space`, `bow wave`, plus `bow shock`, `heliotail`, `interstellar wind`, `ibex ribbon`, `edge of the solar system`… Each one flies out to a view of the whole bubble with main.js's `flyTo`, then opens its card:
+  - Landscape: side-on, looking along Voyager 1 × Voyager 2 so both crossings sit on the outline, with the wind flowing left to right.
+  - Portrait: more from the nose, so it fits.
+  
+  `interstellar` alone still finds the interstellar comets first.
+- **Layers → Heliosphere** checkbox (on by default, remembered as `solar.heliosphere`).
+- **Touch:** labels are 12 px on touch with a ≥ 44 px tap area (25 px label + 12 px padding above and below). Card buttons are 44 px.
+- **Clean view** hides the labels. The galaxy view hides them like other solar labels.
+
+### How it's made
+- **Heliopause:** a Rankine half-body, the classic first model of the heliopause (the dividing streamline of a point source in a uniform flow): r(φ) = R0·√(2/(1+cos φ)), where φ is the angle from the nose. It's cut off 160° from the nose and fades out down the tail.
+- **Termination shock:** a closed surface, r(φ) = R0·(1 + 0.9·((1−cos φ)/2)^1.5), about 1.9× farther downwind than at the nose.
+- **Fitted through the four crossings:** both surfaces are multiplied by (1 + β·sin(ecliptic latitude)). R0 and β are solved so each surface passes exactly through both Voyager crossings:
+  - Termination shock: R0 = 85.6 AU, β = 0.143 (~86 AU at the nose, ~160 AU down the tail).
+  - Heliopause: R0 = 112.2 AU, β = 0.081 (~113 AU at the nose).
+  
+  The crossing points are where each probe's last straight leg in `spacecraft/` is at the crossing distance: Voyager 1 at ~35° N, 30° from the nose; Voyager 2 at ~32–37° S, 49–53° from the nose. The heliosheath shell is halfway between the two surfaces.
+- **Streamlines:** Rankine streamlines, ρ² = ρ∞² + 2R0²(1 + x/r), at three starting radii (0.35, 0.75 and 1.2 R0) and six azimuths (five on touch), with the same β.
+- **Scale:** every vertex keeps its true direction and AU radius and is moved radially with main.js's `scaleDistance()`, the same way meteors/ does it. That means the compressed scale rounds the bubble off, and the Scale slider works. It's only re-laid-out when the scale changes.
+- **Drawing:** 3 meshes (56×72 grids, 40×48 on touch), 1 `LineSegments` (1,602 segments) and 4 sprites. All use ShaderMaterial with a fresnel rim, additive blending and depthWrite off.
+  - The whole group is `visible = false` until the camera is ~1.05× the termination shock's drawn radius from the Sun. It fades in fully by ~1.75×.
+  - In the default view and anywhere near the planets it draws nothing. Each frame it only checks the camera distance.
+  - There are no particle clouds, so perf/'s guard has nothing to thin.
+- **Info cards** fill main.js's `#info-panel` like meteors/ and comets/. ✕ closes just the card.
+- **Fly-to:** main.js's `flyTo` only (no camera code). Before flying, it stops following any focused planet, the same release search/ does. From the galaxy view it calls `exitGalaxy` first. The fly-to stays under 85% of `SOLAR_MAX_DIST`, so it never tips into the galaxy view.
+
+### Sources (checked 2026-10-26)
+- **Crossing dates and distances:**
+  - NASA, Voyager Interstellar Mission and Fast Facts pages (science.nasa.gov/mission/voyager/interstellar-mission, …/fast-facts): termination shock at 94 AU (Dec 2004) and 84 AU (Aug 2007); interstellar space on 25 Aug 2012 and 5 Nov 2018.
+  - Stone et al. 2005, *Science* 309, 2017: Voyager 1 crossed the termination shock on 16 Dec 2004 at 94.01 AU.
+  - Richardson et al. 2008, *Nature* 454, 63: Voyager 2 crossed it several times between 30 Aug and 1 Sep 2007 at 84 AU. The solar wind slowed from 400 to 300 km/s before the shock, then to ~150 km/s at it. The heliosheath flow was 100–170 km/s.
+  - Burlaga et al. 2019, *Nature Astronomy* 3, 1007: heliopause at 121.6 AU (Voyager 1, 25 Aug 2012) and ≈119.0 AU (Voyager 2, 5 Nov 2018), plus the magnetic barrier.
+  - Richardson et al. 2019, *Nature Astronomy* 3, 1019: interstellar plasma at 30,000–50,000 K.
+  - Gurnett & Kurth 2019, *Nature Astronomy* 3, 1024: 0.002 → 0.039 cm⁻³, a factor of ~20.
+  - Richardson & Wang 2011, *ApJL* 734, L21: the shock moved in to ~73 AU around 2010.
+- **Inflow direction: corrected from the brief's 255.4° / 5.2°.** The IBEX + Ulysses "working values" are λ = 255.7°, β = 5.1°, 25.4 km/s, ~7,500 K (McComas et al. 2015, *ApJS* 220, 22). McComas et al. 2020 (IBEX 2009–2019) still uses (255.7°, 5.1°). Bzowski et al. 2015 (*ApJS* 220, 28) give 255.8° ± 0.5°, 5.16° ± 0.10°.
+- **No bow shock, just a bow wave:** McComas et al. 2012, *Science* 336, 1291 (and the SwRI release).
+- **IBEX ribbon:** McComas et al. 2009, *Science* 326, 959. The heliotail: McComas et al. 2013, *ApJ* 771, 77.
+
+### Changed
+- New: `heliosphere/index.js` (shells, streamlines, markers, labels, cards, search entries), `heliosphere/data.js` (numbers and card text) and `heliosphere/heliosphere.css` (loaded by the module).
+- `main.js`: 6 lines. The import, `createHeliosphere(...)` (3 lines, comment included), `heliosphere.update(...)` in the solar-view frame, and `window.solar.heliosphere`. The camera functions are only called.
+- `index.html`: the Layers checkbox.
+- `CONTRIBUTING.md` / `README.md`: `heliosphere/` added to Space Model Coder's row and to the feature list.
+- Screenshots:
+  - `screenshot-heliosphere.png` (new): the whole bubble on 26 Oct 2026, with the planets, both Voyagers and their crossing labels, and the wind streamlines around the nose (panels folded).
+  - `screenshot.png`: refreshed, since Layers has a new checkbox.
+  - `screenshot-ipad.png`: not re-taken. Controls starts folded on iPad, so the default view is the same.
+- Not touched: `spacecraft/` (the module only reads the Voyagers' `track`, `posAU` and `active`), `search/index.js` (the entries are pushed onto `search.entries`, like skytonight/), `style.css`, the camera code, scale/, earth/, moon/, mars/, planets/ and the galaxy files.
+
+### Notes
+- **It's a model.** The real heliosphere's shape is still argued about: a long comet tail (IBEX), a rounder bubble (Cassini INCA, Dialynas et al. 2017) or a "croissant" (Opher et al. 2020). It also breathes in and out with the 11-year solar cycle, and the Voyagers crossed in different years. The shells are the simplest smooth shape through the four measured points.
+- **Voyager timing:** spacecraft/ coasts each Voyager along a straight line at its average speed since its last flyby. The 3D probes therefore reach these distances 2–8 months after the real dates (the sim's Voyager 1 reaches 94 AU in Aug 2005). The labels and cards show the real dates. Fixing the coast is a spacecraft/ change.
+
 ## 2026-10-24: Tonight's sky from Boise (Space Model Coder)
 
 ### Added

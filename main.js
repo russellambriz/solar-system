@@ -27,6 +27,7 @@ import { createUI } from './ui/index.js';
 import { createConstellations } from './constellations/index.js';
 import { createMeteors } from './meteors/index.js';
 import { createSkyTonight } from './skytonight/index.js';
+import { createHeliosphere } from './heliosphere/index.js';
 import { orientTilt } from './axes/index.js';
 
 // ---------------------------------------------------------------------------
@@ -1702,6 +1703,7 @@ function animate() {
     spacecraft.update(days, camera, dt);
     comets.update(days, camera, dt);
     meteors.update(days, camera, dt);
+    heliosphere.update(days, camera, dt);
     const nearSun = sunFX.stats().near;
     // fade the glow sprites out when the Sun is far off-axis or behind: a sprite near the screen edge projects to a huge straight-edged band
     camera.getWorldDirection(_camFwd);
@@ -1752,6 +1754,9 @@ const ui = createUI({ bodies, smallBodies, scene, camera, scaleDistance, realPos
 // skytonight/: "Tonight's sky from Boise" panel (Controls button, search "tonight"); its planet events join ui/'s timeline
 const skyTonight = createSkyTonight({ bodies, search, constellations, focusOn, realPositions, getTime: () => simTime,
   isPaused: () => paused || daysPerSecond === 0, togglePause, isCompact, setPanelCollapsed });
+// heliosphere/: termination shock, heliosheath and heliopause shells with the Voyager crossings (Layers, search, cards; flies with flyTo)
+const heliosphere = createHeliosphere({ scene, bodies, spacecraft, search, scaleDistance, flyTo, exitGalaxy, getMode: () => mode, isTouch: IS_TOUCH,
+  getMaxDist: () => SOLAR_MAX_DIST, releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
 const perfGuard = createPerfGuard({ scenes: [scene, galaxy.scene], exclude: [sunFX.group, sgra.group, ton618.group], isTouch: IS_TOUCH });
 
 updateBodies();
@@ -1764,3 +1769,4 @@ setTimeout(() => loading.remove(), 700);
 // Exposed for experimenting in the browser console (e.g. solar.focusOn(solar.bodies[3]))
 window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, antennae, flyToAntennae, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, meteors, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };
 window.solar.skyTonight = skyTonight;
+window.solar.heliosphere = heliosphere;
