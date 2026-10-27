@@ -108,8 +108,14 @@ export function createHeliosphere({ scene, bodies = [], spacecraft, search, scal
     const it = spacecraft?.get?.(c.probe);
     let p = null, simT = null;
     const pts = it?.track?.pts;
-    if (pts && pts.length >= 2) {
-      const a = pts[pts.length - 2], b = pts[pts.length - 1];
+    // the straight coast leg that reaches the crossing distance (spacecraft/ may split the coast at measured checkpoints;
+    // all its pieces lie on one line, so falling back to the last leg gives the same point)
+    const np = pts ? pts.length : 0;
+    let leg = -1;
+    for (let i = np - 1; i >= 1 && !pts[i].arc; i--) if (pts[i - 1].p.length() <= c.au && pts[i].p.length() >= c.au) { leg = i; break; }
+    if (leg < 0 && np >= 2) leg = np - 1;
+    if (leg >= 1) {
+      const a = pts[leg - 1], b = pts[leg];
       const ab = b.p.clone().sub(a.p);                                   // |a + t·ab| = d  →  quadratic in t
       const A = ab.lengthSq(), B = 2 * a.p.dot(ab), C = a.p.lengthSq() - c.au * c.au;
       const disc = B * B - 4 * A * C;
