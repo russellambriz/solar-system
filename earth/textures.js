@@ -19,6 +19,12 @@
 // any iPad; maxTextureSize ≥ 4096 and not a low-memory device), 2048×1024 on phones. One extra texture, ~45 MB of
 // GPU memory for the 4K one with mips. `?earthclouds=1k|2k|4k` in the page URL forces the size (testing).
 //
+// Tablet-class devices (the same test as the 4K cloud tier) then also upgrade the surface: the 2048×1024 desktop
+// day (December + July), night-lights and water-mask maps are fetched one at a time after the cloud map, decoded
+// off-thread and pre-uploaded, then swapped in. That halves the texel size of coastlines, city lights and the ocean
+// glint edge on iPad close-ups for ~45 MB more GPU memory (4 × 2K RGBA with mips). Phones and low-memory devices
+// keep the 1K surface. `?earthsurf=1k|2k` forces it (testing).
+//
 // Paths are resolved relative to this module, so the site keeps working from a subpath
 // (e.g. https://user.github.io/solar-system/).
 import * as THREE from 'three';
@@ -68,6 +74,20 @@ export function mobileCloudTier(renderer) {
 }
 
 /**
+ * Surface-map size for the mobile tier: '1k' (keep the base maps) or '2k' (tablet-class upgrade, see header).
+ */
+export function mobileSurfaceTier(renderer) {
+  const force = new URLSearchParams(globalThis.location?.search || '').get('earthsurf');
+  const max = renderer?.capabilities.maxTextureSize ?? 0;
+  if (!renderer || force === '1k' || max < 2048) return '1k';
+  if (force === '2k') return '2k';
+  const mem = globalThis.navigator?.deviceMemory;
+  if (mem && mem < 4) return '1k';
+  const sw = globalThis.screen?.width ?? 0, sh = globalThis.screen?.height ?? 0;
+  return Math.min(sw, sh) >= 744 ? '2k' : '1k';
+}
+
+/**
  * Start loading the Earth textures. `onLoad(key, tex, tier)` fires as each real image arrives (tier is
  * '1k' | '2k' | '4k'), so the caller can swap uniforms and flip "ready" flags.
  *
@@ -85,7 +105,9 @@ export function loadEarthTextures({ isMobile, renderer = null, onLoad }) {
   const anisotropy = Math.min(maxAniso, isMobile ? 4 : 16);
   const hiResCapable = !isMobile && canUseHiRes(renderer, isMobile);
   const cloudUp = isMobile ? mobileCloudTier(renderer) : '1k';   // mobile-tier cloud upgrade ('1k' = none)
-  const info = { set, hiResCapable, cloudUp, cloudUpState: cloudUp === '1k' ? 'off' : 'pending', anisotropy, maxTextureSize: renderer?.capabilities.maxTextureSize, tier: {}, hiResState: hiResCapable ? 'pending' : 'off', hiResMs: 0 };
+  const surfUp = isMobile ? mobileSurfaceTier(renderer) : '1k';  // mobile-tier 2K surface upgrade ('1k' = none)
+  const info = { set, hiResCapable, cloudUp, cloudUpState: cloudUp === '1k' ? 'off' : 'pending',
+    surfUp, surfUpState: surfUp === '1k' ? 'off' : 'pending', anisotropy, maxTextureSize: renderer?.capabilities.maxTextureSize, tier: {}, hiResState: hiResCapable ? 'pending' : 'off', hiResMs: 0 };
 
   const loader = new THREE.TextureLoader();
   const files = {
@@ -115,6 +137,7 @@ export function loadEarthTextures({ isMobile, renderer = null, onLoad }) {
       if ((key === 'day' || key === 'night') && --pendingBase === 0) {
         if (hiResCapable) scheduleHiRes();
         else if (cloudUp !== '1k') scheduleIdle(loadMobileClouds);
+        else if (surfUp !== '1k') scheduleIdle(loadMobileSurface);
       }
     }, undefined, (err) => console.warn(`[earth] could not load ${file}`, err));
   }
@@ -170,7 +193,30 @@ export function loadEarthTextures({ isMobile, renderer = null, onLoad }) {
       info.tier.clouds = cloudUp;
       onLoad('clouds', tex, cloudUp);
       info.cloudUpState = 'done';
-    }, (err) => { info.cloudUpState = 'failed'; console.warn(`[earth] ${cloudUp} cloud map unavailable, keeping 1K`, err); });
+      if (surfUp !== '1k') scheduleIdle(loadMobileSurface);
+    }, (err) => {
+      info.cloudUpState = 'failed'; console.warn(`[earth] ${cloudUp} cloud map unavailable, keeping 1K`, err);
+      if (surfUp !== '1k') scheduleIdle(loadMobileSurface);
+    });
+  }
+
+  // tablet tier: 2K desktop day / night / July day / water maps, one at a time (bounded decode + upload spikes)
+  function loadMobileSurface() {
+    info.surfUpState = 'loading';
+    const t0 = performance.now();
+    const queue = ['day', 'night', 'dayJul', 'water'];
+    let failed = false;
+    const next = () => {
+      const key = queue.shift();
+      if (!key) { info.surfUpState = failed ? 'failed' : 'done'; info.surfUpMs = Math.round(performance.now() - t0); return; }
+      const { file, srgb } = files[key];
+      loadBig(new URL(`desktop/${file}`, BASE).href, srgb, (tex) => {
+        info.tier[key] = '2k';
+        onLoad(key, tex, '2k');
+        next();
+      }, (err) => { failed = true; console.warn(`[earth] 2K ${file} unavailable, keeping 1K`, err); next(); });
+    };
+    next();
   }
 
   return { hasNormal: !isMobile, info };
