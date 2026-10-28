@@ -1,5 +1,65 @@
 # Changelog
 
+## 2026-10-28: Lagrange points and Jupiter's Trojan asteroids (Space Model Coder)
+
+### Added
+- **Lagrange points L1–L5** for the Sun–Earth system (blue) and the Sun–Jupiter system (gold): a small ring marker and a label for each, placed from the planet's real position on the shown date (the same ephemeris the planets use). L4 and L5 are 60° ahead of and behind the planet along its orbit, L3 is opposite it, and L1/L2 sit on the Sun–planet line.
+  - At this scale the real L1 and L2 would be inside the planet's (enlarged) globe, so they are drawn just outside its moons: Earth's at the spot where `spacecraft/` already draws JWST, Jupiter's just past Callisto. The cards say so.
+  - They stay hidden in the default overview and fade in when you zoom in (or get near Earth or Jupiter, or open one of their cards), so the default view is unchanged apart from the Trojans (see below).
+- **Jupiter's Trojan swarms**: 4,100 dots (1,900 on touch devices) looping around Jupiter's L4 (the leading "Greeks", about 1.7× more) and L5 (the trailing "Trojans"), moving with Jupiter. Each dot follows a tadpole-shaped loop around its point (3–38° wide, ~150 years per loop, longer toward L3) with its own small eccentricity and a tilt of up to ~40°, so the swarms are long and thick like the real ones.
+- **The Hilda group**: 1,100 dots (450 on touch) at ~4 AU in the 3:2 resonance with Jupiter. Together they make a slowly turning triangle with corners at Jupiter's L3, L4 and L5.
+- **Named objects on their real JPL orbits**: 624 Hektor, 588 Achilles, 617 Patroclus–Menoetius, 3548 Eurybates, 15094 Polymele, 11351 Leucus, 21900 Orus, 52246 Donaldjohanson (the main-belt asteroid Lucy flew past in 2025, not a Trojan) and 153 Hilda. Each has a dot, a label and a card with its size, discovery, live distance from the Sun and Earth, and how far ahead of or behind Jupiter it is on the shown date.
+- **Cards**: what Lagrange points are, all ten L-points, the Trojans, the Hildas and each named object. The L-point cards list who's there: SOHO, ACE, Wind, DSCOVR, Aditya-L1, IMAP and SWFO-L1 at Sun–Earth L1, and JWST and Euclid (before them Gaia, Planck, Herschel and WMAP) at L2. They also cover the Earth Trojans 2010 TK7 and 2020 XL5 at L4, and ESA's planned Vigil at L5. Card buttons jump between L-points, to the named Trojans, to JWST (the existing `spacecraft/` one) and to Lucy, plus a "🔭 View" button.
+- **Lucy's card** (`spacecraft/`) now has a row of buttons to its targets: Donaldjohanson, Eurybates, Polymele, Leucus, Orus, Patroclus–Menoetius and the Trojan swarms. This is added from `lagrange/`, with no change to `spacecraft/`.
+- **Search**: `lagrange`, `L1`–`L5` (Sun–Earth first), `jupiter l4`…, `trojans`, `greeks`, `trojan camp`, `lucy targets`, `hildas`, `hektor`, `achilles`, `patroclus`, `menoetius`, `eurybates`, `queta`, `polymele`, `leucus`, `orus`, `donaldjohanson`, `soho`, `gaia`, `euclid`, `earth trojans`, `counter earth`, `vigil`… Each one flies there with main.js's `flyTo`, opens the card, and then keeps the view turning with the planet (or following the asteroid) until you move the camera. `lucy` still finds the spacecraft first.
+  - The Trojan and Jupiter-point views look down from almost overhead, with the Sun on the left, Jupiter on the right, the Greeks at the top and the Trojans at the bottom, so both swarms sit between the side panels.
+- **Layers → Lagrange & Trojans** checkbox (on by default, remembered as `solar.lagrange`). It hides the markers, labels, swarms and named objects.
+- **Touch**: labels are 12 px with a ≥ 44 px tap area (25 px label plus 12 px padding above and below), and card buttons are 44 px. Clean view hides the labels. The galaxy view hides them like other solar labels.
+
+### Changed
+- `smallbodies.js` no longer adds its 2,200 Trojan and 700 Hilda dots to the asteroid belt (700 and 250 on touch). Those sat at fixed mean longitudes, so they drifted away from Jupiter's real position and the Hildas had no triangle. `lagrange/` draws both now, locked to Jupiter, and the main belt itself is unchanged. One side effect: turning off Layers → Lagrange & Trojans now hides the Trojans, and Layers → Asteroids no longer does.
+- `screenshot.png` was re-taken, since the Trojan swarms near Jupiter look a little different in the overview.
+
+### How it's made
+- **One draw call for the swarms**: a single `THREE.Points` cloud of 5,200 points (2,350 on touch), positioned in the vertex shader from Jupiter's true longitude (a uniform updated each frame). Nothing is moved on the CPU, and the cloud uses the same compressed distance scale as the planets: a, b and p of `scaleDistance(r) = a + b·r^p` are read back from main.js's function, so the Scale slider works.
+  - **Trojans**: the angle from Jupiter is ±(60° + D·(1.05 sin ψ + 0.25 sin² ψ)). The orbit shrinks by 0.24 AU·D·cos ψ while that angle grows, so each dot goes round its tadpole the right way. On top of that come an epicycle (r·(1 − e cos M), λ + 2e sin M) and the dot's own tilt and node.
+  - **Hildas**: mean longitude λ = 1.5·λJ + c and perihelion ϖ = −2c − σ, so the resonant angle 3λJ − 2λ − ϖ stays at σ (a small slow wobble). They pass Jupiter at perihelion and reach aphelion at L3, L4 and L5. Kepler's equation is solved in the shader.
+  - `perf/` thins this cloud like the belts on slow devices: it is created before the frame-rate guard collects its clouds, and has ≥ 3,000 points on desktop. Checked: at the lowest level it draws 1,819 of the 5,200 points.
+- **L-points**: L4/L5 are the planet's heliocentric position turned ±60° about its orbit normal (r × v from the ephemeris). L1/L2 use the Hill radius r·(μ/3)^⅓ (0.0100 AU for Earth and 0.355 AU for Jupiter) for the true positions shown in the cards. L3 is at −r·(1 + 5μ/12).
+- **Named objects**: two-body Kepler orbits from JPL Small-Body Database osculating elements (epoch JD 2461200.5 = 2026-06-09), using `asteroids/`'s `asteroidAU()`.
+- Cards fill main.js's `#info-panel` like `heliosphere/`, and ✕ closes just the card. Fly-to uses main.js's `flyTo` only, with function goals, after releasing any focused planet. From the galaxy view it calls `exitGalaxy` first. main.js has 6 new lines: the import, the create call, the per-frame update and `window.solar.lagrange`.
+
+### Checked against JPL
+- **JPL Horizons** (VECTORS, Sun centre, ecliptic J2000), 2026-10-28 00:00 TDB, against our positions from the SBDB elements:
+  - 624 Hektor: Horizons (−4.743947, −1.796297, −1.022175) AU, ours (−4.74403, −1.79631, −1.02219). Off by 8.6×10⁻⁵ AU ≈ 12,800 km, or 3.4″ as seen from the Sun.
+  - 617 Patroclus: off by 1.0×10⁻⁴ AU ≈ 15,600 km (4.3″).
+  - 3548 Eurybates: off by 7.1×10⁻⁵ AU ≈ 10,700 km (2.6″).
+  
+  The small difference comes from using a pure two-body orbit 141 days after the elements' epoch.
+- **Lucy's flybys**: on each flyby date, the `spacecraft/` Lucy trajectory (from Horizons) passes close to our positions:
+  - Donaldjohanson, 20 Apr 2025: 0.0004 AU.
+  - Eurybates, 12 Aug 2027: 0.0017 AU.
+  - Orus, 11 Nov 2028: 0.0045 AU.
+  - Patroclus, 2 Mar 2033: 0.044 AU. By then Patroclus's two-body orbit is almost seven years from its epoch, and Jupiter's pull isn't modelled.
+- On 2026-10-28 (Jupiter at ecliptic longitude 133.3°), Hektor is 67° ahead of Jupiter, Orus 61°, Eurybates 83° ahead and Patroclus–Menoetius 56° behind, all inside the drawn swarms.
+
+### Sources (fetched 2026-10-28)
+- JPL Small-Body Database API (`sbdb.api?sstr=…&full-prec=1&phys-par=1&discovery=1`): elements, diameters, rotation periods and discovery circumstances.
+- JPL Horizons API: the check vectors above.
+- Lucy flyby dates are from `spacecraft/missions.js` (NASA/SwRI). The moons Queta (Hubble, 2018) and Polymele's "Shaun" (stellar occultation, March 2022), the Patroclus–Menoetius pair (~113 and ~104 km, 4.28 days) and Donaldjohanson's ~8 km contact-binary shape come from NASA's Lucy mission pages.
+
+### Tested
+- Desktop (1440×900) and iPad Pro 11 emulation (portrait and landscape, touch on): the page loads with no console errors, warnings or uncaught exceptions.
+  - Layers → Lagrange & Trojans turns everything off and on and is remembered.
+  - Search `trojans` flies to the swarm view and opens the card. `hektor` flies to Hektor, opens its card and follows it. `L2` flies to Earth and opens Sun–Earth L2. Searching `lucy` opens the Lucy card with its seven target buttons.
+  - Clicking or tapping the "Jupiter L4 Greeks" label opens its card. Labels on touch are 25 px tall plus 24 px of tap padding, and card buttons are 44 px.
+  - The default overview shows no L-point markers or labels.
+  - Clean view hides the labels, and so does the galaxy view. Searching `hektor` from the galaxy view comes back to the Solar System first. The Scale slider moves the swarms with the planets.
+
+### Screenshots
+- New: `screenshot-lagrange.png` (2026-10-28: Jupiter's Greeks above and Trojans below, the Jupiter L1–L5 labels, Hektor, Orus, Eurybates and Patroclus–Menoetius).
+- Re-taken: `screenshot.png`.
+
 ## 2026-10-27: The heliosphere ships, and the Voyagers now cross on the real dates (Space Model Coder)
 
 ### Shipped

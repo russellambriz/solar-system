@@ -522,12 +522,13 @@ export function createLagrange({ scene, bodies = [], spacecraft, search, scaleDi
     u.uScale.value = H * pr / (2 * tanH); u.uMaxPx.value = (isTouch ? 3 : 4) * pr;
     applyFollow(camera);
     // markers and labels: hidden in the overview, fade in as you zoom in (or near the planet, or while a card is open)
-    const cam = camera.position, camSun = cam.length();
+    // thresholds in units of the planet's drawn distance, so they still work after scale/ changes the distance scale
+    const cam = camera.position, camSun = cam.length(), RE = planetW.E.length() || 20, RJ = planetW.J.length() || 40.7;
     const openSys = open ? (cardOf(open).sys || (namedBy[open] || ['trojans', 'hildas', 'lagrange'].includes(open) ? 'J' : null)) : null;
     const flySys = pending ? (cardOf(pending).sys || 'J') : null;
-    fade.E = Math.max(1 - smooth(camSun, 45, 75), 1 - smooth(cam.distanceTo(planetW.E), 22, 40), openSys === 'E' || flySys === 'E' || open === 'lagrange' ? 1 : 0);
-    fade.J = Math.max(1 - smooth(camSun, 110, 140), 1 - smooth(cam.distanceTo(planetW.J), 35, 60), openSys === 'J' || flySys === 'J' ? 1 : 0);
-    if (camSun > 600) fade.E = fade.J = 0;
+    fade.E = Math.max(1 - smooth(camSun / RE, 2.25, 3.75), 1 - smooth(cam.distanceTo(planetW.E), 22, 40), openSys === 'E' || flySys === 'E' || open === 'lagrange' ? 1 : 0);
+    fade.J = Math.max(1 - smooth(camSun / RJ, 2.7, 3.45), 1 - smooth(cam.distanceTo(planetW.J), 35, 60), openSys === 'J' || flySys === 'J' ? 1 : 0);
+    if (camSun > RJ * 15) fade.E = fade.J = 0;
     const k = 2 * tanH / H;
     for (const sys of ['E', 'J']) for (const p of LP[sys]) {
       p.marker.visible = fade[sys] > 0.01;
@@ -538,7 +539,7 @@ export function createLagrange({ scene, bodies = [], spacecraft, search, scaleDi
     for (const n of named) {
       const near = cam.distanceTo(n.pos);
       let f = n.camp === 'belt' || n.camp === 'hilda' ? Math.max(1 - smooth(near, 12, 25), open === n.key || (n.camp === 'hilda' && open === 'hildas') ? 1 : 0)
-        : Math.max(fade.J * (1 - smooth(camSun, 108, 128)), 1 - smooth(near, 15, 30), open === n.key ? 1 : 0, open && (open === 'trojans' || open === `J-${n.camp}`) ? fade.J : 0);
+        : Math.max(fade.J * (1 - smooth(camSun / RJ, 2.65, 3.15)), 1 - smooth(near, 15, 30), open === n.key ? 1 : 0, open && (open === 'trojans' || open === `J-${n.camp}`) ? fade.J : 0);
       if (n.camp === 'belt' && open && LUCY_TARGETS.includes(open)) f = Math.max(f, 0.6);
       n.marker.visible = f > 0.01;
       n.marker.material.opacity = 0.95 * f;
