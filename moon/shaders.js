@@ -4,7 +4,8 @@
 // Relief: LOLA-derived normal map in an analytic east/north tangent frame (exact for a UV sphere).
 // Rays: analytic bright ray systems for Tycho, Copernicus, Kepler and Aristarchus, plus a second tier of younger
 // bright craters (Proclus with its ray-free arc to the southwest, Messier A's twin westward rays, Anaxagoras, Thales,
-// Glushko, Byrgius A, Stevinus A, Furnerius A, and Censorinus's bright spot), laid over the LRO albedo. Ray material is fresh,
+// Glushko, Byrgius A, Stevinus A, Furnerius A, and Censorinus's bright spot), and on the far side Giordano Bruno,
+// Jackson, Ohm, Necho, Pierazzo, Crookes, Moore F and Larmor Q, laid over the LRO albedo. Ray material is fresh,
 // immature ejecta, so it stands out most at full Moon (no shadows, albedo contrast only) and nearly vanishes
 // near the terminator. Cost: ~7 hash lookups per ray system, skipped outright beyond each system's reach.
 // Close-up craters: when the camera is close enough that the colour/relief maps are magnified (one texel spread
@@ -69,6 +70,10 @@ uniform float uRayMinor;      // 0 turns the second-tier ray craters off (see MI
 uniform vec3 uMinorC[MINOR_RAYS];   // crater centres, unit vectors in mesh space
 uniform vec4 uMinorP[MINOR_RAYS];   // crater radius (rad), longest ray (rad), rays around the rim, strength
 uniform vec4 uMinorA[MINOR_RAYS];   // ray-free arc: centre azimuth (rad, clockwise from north), half-width (rad, 0 = none); seed; ray width radius (rad)
+uniform float uRayFar;        // 0 turns the far-side ray craters off (see FAR_RAYS in moon/index.js)
+uniform vec3 uFarC[FAR_RAYS];
+uniform vec4 uFarP[FAR_RAYS];       // as uMinorP
+uniform vec4 uFarA[FAR_RAYS];       // as uMinorA
 uniform vec3 uMessierA;       // Messier A and the far ends of its two westward rays
 uniform vec3 uMessierT1;
 uniform vec3 uMessierT2;
@@ -323,6 +328,15 @@ void main() {
       // Messier A: a low-angle impact that threw two nearly straight rays west across Mare Fecunditatis (the "comet").
       minor += 1.8 * (longRay(n, uMessierA, uMessierT1, 0.006, 0.085, pixArc) + longRay(n, uMessierA, uMessierT2, 0.006, 0.075, pixArc));
       rays += uRayMinor * minor;
+    }
+    // Far side: Giordano Bruno, Jackson, Ohm, Necho, Pierazzo, Crookes, Moore F, Larmor Q (FAR_RAYS in moon/index.js).
+    if (uRayFar > 0.0) {
+      float far = 0.0;
+      for (int i = 0; i < FAR_RAYS; i++) {
+        vec4 P = uFarP[i], A = uFarA[i];
+        far += P.w * raySystem(n, uFarC[i], P.x, P.y, P.z, A.z, A.xy, pixArc, max(P.x, A.w));
+      }
+      rays += uRayFar * far;
     }
     rays = 1.0 - exp(-1.3 * rays);                         // soft cap where rays overlap near the rims
     float full = 1.0 - smoothstep(0.2, 1.35, g);

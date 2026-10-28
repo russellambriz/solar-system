@@ -39,6 +39,24 @@ const MINOR_RAYS = [
   ['Furnerius A', -33.5, 59.0, 12, 300, 14, 1.6, 0, 0, 32],
   ['Censorinus', -0.4, 32.7, 4.1, 60, 10, 1.8, 0, 0, 8],
 ];
+// Far-side ray craters, same columns as MINOR_RAYS. The LROC mosaic already holds their albedo, but only the near
+// side had the analytic boost, so seen from beyond the limb (or at new Moon from the far side) the far side looked
+// flatter and duller than the near side. Positions and sizes from the IAU names (Wikipedia list of craters with ray
+// systems; Giordano Bruno 35.97 N 102.89 E, 22 km). Giordano Bruno is the youngest crater this size on the Moon
+// (1-10 million years) and the brightest; its rays reach 150-300 km. Jackson and Ohm have the far side's two big
+// Tycho-like fans; Necho, Crookes, Moore F, Larmor Q and the small, very bright Pierazzo fill in the rest. Ray
+// lengths are rough visual estimates from LROC WAC mosaics. Giordano Bruno and Pierazzo peek round the limb at
+// favourable libration.
+const FAR_RAYS = [
+  ['Giordano Bruno', 35.97, 102.89, 22, 350, 18, 2.4, 0, 0, 44],
+  ['Jackson', 22.4, -163.1, 71, 1000, 28, 0.9, 0, 0, 71],
+  ['Ohm', 18.4, -113.5, 64, 900, 24, 0.9, 0, 0, 64],
+  ['Necho', -5.0, 123.1, 30, 500, 18, 1.5, 0, 0, 40],
+  ['Pierazzo', 3.3, -100.24, 9.3, 400, 16, 1.3, 0, 0, 30],
+  ['Crookes', -10.3, -164.5, 49, 500, 20, 1.0, 0, 0, 49],
+  ['Moore F', 37.28, -174.96, 24, 400, 16, 1.3, 0, 0, 36],
+  ['Larmor Q', 24.79, -178.6, 25.5, 350, 16, 1.0, 0, 0, 34],
+];
 const KM = 1 / 1737.4;   // km -> radians of arc on the Moon
 
 const _sun = new THREE.Vector3(), _earth = new THREE.Vector3(), _moon = new THREE.Vector3();
@@ -134,6 +152,11 @@ export function createMoonMesh({ radius, isTouch = false }) {
     uMinorP: { value: MINOR_RAYS.map(([, , , dKm, lenKm, nR, k]) => new THREE.Vector4(0.5 * dKm * KM, lenKm * KM, nR, k)) },
     uMinorA: { value: MINOR_RAYS.map(([, , , , , , , az, hw, wKm], i) =>
       new THREE.Vector4(THREE.MathUtils.degToRad(az), THREE.MathUtils.degToRad(hw), 173 + 29 * i, 0.5 * wKm * KM)) },
+    uRayFar: { value: 1.0 },                                 // far-side ray craters (FAR_RAYS); 0 = the previous look
+    uFarC: { value: FAR_RAYS.map(([, lat, lon]) => seleno(lat, lon)) },
+    uFarP: { value: FAR_RAYS.map(([, , , dKm, lenKm, nR, k]) => new THREE.Vector4(0.5 * dKm * KM, lenKm * KM, nR, k)) },
+    uFarA: { value: FAR_RAYS.map(([, , , , , , , az, hw, wKm], i) =>
+      new THREE.Vector4(THREE.MathUtils.degToRad(az), THREE.MathUtils.degToRad(hw), 409 + 31 * i, 0.5 * wKm * KM)) },
     uMessierA: { value: seleno(-2.03, 46.94) },              // Messier A's twin rays run west across Mare Fecunditatis
     uMessierT1: { value: seleno(-1.1, 40.0) },
     uMessierT2: { value: seleno(-2.6, 40.0) },
@@ -157,7 +180,7 @@ export function createMoonMesh({ radius, isTouch = false }) {
   };
   // iPad: three size bands (down to ~3 km craters); desktop adds a fourth (~1.3 km) for the closest views.
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERT, fragmentShader: FRAG,
-    defines: { DETAIL_BANDS: isTouch ? 3 : 4, SHADOW_STEPS: isTouch ? 24 : 44, MINOR_RAYS: MINOR_RAYS.length } });
+    defines: { DETAIL_BANDS: isTouch ? 3 : 4, SHADOW_STEPS: isTouch ? 24 : 44, MINOR_RAYS: MINOR_RAYS.length, FAR_RAYS: FAR_RAYS.length } });
 
   const lod = new THREE.LOD();
   // The closest level is fine enough for the displaced limb to show mountain profiles (~20 km steps on desktop,

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-27: Bright ray craters on the Moon's far side (MoonBot)
+
+### Added
+- **The far side now has its own bright ray craters.** Until now only near-side craters got the analytic rays and
+  bright ejecta on top of the LRO albedo, so when you flew round the back of the Moon (best near new Moon, when the
+  far side is in full sunlight) it looked flatter and duller than the near side. It now gets eight young rayed
+  craters: **Giordano Bruno** (22 km, 1 to 10 million years old, the youngest crater its size and the brightest spot
+  on the far side, with rays reaching 150 to 300 km), the two big Tycho-like fans of **Jackson** and **Ohm**, and
+  **Necho**, **Crookes**, **Moore F**, **Larmor Q** and the small, very bright **Pierazzo**. As on the near side,
+  they stand out with the Sun behind you and nearly vanish toward the terminator. Giordano Bruno and Pierazzo peek
+  round the limb from Earth at favourable libration.
+  - Positions and crater sizes come from the IAU names (Wikipedia's list of craters with ray systems). Ray lengths
+    are rough visual estimates from LROC WAC mosaics.
+- `uRayFar` uniform on the Moon material (`mesh.userData.moonUniforms.uRayFar`, 1 by default, 0 = the previous
+  look). The crater list is `FAR_RAYS` in `moon/index.js`. No new textures, and desktop and iPad get the same thing.
+  It costs one dot product per crater for pixels outside a crater's reach.
+
+### Testing
+- New check `moon-shots/raysfar.js`: it steps to the time when the far side faces the Sun and shoots the whole far
+  side plus Giordano Bruno, Jackson, Ohm/Pierazzo and Necho, with `uRayFar` on and off, on desktop and iPad.
+  Before/after at `moon-shots/raysfar-before-after.png`.
+
 ## 2026-10-27: The heliosphere ships, and the Voyagers now cross on the real dates (Space Model Coder)
 
 ### Shipped
