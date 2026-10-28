@@ -17,6 +17,12 @@
 // the statistical oval; along it, slowly drifting value noise folds the band into curtains and rays. Emission is
 // green (557.7 nm oxygen) low in the shell with a red (630 nm) top, only where the air above the ground is dark, so
 // it shows as a glowing ring over the night-side polar regions and as curtains standing above the night limb.
+//
+// Airglow (uAirglow, 0 = the pre-2026-10-28 look): the whole night sky glows faintly in a thin layer around 90-100 km
+// (oxygen 557.7 nm green) with a dimmer, higher red-orange (630 nm / sodium) layer. Seen from above it is a barely-there
+// green veil, but along the limb the line of sight grazes the layer for ~40x the vertical path, so it shows as the thin
+// green-gold arc that ISS night photos show hugging the dark limb. Each layer is an analytic spherical annulus: the
+// emission is the ray's chord length inside it (soft-edged with two nested annuli), only where that air is dark.
 import * as THREE from 'three';
 import { ATMO_SCATTER, VALUE_NOISE } from './glsl.js';
 
@@ -37,6 +43,7 @@ uniform vec3  uAuroraPole;    // north geomagnetic pole, unit vector in the grou
 uniform mat3  uWorldToGround; // world → ground object frame (tilt + daily spin removed; rotation only)
 uniform float uAuroraTime;    // slow real-time clock for the curtain drift
 uniform float uDetail;        // 1 close-up … 0 overview (curtain fine structure averaged out far away)
+uniform float uAirglow;       // night-sky airglow brightness (0 = off)
 varying vec3 vWorldPos;
 ${VALUE_NOISE}
 
@@ -93,6 +100,38 @@ vec3 aurora(vec3 ro, vec3 rd, float tA, float tB) {
   }
   return sum / thick * uAurora;
 }
+// Length of the ray segment [0, tEnd] that lies inside the sphere of radius r (relative to centre).
+float chordIn(vec3 ro, vec3 rd, float r, float tEnd) {
+  vec2 t = raySphere(ro, rd, r);
+  if (t.x > t.y) return 0.0;
+  return max(min(t.y, tEnd) - max(t.x, 0.0), 0.0);
+}
+// Path length inside the annulus between heights h0 and h1 (fractions of the shell), plus its midpoint parameter.
+float annulus(vec3 ro, vec3 rd, float h0, float h1, float tEnd, out float tMid) {
+  float thick = uRa - uR;
+  float r1 = uR + thick * h1;
+  vec2 t = raySphere(ro, rd, r1);
+  tMid = 0.5 * (max(t.x, 0.0) + min(t.y, tEnd));
+  return chordIn(ro, rd, r1, tEnd) - chordIn(ro, rd, uR + thick * h0, tEnd);
+}
+float airDark(vec3 ro, vec3 rd, float t) {
+  vec3 up = normalize(ro + rd * t);
+  return 1.0 - smoothstep(-0.10, 0.06, dot(up, normalize(uSunDir)));
+}
+vec3 airglow(vec3 ro, vec3 rd, float tEnd, float hitGround) {
+  if (uAirglow <= 0.0) return vec3(0.0);
+  float thick = uRa - uR;
+  float tm, tm2;
+  // green O(1S) layer: soft core 0.27-0.33 inside a wider 0.22-0.38 skirt
+  float g = 0.65 * annulus(ro, rd, 0.27, 0.33, tEnd, tm) + 0.35 * annulus(ro, rd, 0.22, 0.38, tEnd, tm2);
+  float dg = airDark(ro, rd, tm);
+  // red/orange O(1D) + Na layer a little higher and more diffuse
+  float r = annulus(ro, rd, 0.40, 0.62, tEnd, tm);
+  float dr = airDark(ro, rd, tm);
+  vec3 col = vec3(0.10, 0.55, 0.16) * g * dg + vec3(0.30, 0.08, 0.04) * r * dr * 0.35;
+  // over the disc the real veil is barely visible next to city lights, so keep it a hint; the limb arc carries it
+  return col / thick * 0.02 * mix(1.0, 0.35, hitGround) * uAirglow;
+}
 void main() {
   vec3 rd = normalize(vWorldPos - cameraPosition);
   float ground, gNdL;
@@ -106,12 +145,13 @@ void main() {
   vec3 col = (s.rgb + mie * mix(1.0, 0.25, ground)) * k;
   float trans = mix(1.0, s.a, mix(1.0, uAerial, ground));   // transmittance (dimming) applies day and night
   // aurora: emission along the in-shell segment (ending at the ground if the ray hits it)
-  if (uAurora > 0.0) {
+  if (uAurora > 0.0 || uAirglow > 0.0) {
     vec3 ro = cameraPosition - uCenter;
     vec2 ta = raySphere(ro, rd, uRa);
     vec2 tp = raySphere(ro, rd, uR);
     float tB = (tp.x <= tp.y && tp.x > 0.0) ? tp.x : ta.y;
     col += aurora(ro, rd, max(ta.x, 0.0), tB);
+    col += airglow(ro, rd, tB, (tp.x <= tp.y && tp.x > 0.0) ? 1.0 : 0.0);
   }
   gl_FragColor = vec4(col, trans);
   #include <colorspace_fragment>

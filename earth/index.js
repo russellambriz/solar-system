@@ -97,6 +97,7 @@ const DEFAULTS = {
   auroraSpeed: 1.0,        //   curtain drift speed (real time)
   auroraSamples: 8,        //   emission samples per pixel (mobile: auroraSamplesMobile)
   auroraSamplesMobile: 5,
+  airglow: 1.0,            // night-sky airglow (atmosphere.js): thin green 557.7 nm arc along the night limb + faint veil; 0 = previous look
   season: 1.0,             // seasonal day map: blends the December and July Blue Marble maps by the Sun's position
                            // (snow line advancing/retreating with latitude); 0 = December map only (previous look)
   seasonWeight: null,      //   force the December-map weight 0..1 (testing); null = from the Sun's ecliptic longitude
@@ -184,6 +185,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
     uRa:            { value: radius * (1 + P.atmoThickness) },
     uEarthTint:     { value: EARTH_TINT.clone() },
     uAurora:        { value: P.aurora },
+    uAirglow:       { value: P.airglow },
     uAuroraPole:    { value: new THREE.Vector3(0, 1, 0) },
     uAuroraTime:    { value: 0 },
     uWorldToGround: { value: new THREE.Matrix3() },
@@ -267,6 +269,7 @@ export function createEarth({ radius, sunLight, isMobile = false, renderer = nul
       U.uAuroraTime.value = (U.uAuroraTime.value + Math.min((now - (auroraClock.t || now)) / 1000, 0.1) * P.auroraSpeed) % 1000;
       auroraClock.t = now;
       U.uAurora.value = P.aurora;
+      U.uAirglow.value = P.airglow;
       U.uCityLights.value = P.cityLights;
       U.uOceanColor.value = P.oceanColor;
       U.uTwilight.value = P.twilight;
