@@ -28,6 +28,7 @@ import { createConstellations } from './constellations/index.js';
 import { createMeteors } from './meteors/index.js';
 import { createSkyTonight } from './skytonight/index.js';
 import { createHeliosphere } from './heliosphere/index.js';
+import { createLagrange } from './lagrange/index.js';
 import { orientTilt } from './axes/index.js';
 
 // ---------------------------------------------------------------------------
@@ -1704,6 +1705,7 @@ function animate() {
     comets.update(days, camera, dt);
     meteors.update(days, camera, dt);
     heliosphere.update(days, camera, dt);
+    lagrange.update(days, camera, dt);
     const nearSun = sunFX.stats().near;
     // fade the glow sprites out when the Sun is far off-axis or behind: a sprite near the screen edge projects to a huge straight-edged band
     camera.getWorldDirection(_camFwd);
@@ -1757,6 +1759,9 @@ const skyTonight = createSkyTonight({ bodies, search, constellations, focusOn, r
 // heliosphere/: termination shock, heliosheath and heliopause shells with the Voyager crossings (Layers, search, cards; flies with flyTo)
 const heliosphere = createHeliosphere({ scene, bodies, spacecraft, search, scaleDistance, flyTo, exitGalaxy, getMode: () => mode, isTouch: IS_TOUCH,
   getMaxDist: () => SOLAR_MAX_DIST, releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
+// lagrange/: Sun–Earth and Sun–Jupiter L1–L5, Jupiter's Trojan swarms + Hildas (one Points cloud), named Trojans (Layers, search, cards)
+const lagrange = createLagrange({ scene, bodies, spacecraft, search, scaleDistance, flyTo, exitGalaxy, getMode: () => mode, isTouch: IS_TOUCH, controls, renderer,
+  getMaxDist: () => SOLAR_MAX_DIST, releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
 const perfGuard = createPerfGuard({ scenes: [scene, galaxy.scene], exclude: [sunFX.group, sgra.group, ton618.group], isTouch: IS_TOUCH });
 
 updateBodies();
@@ -1770,3 +1775,4 @@ setTimeout(() => loading.remove(), 700);
 window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEclipticLongitude(d), anchorGalileanMoons, isTransitioning: () => !!transition, getTransitionInfo: () => transition && { t: transition.t, duration: transition.duration, cinematic: !!transition.cinematic }, asteroidBelt, kuiperBelt, smallBodies, sunFX, setGlide: (v) => (glideEnabled = v), lgView, LG_MID, flyToAndromeda, flyToMilkyWay, sombrero, flyToSombrero, antennae, flyToAntennae, sgra, flyToSgrA, leaveSgrA, ton618, flyToTon618, leaveTon618, getGalaxyFocus: () => galaxyFocus, THREE, pick, scene, camera, controls, bodies, focusOn, goOverview, isDrifting: () => !!drift, getDrift: () => drift && { angle: drift.angle, useOut: drift.useOut }, enterGalaxy, exitGalaxy, galaxy, skyBand, getMode: () => mode, spacecraft, comets, localGroup, flyToLocalGroup, realPositions, search, perfGuard, scaleTools, ui, constellations, meteors, getConstView: () => constView && { phase: constView.phase, t: constView.t, abbr: constView.abbr, fov: camera.fov, savedFov: constView.savedFov, toFov: constView.toFov } };
 window.solar.skyTonight = skyTonight;
 window.solar.heliosphere = heliosphere;
+window.solar.lagrange = lagrange;

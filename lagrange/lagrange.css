@@ -1,0 +1,15 @@
+/* lagrange/ (loaded by lagrange/index.js) */
+.lagr-wrap { pointer-events: none; }
+.label.lagr-label { color: #d8f1ff; border-color: rgba(143, 211, 255, 0.45); background: rgba(6, 16, 30, 0.55); }
+.label.lagr-label.lp.J { color: #ffe2b0; border-color: rgba(255, 207, 138, 0.5); background: rgba(30, 20, 6, 0.55); }
+.label.lagr-label.lp span { color: #ffbe86; font-weight: 600; }
+.label.lagr-label.named { color: #ffe4c8; border-color: rgba(255, 185, 138, 0.35); background: rgba(24, 14, 8, 0.5); border-style: dashed; }
+.label.lagr-label.named.belt, .label.lagr-label.named.hilda { color: #e4e8d0; border-color: rgba(200, 216, 168, 0.4); }
+.label.lagr-label.active { border-color: #ffd27a; color: #ffd27a; border-style: solid; }
+body.touch .label.lagr-label { font-size: 12px; }
+body.touch .label.lagr-label::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
+body.clean-view .lagr-wrap { display: none !important; }
+.lagr-extra { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; }
+.lagr-extra.hidden { display: none; }
+.lagr-btn { min-height: 32px; padding: 4px 10px; font-size: 12.5px; }
+body.touch .lagr-btn { min-height: 44px; min-width: 44px; }

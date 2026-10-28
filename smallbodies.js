@@ -1,5 +1,6 @@
 // Small bodies of the Solar System:
-//  • Main asteroid belt (with Kirkwood gaps) + Jupiter Trojans, and the Kuiper belt — GPU-animated particle clouds.
+//  • Main asteroid belt (with Kirkwood gaps) and the Kuiper belt — GPU-animated particle clouds (Jupiter's Trojans and
+//    Hildas: lagrange/).
 //    Every particle has its own Kepler orbit (semi-major axis, eccentricity, inclination, node, perihelion, phase);
 //    the vertex shader moves it, so thousands of asteroids cost one draw call and zero CPU per frame.
 //  • Orbital elements, facts and procedural surface textures for the dwarf planets (Ceres, Pluto + Charon, Eris,
@@ -158,35 +159,23 @@ function makeBeltPoints(count, gen, { maxPx, bright }) {
   return pts;
 }
 
-// Main belt: semi-major axes 2.1–3.3 AU with the Kirkwood gaps (orbital resonances with Jupiter) carved out,
-// plus the Hilda group (3:2) and the two Jupiter Trojan swarms 60° ahead of / behind Jupiter.
+// Main belt: semi-major axes 2.1–3.3 AU with the Kirkwood gaps (orbital resonances with Jupiter) carved out.
+// The Jupiter Trojans and the Hilda group used to be appended here at fixed mean longitudes; since 2026-10-28 lagrange/
+// draws them locked to Jupiter's real position (tadpole librations, the Hilda triangle), so they are no longer added here.
 const KIRKWOOD = [[2.502, 0.035], [2.825, 0.028], [2.958, 0.018], [3.279, 0.03], [2.065, 0.02]]; // 3:1, 5:2, 7:3, 2:1, 4:1
-export function createAsteroidBelt({ isTouch, jupiterL0Deg, scale }) {
+export function createAsteroidBelt({ isTouch, scale }) {   // (main.js still passes jupiterL0Deg; no longer needed)
   const r = rng(1801);
-  const nMain = isTouch ? 4500 : 13000, nTrojan = isTouch ? 700 : 2200, nHilda = isTouch ? 250 : 700;
+  const nMain = isTouch ? 4500 : 13000;
   const grey = [0.62, 0.58, 0.53], brown = [0.66, 0.5, 0.36], blue = [0.55, 0.6, 0.68];
-  const pts = makeBeltPoints(nMain + nTrojan + nHilda, (o, k) => {
+  const pts = makeBeltPoints(nMain, (o) => {
     let a;
-    if (k < nMain) {
-      for (;;) {   // rejection sampling: denser in the middle belt, with resonance gaps
-        a = 2.1 + 1.2 * Math.pow(r(), 1.15);
-        if (KIRKWOOD.every(([g, w]) => Math.abs(a - g) > w * (0.6 + 0.6 * r()))) break;
-      }
-      o.e = Math.min(0.3, Math.abs(gauss(r)) * 0.09);
-      o.i = Math.abs(gauss(r)) * 8 * DEG;          // most asteroids within ~10–15° of the ecliptic
-      o.node = r() * 2 * Math.PI; o.peri = r() * 2 * Math.PI; o.M0 = r() * 2 * Math.PI;
-    } else if (k < nMain + nTrojan) {              // Trojans share Jupiter's orbit, leading (L4) or trailing (L5) by 60°
-      a = 5.203;                                   // same period as Jupiter, so the swarms stay locked to it
-      o.e = Math.abs(gauss(r)) * 0.05; o.i = Math.abs(gauss(r)) * 12 * DEG;
-      o.node = r() * 2 * Math.PI; o.peri = 0;
-      // mean longitude = node + peri + M → set M so the particle librates around Jupiter ± 60°
-      const L = jupiterL0Deg * DEG + (r() < 0.5 ? 1 : -1) * (60 * DEG) + gauss(r) * 14 * DEG;
-      o.M0 = L - o.node;
-    } else {                                       // Hildas: 3.97 AU, 3:2 resonance, triangular pattern
-      a = 3.97 + gauss(r) * 0.04;
-      o.e = 0.08 + r() * 0.2; o.i = Math.abs(gauss(r)) * 7 * DEG;
-      o.node = r() * 2 * Math.PI; o.peri = r() * 2 * Math.PI; o.M0 = r() * 2 * Math.PI;
+    for (;;) {   // rejection sampling: denser in the middle belt, with resonance gaps
+      a = 2.1 + 1.2 * Math.pow(r(), 1.15);
+      if (KIRKWOOD.every(([g, w]) => Math.abs(a - g) > w * (0.6 + 0.6 * r()))) break;
     }
+    o.e = Math.min(0.3, Math.abs(gauss(r)) * 0.09);
+    o.i = Math.abs(gauss(r)) * 8 * DEG;            // most asteroids within ~10–15° of the ecliptic
+    o.node = r() * 2 * Math.PI; o.peri = r() * 2 * Math.PI; o.M0 = r() * 2 * Math.PI;
     o.a = a;
     o.size = (0.09 + Math.pow(r(), 6) * 0.22) * scale;
     const t = r(), base = t < 0.45 ? grey : t < 0.85 ? brown : blue, s = 0.75 + r() * 0.5;
