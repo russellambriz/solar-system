@@ -13,9 +13,10 @@
 // (Akeson 2021 / Pourbaix & Boffin 2016). Proxima's ~550 kyr orbit is treated as fixed. Planets use
 // circular-ish Kepler orbits about Proxima in the local frame.
 //
-// Visuals: Space Visuals Coder may ship alphacen/visuals.js with createStar() / createPlanet(). We import it
-// dynamically when present; otherwise we draw simple emissive spheres (Proxima b's mesh stays replaceable
-// for EarthBot). ScaleBot may add window.solar.flyToAlphaCen(); search uses that when present.
+// Visuals: simple emissive spheres by default. Space Visuals Coder's alphacen/visuals.js (createStar /
+// createPlanet) is installed via alphaCen.useVisuals(...) once that file exists — we do not import it
+// here (a missing file would 404 in the console). Proxima b's mesh stays replaceable for EarthBot.
+// ScaleBot may add window.solar.flyToAlphaCen(); search uses that when present.
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { raDecToScene } from '../constellations/index.js';
@@ -166,13 +167,8 @@ export function createAlphaCen(o) {
   // ---- makers (visuals.js if Space Visuals Coder shipped it; else simple spheres) ------------------------------------
   let makeStar = (spec) => fallbackStar(spec);
   let makePlanet = (spec) => fallbackPlanet(spec);
-  const pendingVisuals = import('./visuals.js')
-    .then((v) => {
-      if (typeof v.createStar === 'function') makeStar = (spec) => v.createStar(spec);
-      if (typeof v.createPlanet === 'function') makePlanet = (spec) => v.createPlanet(spec);
-      return true;
-    })
-    .catch(() => false);
+  // Space Visuals Coder owns alphacen/visuals.js (createStar / createPlanet). We do not import it here:
+  // a missing file 404s in the console. Once it ships, call alphaCen.useVisuals(await import('./alphacen/visuals.js')).
 
   const starRadius = (solar) => Math.max(0.35, SUN_RADIUS * solar);
   // Planets: enlarge enough to tap (≥ ~0.35) while staying well under Proxima's disc
@@ -224,9 +220,7 @@ export function createAlphaCen(o) {
     b.object3D.add(newMesh); b.mesh = newMesh;
   }
 
-  // Re-build with visuals.js once it loads (only if it arrived after first paint)
-  pendingVisuals.then((ok) => {
-    if (!ok) return;
+  function rebuildAll() {
     for (const key of ['A', 'B', 'proxima']) {
       const parent = key === 'proxima' ? proxGroup : abGroup;
       const old = bodies[key];
@@ -239,7 +233,14 @@ export function createAlphaCen(o) {
       buildPlanet(key, proxGroup);
     }
     layout(true);
-  });
+    placeStars(lastDays || 0);
+  }
+  /** Space Visuals: pass { createStar, createPlanet } from alphacen/visuals.js once that file exists. */
+  function useVisuals(v = {}) {
+    if (typeof v.createStar === 'function') makeStar = (spec) => v.createStar(spec);
+    if (typeof v.createPlanet === 'function') makePlanet = (spec) => v.createPlanet(spec);
+    rebuildAll();
+  }
 
   // ---- binary orbit ring (A-B relative, drawn about the barycentre) --------------------------------------------------
   const orbitPts = [];
@@ -428,17 +429,22 @@ export function createAlphaCen(o) {
     const dir = camera ? camera.position.clone().sub(controls?.target || target).normalize()
       : new THREE.Vector3(0.4, 0.35, 0.85).normalize();
     if (dir.lengthSq() < 1e-6) dir.set(0.4, 0.35, 0.85).normalize();
-    const cam = target.clone().addScaledVector(dir, Math.max(span, 40));
+    const camPos = target.clone().addScaledVector(dir, Math.max(span, 40));
     const max = getMaxDist?.() || 900;
-    // Raise the solar zoom cap for this trip if the system sits beyond it (true ly → AU compression).
+    // Raise zoom + far plane so the soft-capped nearby-star distance is reachable (ScaleBot may replace this).
     if (controls && target.length() > max * 0.9) {
       controls.maxDistance = Math.max(controls.maxDistance, target.length() + span * 2);
     }
+    if (camera && camera.far < target.length() + span * 4) {
+      camera.far = target.length() + span * 4;
+      camera.updateProjectionMatrix();
+    }
     if (typeof flyTo === 'function') {
-      flyTo(cam, target, 2.4, () => showInfo(key));
+      // fixed duration: flyDuration would stretch a multi-thousand-unit trip up to FLY_STAGE_MAX
+      flyTo(camPos, target, 2.6, () => showInfo(key), true);
     } else if (controls && camera) {
       controls.target.copy(target);
-      camera.position.copy(cam);
+      camera.position.copy(camPos);
       controls.update?.();
       showInfo(key);
     } else {
@@ -536,6 +542,9 @@ export function createAlphaCen(o) {
       return;
     }
     root.visible = true;
+    // Keep the far plane past the soft-capped system so it is not clipped when approached.
+    const needFar = abGroup.position.length() + scaleSystemAU(AB_ORBIT.a_AU * 4, scaleDistance);
+    if (cam.far < needFar) { cam.far = needFar; cam.updateProjectionMatrix(); }
     layout();
     if (days !== lastDays || (frame % 2) === 0) { placeStars(days); lastDays = days; }
     // gentle Proxima flare pulse
@@ -578,6 +587,7 @@ export function createAlphaCen(o) {
     isOn: () => on,
     setOn,
     replacePlanetMesh,          // EarthBot: replace Proxima b (or d) mesh without rebuilding the module
+    useVisuals,                 // Space Visuals: install createStar/createPlanet from visuals.js
     orbit: AB_ORBIT,
     stats: () => ({
       on, open, abR: +abGroup.position.length().toFixed(1), proxR: +proxGroup.position.length().toFixed(1),

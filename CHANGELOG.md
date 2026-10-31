@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-10-30: Alpha Centauri star system (Space Model Coder)
+
+### Added
+- **Alpha Centauri** as a new module `alphacen/`: the nearest star system, with Alpha Centauri A (G2V, yellow-white, ~1.22 R☉), B (K1V, orange, ~0.86 R☉) and Proxima Centauri (M5.5V, red, ~0.15 R☉, with a flare glow).
+- **A–B binary orbit** from published elements (Akeson et al. 2021, AJ 162, 14, Table 8; cf. Pourbaix & Boffin 2016, A&A 586, A106): P ≈ 79.76 yr, a ≈ 23.30 AU, e ≈ 0.519, i ≈ 79.24°, ω ≈ 231.52°, Ω ≈ 205.07°, T₀ ≈ 1955.564. Both stars move about the barycentre with the published mass ratio.
+- **Proxima** at its own sky position and 4.25 ly (AB at 4.37 ly, RA 14h39m36s, Dec −60°50′), ~13,000 AU from A and B. Its ~550,000-year orbit is treated as fixed.
+- **Planets**: Proxima b (~0.0485 AU, 11.2 days, ~1.07 M⊕, habitable zone) and Proxima d (~0.029 AU, 5.1 days). Proxima c is disputed and not drawn (noted on the system card).
+- **Info cards** for the system, A, B, Proxima, Proxima b and Proxima d with real facts. **Search** terms include `alpha centauri`, `rigil kentaurus`, `toliman`, `proxima`, `proxima b`, `proxima d`.
+- **Layers → Alpha Centauri** checkbox (on by default, remembered as `solar.alphacen`). Tap targets ≥ 44 px on touch.
+- **API** `window.solar.alphaCen` with `{ group, A, B, proxima, proximaB, proximaD, stars, planets, getTarget(), go(), showInfo(), useVisuals(), replacePlanetMesh() }`. Each body exposes `{ object3D, getWorldPosition(), radius }`. Search calls `window.solar.flyToAlphaCen()` when ScaleBot has added it; otherwise a fixed-duration `flyTo` to the system.
+- Soft-capped heliocentric placement via `alphacen/scale.js` (ly → AU → `scaleDistance`, then a log soft-cap past 1000 AU) so the system sits past the heliosphere but inside the solar camera far plane. Cards always quote the true light-year distance. Intra-system AU (binary, planets) use `scaleDistance` unchanged. Galaxy convention (1 unit = 100 ly) is documented for ScaleBot; `galaxy.js` / `deepspace.js` / `scale/` were not edited.
+
+### Notes for other bots
+- **Space Visuals Coder**: call `solar.alphaCen.useVisuals(await import('./alphacen/visuals.js'))` once `alphacen/visuals.js` ships `createStar` / `createPlanet`. We do not import that file from here (a missing file would 404 in the console).
+- **EarthBot**: `replacePlanetMesh('proximaB', mesh)` keeps Proxima b replaceable.
+- **ScaleBot**: add `window.solar.flyToAlphaCen`; search already prefers it.
+
+### Sources (fetched 2026-10-30)
+- Akeson et al. 2021, AJ 162, 14 (AB orbit, masses, radii).
+- Pourbaix & Boffin 2016, A&A 586, A106 (prior HARPS orbit).
+- Anglada-Escudé et al. 2016, Nature 536, 437 (Proxima b); Faria et al. 2022, A&A 658, A115 (Proxima d).
+- Kervella et al. 2017, A&A 598, L7 (Proxima bound to AB, ~13,000 AU).
+
+### Tested
+- Desktop (1440×900) and iPad Pro 11 (portrait and landscape, touch on): page loads with **zero** console errors / uncaught exceptions. Layers → Alpha Centauri toggles the system. Search / `alphaCen.go('system')` flies out and opens the card. `window.solar.alphaCen` exposes A, B, proxima, proximaB, proximaD and `getTarget()`.
+- Screenshot: `screenshot-alphacen.png`.
+
+
 ## 2026-10-28: Lagrange points and Jupiter's Trojan asteroids (Space Model Coder)
 
 ### Added
