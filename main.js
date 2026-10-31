@@ -29,6 +29,7 @@ import { createMeteors } from './meteors/index.js';
 import { createSkyTonight } from './skytonight/index.js';
 import { createHeliosphere } from './heliosphere/index.js';
 import { createLagrange } from './lagrange/index.js';
+import { createAlphaCen } from './alphacen/index.js';
 import { orientTilt } from './axes/index.js';
 
 // ---------------------------------------------------------------------------
@@ -1706,6 +1707,7 @@ function animate() {
     meteors.update(days, camera, dt);
     heliosphere.update(days, camera, dt);
     lagrange.update(days, camera, dt);
+    alphaCen.update(days, camera, dt);
     const nearSun = sunFX.stats().near;
     // fade the glow sprites out when the Sun is far off-axis or behind: a sprite near the screen edge projects to a huge straight-edged band
     camera.getWorldDirection(_camFwd);
@@ -1762,6 +1764,9 @@ const heliosphere = createHeliosphere({ scene, bodies, spacecraft, search, scale
 // lagrange/: Sun–Earth and Sun–Jupiter L1–L5, Jupiter's Trojan swarms + Hildas (one Points cloud), named Trojans (Layers, search, cards)
 const lagrange = createLagrange({ scene, bodies, spacecraft, search, scaleDistance, flyTo, exitGalaxy, getMode: () => mode, isTouch: IS_TOUCH, controls, renderer,
   getMaxDist: () => SOLAR_MAX_DIST, releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
+// alphacen/: Alpha Centauri A/B + Proxima with Proxima b & d (Layers, search, cards; ScaleBot may add flyToAlphaCen)
+const alphaCen = createAlphaCen({ scene, search, scaleDistance, flyTo, exitGalaxy, getMode: () => mode, isTouch: IS_TOUCH, controls, camera,
+  getMaxDist: () => SOLAR_MAX_DIST, releaseFocus: () => { focused = null; drift = null; bodies.forEach((o) => { o.labelEl.classList.remove('active'); o.button.classList.remove('active'); }); } });
 const perfGuard = createPerfGuard({ scenes: [scene, galaxy.scene], exclude: [sunFX.group, sgra.group, ton618.group], isTouch: IS_TOUCH });
 
 updateBodies();
@@ -1776,3 +1781,4 @@ window.solar = { moonPhase: currentMoonPhase, moonLongitude: (d) => moonEcliptic
 window.solar.skyTonight = skyTonight;
 window.solar.heliosphere = heliosphere;
 window.solar.lagrange = lagrange;
+window.solar.alphaCen = alphaCen;

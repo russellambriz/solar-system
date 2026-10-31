@@ -1,0 +1,15 @@
+/* alphacen/ (loaded by alphacen/index.js) */
+.ac-wrap { pointer-events: none; }
+.label.ac-label { color: #ffe9c0; border-color: rgba(255, 200, 120, 0.5); background: rgba(24, 14, 4, 0.55); }
+.label.ac-label.star-a { color: #ffe9a8; }
+.label.ac-label.star-b { color: #ffb070; }
+.label.ac-label.proxima { color: #ff8a6a; }
+.label.ac-label.planet { color: #9fd0ff; border-color: rgba(120, 180, 255, 0.45); background: rgba(6, 14, 28, 0.55); }
+.label.ac-label.active { border-color: #ffd27a; color: #ffd27a; }
+body.touch .label.ac-label { font-size: 12px; }
+body.touch .label.ac-label::before { inset: -12px -8px; }   /* ≥ 44 px tap target */
+body.clean-view .ac-wrap { display: none !important; }
+.ac-extra { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ac-extra.hidden { display: none; }
+.ac-btn { min-height: 32px; padding: 4px 10px; font-size: 12.5px; }
+body.touch .ac-btn { min-height: 44px; }
