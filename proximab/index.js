@@ -7,7 +7,7 @@
 // Design (mobile-safe, procedural, no textures):
 //   • radius matches alphacen's planetRadius(~1.07 M⊕) ≈ 0.55·√m
 //   • substellar ocean "eye", rocky day side, ice beyond / permanent night ice
-//   • dim orange-red lighting from Proxima (~3000 K); uses Space Visuals star-light API when present
+//   • dim orange-red lighting from Proxima (~3000 K); reads proxima.lightColor + proxima.flare each frame
 //   • thin atmosphere rim tinted by the star
 //
 // Exposed: window.solar.proximaB = { group, mesh, atmosphere, params, uniforms, update, dispose, stats }
@@ -15,9 +15,9 @@ import * as THREE from 'three';
 import { createProximaBMaterial } from './material.js';
 import { createProximaBAtmosphere } from './atmosphere.js';
 
-// Approximate blackbody chromaticity for ~3000 K (Proxima Teff ≈ 2992 K), normalised so peak channel = 1.
+// Approximate blackbody chromaticity for ~3000 K (Proxima Teff ≈ 2992 K).
 export const PROXIMA_TEFF = 3000;
-export const PROXIMA_COLOR = new THREE.Color(1.0, 0.45, 0.18);
+export const PROXIMA_COLOR = new THREE.Color('#ffb376');
 
 const DEFAULTS = {
   atmoThickness: 0.028,          // shell = R · (1 + t); thin but readable
@@ -40,34 +40,25 @@ const DEFAULTS = {
 };
 
 /**
- * Resolve Proxima's light colour / brightness.
- * Space Visuals may expose any of: alphaCen.getStarLight('proxima'), proxima.getLight(),
- * proxima.lightColor + lightIntensity, or window.solar.alphaCenVisuals.getStarLight('proxima').
- * Falls back to ~3000 K orange-red.
- * @returns {{ color: THREE.Color, intensity: number }}
+ * Resolve Proxima's light colour and flare each frame.
+ * Space Visuals exposes window.solar.alphaCen.proxima.lightColor (THREE.Color) and
+ * alphaCen.proxima.flare (number 0..~1). Guard if missing: colour #ffb376 (~3000 K), flare 0.
+ * Day-side lighting and atmosphere rim are multiplied by (1 + flare).
+ * @returns {{ color: THREE.Color, flare: number }}
  */
 export function resolveProximaLight(alphaCen) {
-  const tryApi = (fn, arg) => {
-    try {
-      if (typeof fn !== 'function') return null;
-      const r = arg !== undefined ? fn(arg) : fn();
-      if (!r) return null;
-      const color = r.color?.isColor ? r.color.clone()
-        : r.color != null ? new THREE.Color(r.color)
-          : r.isColor ? r.clone() : null;
-      if (!color) return null;
-      const intensity = r.intensity != null ? +r.intensity : (r.brightness != null ? +r.brightness : 1);
-      return { color, intensity: Number.isFinite(intensity) ? intensity : 1 };
-    } catch (_) { return null; }
-  };
-  return tryApi(alphaCen?.getStarLight, 'proxima')
-    || tryApi(alphaCen?.proxima?.getLight)
-    || (alphaCen?.proxima?.lightColor != null
-      ? { color: new THREE.Color(alphaCen.proxima.lightColor), intensity: +(alphaCen.proxima.lightIntensity ?? 1) }
-      : null)
-    || tryApi(typeof window !== 'undefined' ? window.solar?.alphaCenVisuals?.getStarLight : null, 'proxima')
-    || tryApi(typeof window !== 'undefined' ? window.solar?.visuals?.getStarLight : null, 'proxima')
-    || { color: PROXIMA_COLOR.clone(), intensity: 1 };
+  const prox = alphaCen?.proxima;
+  const color = PROXIMA_COLOR.clone();
+  const lc = prox?.lightColor;
+  if (lc && lc.isColor) {
+    color.copy(lc);
+  } else if (lc != null) {
+    try { color.set(lc); } catch (_) { /* keep fallback */ }
+  }
+  let flare = 0;
+  const f = prox?.flare;
+  if (typeof f === 'number' && Number.isFinite(f)) flare = Math.max(0, f);
+  return { color, flare };
 }
 
 /**
@@ -160,9 +151,11 @@ export function createProximaB({ alphaCen, isTouch = false, params = {}, replace
   }
 
   function applyStarLight() {
+    // Read lightColor + flare each frame (Space Visuals); boost day + rim by (1 + flare).
     const L = resolveProximaLight(alphaCen);
-    U.uStarColor.value.copy(L.color).multiplyScalar((L.intensity * P.starIntensity) / Math.PI);
-    atmoU.uStarColor.value.copy(L.color).multiplyScalar(L.intensity * P.starIntensity);
+    const boost = (1 + L.flare) * P.starIntensity;
+    U.uStarColor.value.copy(L.color).multiplyScalar(boost / Math.PI);
+    atmoU.uStarColor.value.copy(L.color).multiplyScalar(boost);
   }
 
   /** Orient so object +Z (substellar) faces Proxima; refresh lighting uniforms. */
@@ -240,7 +233,7 @@ export function createProximaB({ alphaCen, isTouch = false, params = {}, replace
       installed: !!(group.parent),
       star: (() => {
         const L = resolveProximaLight(alphaCen);
-        return { hex: '#' + L.color.getHexString(), intensity: L.intensity };
+        return { hex: '#' + L.color.getHexString(), flare: L.flare, boost: 1 + L.flare };
       })(),
     }),
   };

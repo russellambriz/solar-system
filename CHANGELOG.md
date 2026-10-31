@@ -16,6 +16,9 @@
 ### Tests
 - Headless Chrome desktop 1280×800 and iPad 820×1180: zero console errors; screenshots in `earth-shots/oct30-proximab/`. Existing Earth unaffected.
 
+### Follow-up
+- Reads `alphaCen.proxima.lightColor` (THREE.Color) and `alphaCen.proxima.flare` (0..~1) each frame; fallback `#ffb376` / 0. Day-side + rim × `(1 + flare)`. Flare=1 verify shot: `earth-shots/oct30-proximab/flare.png`.
+
 ## 2026-10-30: Alpha Centauri star system (Space Model Coder)
 
 ### Added
