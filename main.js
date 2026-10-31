@@ -30,6 +30,7 @@ import { createSkyTonight } from './skytonight/index.js';
 import { createHeliosphere } from './heliosphere/index.js';
 import { createLagrange } from './lagrange/index.js';
 import { createAlphaCen } from './alphacen/index.js';
+import { createProximaB } from './proximab/index.js';
 import { orientTilt } from './axes/index.js';
 
 // ---------------------------------------------------------------------------
@@ -1782,3 +1783,5 @@ window.solar.skyTonight = skyTonight;
 window.solar.heliosphere = heliosphere;
 window.solar.lagrange = lagrange;
 window.solar.alphaCen = alphaCen;
+// proximab/: tidally-locked eyeball Proxima b (replaces alphacen's placeholder mesh; updates via onBeforeRender)
+window.solar.proximaB = createProximaB({ alphaCen, isTouch: IS_TOUCH });

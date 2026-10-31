@@ -1,5 +1,21 @@
 # Changelog
 
+
+## 2026-10-30: Proxima b eyeball planet (EarthBot)
+
+### Added
+- **Proxima Centauri b** as a new module `proximab/`: commercial-quality tidally-locked rocky super-Earth replacing alphacen's placeholder via `alphaCen.replacePlanetMesh('proximaB', mesh)`.
+- Procedural "eyeball" surface (no textures): dark basalt day side, substellar ocean eye with warm specular under Proxima's ~3000 K orange-red light, ice fringe toward the terminator, permanently dark ice night side, soft terminator band.
+- Thin atmosphere rim glow tinted by the star light (Mars/Earth-style back-faced additive shell). Uses Space Visuals star-light colour/brightness when exposed (`getStarLight` / `getLight` / `lightColor`); otherwise defaults to ~3000 K.
+- Mesh re-orients each frame so object +Z (substellar) faces Proxima. Tunables on `window.solar.proximaB.params`.
+- Mobile-safe (procedural fBm, fewer segments on touch). Self-contained: copies shader ideas from `earth/` / `mars/`, does not edit those modules. Survives `alphaCen.useVisuals()` rebuilds.
+
+### Changed
+- `main.js`: import + `window.solar.proximaB = createProximaB({ alphaCen, isTouch })` after `alphaCen` (2 hook lines). No animate-loop change (`onBeforeRender`).
+
+### Tests
+- Headless Chrome desktop 1280×800 and iPad 820×1180: zero console errors; screenshots in `earth-shots/oct30-proximab/`. Existing Earth unaffected.
+
 ## 2026-10-30: Alpha Centauri star system (Space Model Coder)
 
 ### Added
